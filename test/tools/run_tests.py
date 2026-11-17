@@ -71,7 +71,12 @@ def main():
         run('construction_flow', ['--script', str(root / 'cases/test_construction_flow.gd'), '--',
                                   '--save-file=' + str(output / 'construction_flow_save.json')],
             ['CONSTRUCTION_FLOW_OK'])
-    passed = len(results) == 7 and all(item['passed'] for item in results)
+    # Item ownership, orientation and independent map transitions.
+    if results[0]['passed']:
+        run('item_map_flow', ['--script', str(root / 'cases/test_item_map_flow.gd'), '--',
+                              '--save-file=' + str(output / 'item_map_flow_save.json')],
+            ['ITEM_MAP_FLOW_OK'])
+    passed = len(results) == 8 and all(item['passed'] for item in results)
     summary = dict(run_id=run_id, passed=passed, results=results)
     (output / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print(f'Results: {output}')

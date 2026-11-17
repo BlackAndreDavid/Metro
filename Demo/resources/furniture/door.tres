@@ -6,6 +6,6 @@ id = "door"
 display_name = "门"
 function_text = "出站探索"
 action = "gear"
-slot_span = 2
 texture_path = "res://assets/textures/Door.png"
 source_origin = Vector2(59, 17)
+grid_size = Vector2i(4, 12)

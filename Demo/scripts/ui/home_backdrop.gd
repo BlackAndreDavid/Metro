@@ -20,6 +20,7 @@ var dragged := false
 var press_position := Vector2.ZERO
 var pending_action := Callable()
 var interaction_enabled := true
+var camera_locked := false
 @onready var background: TextureRect = $Background
 @onready var carriage: Control = $Carriage
 
@@ -43,7 +44,7 @@ func _gui_input(event: InputEvent) -> void:
 		start_drag(event.global_position)
 
 func start_drag(at: Vector2, callback: Callable = Callable()) -> void:
-	if not interaction_enabled:
+	if not interaction_enabled or camera_locked:
 		return
 	dragging = true
 	dragged = false
@@ -84,39 +85,36 @@ func _notification(what: int) -> void:
 		choose_nearest_carriage()
 
 func _process(delta: float) -> void:
-	if not dragging and not offset.is_equal_approx(return_target):
+	if not camera_locked and not dragging and not offset.is_equal_approx(return_target):
 		offset = offset.move_toward(return_target, return_speed * delta)
 		_apply_offset()
 
-func native_rect(kind: String) -> Rect2:
-	var definition: Resource = DEFINITIONS[kind]
-	return Rect2(Vector2(154, 144) + definition.source_origin * 4.0 - Vector2(8, 8),
-		Vector2(definition.texture.get_size()) * 4.0 + Vector2(16, 16))
+func furniture_rect(kind: String, placement: Dictionary) -> Rect2:
+	return Catalog.placement_rect(kind, placement)
 
-func slot_rect(slot: int) -> Rect2:
-	var local_slot := slot % Catalog.SLOTS_PER_CARRIAGE
-	var bounds: Rect2
-	match local_slot:
-		0: bounds = native_rect("computer")
-		1: bounds = native_rect("bed")
-		2: bounds = native_rect("locker")
-		3, 4:
-			bounds = native_rect("door")
-			bounds.size.x /= 2.0
-			bounds.position.x += (local_slot - 3) * bounds.size.x
-		5:
-			bounds = Rect2(Vector2(154, 144) + Vector2(28, 44) * 4.0 - Vector2(8, 8), Vector2(128, 232))
-		6, 7, 8, 9:
-			bounds = native_rect("screen")
-			bounds.position += (Catalog.HANGING_ORIGINS[local_slot - Catalog.FLOOR_SLOTS] - Catalog.HANGING_ORIGINS[0]) * 4.0
-	bounds.position.x += floori(slot / float(Catalog.SLOTS_PER_CARRIAGE)) * 972
-	return bounds
+func make_grid(parent: Control, hanging: bool) -> void:
+	var grid = preload("res://scripts/construction/placement_grid.gd").new()
+	grid.name = "MountGrid" if hanging else "FurnitureGrid"
+	grid.cars = train_count
+	grid.hanging = hanging
+	grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(grid)
 
-func furniture_rect(kind: String, slot: int) -> Rect2:
-	var bounds := slot_rect(slot)
-	for cell in Catalog.footprint(kind, slot, train_count):
-		bounds = bounds.merge(slot_rect(cell))
-	return bounds
+func make_preview(parent: Control, name: String) -> void:
+	var preview = preload("res://scripts/construction/placement_preview.gd").new()
+	preview.name = name
+	preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(preview)
+
+func update_preview(kind: String, placement: Dictionary, valid: bool) -> void:
+	for name in ["FloorPreview", "HangingFixtures/HangingPreview"]:
+		var preview = carriage.get_node(name)
+		preview.texture = null
+		if not kind.is_empty() and not placement.is_empty() and (placement.has("mount") == name.begins_with("Hanging")):
+			preview.bounds = Catalog.placement_rect(kind, placement)
+			preview.texture = Catalog.DEFINITIONS[kind].texture
+			preview.valid = valid
+		preview.queue_redraw()
 
 func configure_world(home: Control) -> void:
 	train_count = home.state.carriage_count
@@ -151,44 +149,39 @@ func configure_world(home: Control) -> void:
 		fixtures.add_child(window)
 		window.set_item(ImageTexture.create_from_image(image), "交易", self)
 		window.activated.connect(_open_trade)
-	var layer := Control.new()
-	layer.name = "FurnitureSlots"
-	layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	carriage.add_child(layer)
-	for slot in range(train_count * Catalog.SLOTS_PER_CARRIAGE):
-		if not home.construction.can_place_at(slot):
-			continue
-		var callback: Callable = home.construction.place_at.bind(slot)
-		var hanging := slot % Catalog.SLOTS_PER_CARRIAGE >= Catalog.FLOOR_SLOTS
-		var text := "挂点 %d" % (slot % Catalog.SLOTS_PER_CARRIAGE - Catalog.FLOOR_SLOTS + 1) if hanging else "槽位 %d" % (slot % Catalog.SLOTS_PER_CARRIAGE + 1)
-		var button: Button = home.action(layer, text, slot_rect(slot), callback)
-		button.name = "Slot%d" % slot
-		button.set_meta("hanging_point", hanging)
-		button.modulate.a = 0.75
-		bind_hotspot(button, callback)
+	if home.construction.active:
+		make_grid(carriage, false)
+	var floor_layer := Control.new()
+	floor_layer.name = "FurnitureSlots"
+	floor_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	carriage.add_child(floor_layer)
+	make_preview(carriage, "FloorPreview")
+	var hanging_layer := Control.new()
+	hanging_layer.name = "HangingFixtures"
+	hanging_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	carriage.add_child(hanging_layer)
+	if home.construction.active:
+		make_grid(hanging_layer, true)
 	for kind in Catalog.IDS:
-		var slot: int = home.state.furniture_layout[kind]
-		if slot < 0:
+		var placement: Variant = home.state.furniture_layout[kind]
+		if placement == null:
 			continue
-		var bounds := furniture_rect(kind, slot)
+		var bounds := furniture_rect(kind, placement)
 		var data: Resource = DEFINITIONS[kind]
 		var item = FURNITURE.instantiate()
 		item.name = kind.capitalize()
-		var padded := (Vector2(data.texture.get_size()) + Vector2(4, 4)) * 4.0
-		var fit := minf(1.0, minf(bounds.size.x / padded.x, bounds.size.y / padded.y))
+		var padded := (Vector2(data.texture.get_size()) + Vector2(4, 4))
+		var fit := minf(bounds.size.x / data.texture.get_width(), bounds.size.y / data.texture.get_height())
 		item.size = padded * fit
-		item.position = bounds.get_center() - item.size * 0.5
-		layer.add_child(item)
+		var raw_size: Vector2 = Vector2(data.texture.get_size()) * fit
+		item.position = bounds.position + Vector2((bounds.size.x - raw_size.x) / 2, bounds.size.y - raw_size.y) - Vector2(2,2) * fit
+		(hanging_layer if data.placement_type == "hanging" else floor_layer).add_child(item)
 		home.construction.register_furniture(item, data)
 		item.configure(data, home, self)
 		if home.construction.moving and home.construction.selected_id == kind:
-			item.modulate.a = 0.5
+			item.modulate.a = 0.25
 			item.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# Hanging controls must be last in the GUI tree as well as drawn on top;
-	# z_index alone would leave the door intercepting a hanger click.
-	for child in layer.get_children():
-		if child.get_meta("hanging_point", false):
-			layer.move_child(child, layer.get_child_count() - 1)
+	make_preview(hanging_layer, "HangingPreview")
 	_apply_offset()
 
 func _open_trade() -> void:

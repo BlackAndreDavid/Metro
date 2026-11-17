@@ -10,7 +10,7 @@ const SMALL := Vector2i(5, 4)
 const LARGE := Vector2i(6, 5)
 const LOCKER := Vector2i(8, 5)
 const FOOTPRINTS := {
-	"copper": Vector2i(1, 2), "tools": Vector2i(3, 1),
+	"computer": Vector2i(2, 2), "copper": Vector2i(1, 2), "tools": Vector2i(3, 1),
 	"book": Vector2i(1, 2), "meds": Vector2i(2, 2),
 	"circuit": Vector2i(2, 1), "powercore": Vector2i(3, 2),
 	"relic": Vector2i(2, 2),
@@ -20,6 +20,7 @@ const FOOTPRINTS := {
 }
 const SUPPLY_NAMES := {"aaa": "七号电池", "water": "饮用水", "ration": "口粮"}
 const RARITY := {
+	"computer": 0,
 	"book": 0, "copper": 0, "tools": 1,
 	"meds": 2, "circuit": 2, "relic": 2, "powercore": 3,
 	"aaa": 0, "water": 0, "ration": 0,
@@ -28,9 +29,9 @@ const RARITY := {
 const RARITY_NAMES := ["普通", "少见", "稀有", "珍稀"]
 const RARITY_COLORS := [Color("bfc3ce"), Color("e4be76"), Color("ffa271"), Color("ff7873")]
 const EPOCH := "2026-07-11T00:00:00"
-const CABIN_SAVE_VERSION := 5
+const CABIN_SAVE_VERSION := 6
+const ITEM_DEFINITIONS := {"computer": preload("res://resources/items/computer.tres")}
 const Furniture = preload("res://scripts/items/furniture_catalog.gd")
-const SLOTS_PER_CARRIAGE := Furniture.SLOTS_PER_CARRIAGE
 const MAX_CARRIAGES := 3
 const EXPANSION_COST := {"steel_plate": 2, "bolts": 4, "tools": 1}
 const EXTRA_TRAVEL_COST := 10
@@ -51,7 +52,7 @@ const TRIP_LIMIT_SECONDS := 90
 const BLACKOUT_INTERVAL := 5
 
 var carriage_count := 1
-var furniture_layout := Furniture.DEFAULT_LAYOUT.duplicate()
+var furniture_layout := Furniture.initial_layout()
 var station := START_STATION
 var locker: Array[Dictionary] = []
 var wide_bag := false
@@ -80,6 +81,7 @@ var auto_repair_level := 0
 func _init() -> void:
 	account = ACCOUNT_START_POWER
 	give_starter_supplies()
+	add_supply("computer", "locker")
 
 func date_unix(extra_days: int = 0) -> int:
 	return Time.get_unix_time_from_datetime_string(EPOCH) + (day - 1 + extra_days) * 86400
@@ -156,6 +158,8 @@ func extract_at(destination: String) -> String:
 	return ""
 
 func item_name(kind: String) -> String:
+	if ITEM_DEFINITIONS.has(kind):
+		return ITEM_DEFINITIONS[kind].display_name
 	if SUPPLY_NAMES.has(kind):
 		return SUPPLY_NAMES[kind]
 	if AutoRepair.PART_NAMES.has(kind):
@@ -185,6 +189,8 @@ func grid_size(container: String) -> Vector2i:
 	return LOCKER if container == "locker" else bag_size()
 
 func footprint(kind: String, rotated: bool = false) -> Vector2i:
+	if ITEM_DEFINITIONS.has(kind):
+		return ITEM_DEFINITIONS[kind].footprint(rotated)
 	var shape: Vector2i = FOOTPRINTS[kind]
 	return Vector2i(shape.y, shape.x) if rotated else shape
 
@@ -638,7 +644,7 @@ func save_data() -> Dictionary:
 		"ate_today": ate_today, "game_over_reason": game_over_reason,
 		"car_power": car_power, "world_seed": world_seed, "charger_used": charger_used,
 		"auto_repair_level": auto_repair_level,
-		"carriage_count": carriage_count, "furniture_layout": furniture_layout.duplicate(),
+		"carriage_count": carriage_count, "furniture_layout": furniture_layout.duplicate(true),
 	}
 
 func write_save(path: String, data: Dictionary) -> Error:
@@ -706,7 +712,7 @@ func load_cabin(path: String, known_stations: Array) -> bool:
 	if not data is Dictionary:
 		return false
 	var version: Variant = data.get("version")
-	if version != 1 and version != 2 and version != 3 and version != 4 and version != CABIN_SAVE_VERSION:
+	if version != 1 and version != 2 and version != 3 and version != 4 and version != 5 and version != CABIN_SAVE_VERSION:
 		return false
 	if version >= 3 and not valid_car_state(data):
 		return false
@@ -728,6 +734,12 @@ func load_cabin(path: String, known_stations: Array) -> bool:
 	var loaded_locker := read_cargo(data.get("locker"), LOCKER)
 	if loaded_bag.is_empty() or loaded_locker.is_empty():
 		return false
+	var loaded_layout := Furniture.copy_layout(data.furniture_layout) if version == CABIN_SAVE_VERSION else migrate_furniture(data, int(version))
+	var computers := 1 if loaded_layout.computer != null else 0
+	for entry in loaded_bag.entries + loaded_locker.entries:
+		if entry.kind == "computer": computers += 1
+	if computers > 1:
+		return false
 	inventory.assign(loaded_bag.entries)
 	locker.assign(loaded_locker.entries)
 	# Reissue runtime IDs across both grids after validating the saved placements.
@@ -736,16 +748,10 @@ func load_cabin(path: String, known_stations: Array) -> bool:
 		entry.id = next_id
 		next_id += 1
 	carriage_count = int(data.carriage_count) if version >= 4 else 1
-	furniture_layout = Furniture.DEFAULT_LAYOUT.duplicate()
-	if version == CABIN_SAVE_VERSION:
-		furniture_layout = data.furniture_layout.duplicate()
-	elif version == 4:
-		for kind in ["bed", "computer"]:
-			var old_slot := int(data.furniture_layout[kind])
-			furniture_layout[kind] = -1 if old_slot < 0 else floori(old_slot / 2.0) * SLOTS_PER_CARRIAGE + old_slot % 2
-	else:
-		furniture_layout.bed = 1
-		furniture_layout.computer = 0
+	furniture_layout = loaded_layout
+	if version < CABIN_SAVE_VERSION and furniture_layout.computer == null and material_count("computer") == 0:
+		if not add_supply("computer", "locker") and not add_supply("computer", "bag"):
+			furniture_layout.computer = Furniture.default_placement("computer")
 	base_name = str(data.get("base_name", "未命名基地"))
 	station = data.station
 	wide_bag = data.wide
@@ -802,31 +808,42 @@ func daily_power_cost() -> float:
 func can_edit_home() -> bool:
 	return not trip_active and game_over_reason.is_empty()
 
-func furniture_placement_problem(kind: String, slot: int) -> String:
+func furniture_placement_problem(kind: String, placement: Variant) -> String:
 	if not can_edit_home():
 		return "当前不能布置家具。"
-	var cells := Furniture.footprint(kind, slot, carriage_count)
-	if cells.is_empty():
-		return "槽位类型不匹配；屏幕只能挂栏杆，门需同一车厢内两个连续地面槽位。"
+	if not Furniture.valid_placement(kind, placement, carriage_count):
+		return "超出网格边界或位置类型不匹配；屏幕只能放在独立挂点。"
 	for other in FURNITURE_IDS:
-		if other == kind:
-			continue
-		for used in Furniture.footprint(other, int(furniture_layout[other]), carriage_count):
-			if used in cells:
-				return "槽位已被占用，请先收纳原家具。"
+		if other != kind and furniture_layout[other] != null and Furniture.overlaps(kind, placement, other, furniture_layout[other]):
+			return "家具格已被占用。"
 	return ""
 
-func place_furniture(kind: String, slot: int) -> String:
-	var problem := furniture_placement_problem(kind, slot)
+func place_furniture(kind: String, placement: Variant) -> String:
+	var problem := furniture_placement_problem(kind, placement)
 	if not problem.is_empty():
 		return problem
-	furniture_layout[kind] = slot
+	if kind == "computer" and furniture_layout.computer == null:
+		var consumed := false
+		for cargo in [locker, inventory]:
+			for entry in cargo:
+				if entry.kind == "computer":
+					cargo.erase(entry)
+					consumed = true
+					break
+			if consumed:
+				break
+		if not consumed:
+			return "储物格里没有可摆放的电脑。"
+	furniture_layout[kind] = Furniture.canonical(placement)
 	return ""
 
 func store_furniture(kind: String) -> String:
 	if not can_edit_home() or kind not in FURNITURE_IDS:
-		return "当前不能收纳这件家具。"
-	furniture_layout[kind] = -1
+		return "当前不能拆除这件家具。"
+	if kind == "computer" and furniture_layout.computer != null:
+		if not add_supply("computer", "locker") and not add_supply("computer", "bag"):
+			return "储物格已满，无法拆除电脑。"
+	furniture_layout[kind] = null
 	return ""
 
 func material_count(kind: String) -> int:
@@ -866,25 +883,59 @@ func valid_home_layout(data: Dictionary, version: int = CABIN_SAVE_VERSION) -> b
 		return false
 	var layout: Variant = data.get("furniture_layout")
 	var ids: Array = ["bed", "computer"] if version == 4 else FURNITURE_IDS
-	var per_car := 2 if version == 4 else SLOTS_PER_CARRIAGE
 	if not layout is Dictionary or layout.size() != ids.size():
 		return false
-	var occupied: Array[int] = []
-	for kind in ids:
-		var slot: Variant = layout.get(kind)
-		if not valid_index(slot, -1, int(data.carriage_count) * per_car - 1):
+	for key in layout:
+		if key not in ids:
 			return false
-		if int(slot) < 0:
-			continue
-		var cells: Array[int] = []
-		if version == 4:
-			cells.append(int(slot))
-		else:
-			cells = Furniture.footprint(kind, int(slot), int(data.carriage_count))
-		if cells.is_empty():
-			return false
-		for cell in cells:
-			if cell in occupied:
+	if version < CABIN_SAVE_VERSION:
+		var occupied: Array[int] = []
+		for kind in ids:
+			var value: Variant = layout.get(kind)
+			var per_car := 2 if version == 4 else 10
+			if not valid_index(value, -1, int(data.carriage_count) * per_car - 1):
 				return false
-			occupied.append(cell)
+			if int(value) < 0:
+				continue
+			var span := 2 if kind == "door" and version == 5 else 1
+			var local := int(value) % per_car
+			if version == 5 and ((kind == "screen" and local < 6) or (kind != "screen" and local + span > 6)):
+				return false
+			for cell in range(int(value), int(value) + span):
+				if cell in occupied:
+					return false
+				occupied.append(cell)
+		return true
+	for kind in ids:
+		var p: Variant = layout.get(kind)
+		if p == null:
+			continue
+		if not Furniture.valid_placement(kind, p, int(data.carriage_count)):
+			return false
+		for other in ids:
+			if other != kind and layout[other] != null and Furniture.valid_placement(other, layout[other], int(data.carriage_count)) and Furniture.overlaps(kind, p, other, layout[other]):
+				return false
 	return true
+
+func migrate_furniture(data: Dictionary, version: int) -> Dictionary:
+	var layout := Furniture.initial_layout()
+	if version <= 3:
+		layout.bed = Furniture.default_placement("bed")
+		layout.computer = Furniture.default_placement("computer")
+		return layout
+	var legacy: Dictionary = data.furniture_layout
+	var ids: Array = ["bed", "computer"] if version == 4 else FURNITURE_IDS
+	for kind in ids:
+		var old := int(legacy[kind])
+		if old < 0:
+			layout[kind] = null
+			continue
+		var per_car := 2 if version == 4 else 10
+		var car := floori(old / float(per_car))
+		layout[kind] = Furniture.default_placement(kind, car)
+		if kind == "screen":
+			layout[kind].mount = old % 10 - 6
+	return layout
+
+func stored_furniture_available(kind: String) -> bool:
+	return furniture_layout[kind] == null and (kind != "computer" or material_count("computer") > 0)

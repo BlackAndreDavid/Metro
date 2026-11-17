@@ -1,4 +1,4 @@
-extends Control
+extends "res://scripts/ui/ui_builder.gd"
 
 const State = preload("res://scripts/cabin_state.gd")
 const Rail = preload("res://scripts/cabin_map.gd")
@@ -10,12 +10,6 @@ const BACKDROP = preload("res://scenes/game/home_backdrop.tscn")
 const EXPLORATION = preload("res://scenes/game/exploration.tscn")
 const SETTINGS = preload("res://scenes/ui/settings_panel.tscn")
 
-const TEXT := Color("f2eadd")
-const MUTED := Color("b9b3cb")
-const AMBER := Color("f0cc91")
-const MINT := Color("a6dccc")
-const DARK := Color("211f31")
-const BORDER := Color("514b67")
 const LOOT_SPOTS := [Vector2(114, 348), Vector2(266, 380), Vector2(400, 335), Vector2(563, 397), Vector2(681, 335), Vector2(710, 455)]
 const RADIATION := ["", "低", "中", "高"]
 
@@ -27,8 +21,7 @@ var selection: Dictionary = {}
 var grids: Array[Control] = []
 var status: Label
 var time_label: Label
-var selected_station := ""
-var outside_tab := false
+var map_scene: Control
 var trade_supplies := false
 var loadout: Dictionary = {}
 var save_path: String
@@ -122,8 +115,6 @@ func _input(event: InputEvent) -> void:
 		clear_selection()
 	elif event.keycode == KEY_R and not selection.is_empty():
 		rotate_selection()
-	elif event.keycode == KEY_ESCAPE and screen == "news":
-		show_map()
 	elif event.keycode == KEY_ESCAPE and screen == "rules":
 		dismiss_rules()
 	elif event.keycode == KEY_ESCAPE and screen not in ["cabin", "surface", "game_over"]:
@@ -131,74 +122,6 @@ func _input(event: InputEvent) -> void:
 	else:
 		return
 	get_viewport().set_input_as_handled()
-
-func style(fill: Color, edge: Color, width: int = 1) -> StyleBoxFlat:
-	var box := StyleBoxFlat.new()
-	box.bg_color = fill
-	box.border_color = edge
-	box.set_border_width_all(width)
-	return box
-
-func put(parent: Control, node: Control, bounds: Rect2) -> void:
-	node.position = bounds.position
-	node.size = bounds.size
-	parent.add_child(node)
-
-func plate(parent: Control, bounds: Rect2, color: Color, edge: Color = Color.TRANSPARENT) -> Panel:
-	var block := Panel.new()
-	block.mouse_filter = MOUSE_FILTER_IGNORE
-	block.add_theme_stylebox_override("panel", style(color, edge))
-	put(parent, block, bounds)
-	return block
-
-func label(parent: Control, message: String, bounds: Rect2, pixels: int, color: Color = TEXT, alignment: int = HORIZONTAL_ALIGNMENT_LEFT, wrap: bool = false) -> Label:
-	var node := Label.new()
-	if wrap:
-		node.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	node.text = message
-	node.horizontal_alignment = alignment
-	node.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	node.mouse_filter = MOUSE_FILTER_IGNORE
-	node.add_theme_font_size_override("font_size", pixels)
-	node.add_theme_color_override("font_color", color)
-	put(parent, node, bounds)
-	return node
-
-func wrapped(parent: Control, message: String, bounds: Rect2, pixels: int, color: Color = TEXT) -> Label:
-	var node := label(parent, message, bounds, pixels, color, HORIZONTAL_ALIGNMENT_LEFT, true)
-	node.vertical_alignment = VERTICAL_ALIGNMENT_TOP
-	return node
-
-func button_style(node: Button, prominent: bool = false) -> void:
-	var fill := Color("463759") if prominent else Color("302b43")
-	node.add_theme_stylebox_override("normal", style(fill, AMBER if prominent else BORDER))
-	node.add_theme_stylebox_override("hover", style(Color("594861"), AMBER))
-	node.add_theme_stylebox_override("pressed", style(Color("6a5270"), AMBER))
-	node.add_theme_stylebox_override("disabled", style(Color("29263a"), Color("3b364b")))
-	node.add_theme_stylebox_override("focus", style(Color.TRANSPARENT, AMBER, 2))
-	node.add_theme_color_override("font_color", AMBER if prominent else TEXT)
-	node.add_theme_color_override("font_hover_color", TEXT)
-	node.add_theme_color_override("font_disabled_color", Color("8f889f"))
-	node.add_theme_font_size_override("font_size", 16)
-	node.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-
-func action(parent: Control, caption: String, bounds: Rect2, callback: Callable, prominent: bool = false) -> Button:
-	var node := Button.new()
-	node.text = caption
-	button_style(node, prominent)
-	if bounds.size.y < 32:
-		node.add_theme_font_size_override("font_size", 14)
-	node.pressed.connect(callback)
-	put(parent, node, bounds)
-	return node
-
-func invisible_action(parent: Control, area: Rect2, callback: Callable) -> Button:
-	var hit := action(parent, "", area, callback)
-	hit.focus_mode = Control.FOCUS_NONE
-	hit.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
-	hit.add_theme_stylebox_override("hover", style(Color(AMBER, 0.1), Color(AMBER, 0.85), 2))
-	hit.add_theme_stylebox_override("pressed", style(Color(AMBER, 0.18), AMBER, 2))
-	return hit
 
 func cabin_art() -> void:
 	home_backdrop = BACKDROP.instantiate()
@@ -248,6 +171,9 @@ func power(parent: Control, at: Vector2, title: String, value: String, tint: Col
 	label(parent, value, Rect2(at + Vector2(84, 0), Vector2(133, 64)), 20, tint, HORIZONTAL_ALIGNMENT_RIGHT)
 
 func show_cabin(message: String = "") -> void:
+	if is_instance_valid(map_scene) and map_scene.active:
+		map_scene.exit(message)
+		return
 	begin_page("cabin")
 	cabin_art()
 	label(view, "终末地铁 · %s" % state.base_name, Rect2(32, 6, 560, 39), 30)
@@ -336,15 +262,7 @@ func use_hotspot(kind: String) -> void:
 			loadout = {"heavy": false, "wide": state.wide_bag, "light": true, "crowbar": true, "wrench": state.auto_repair_level > 0}
 			show_gear()
 		"news":
-			selected_station = ""
-			outside_tab = false
 			show_news()
-
-func overlay(parent: Control, color: Color) -> void:
-	var blocker := ColorRect.new()
-	blocker.color = color
-	blocker.mouse_filter = MOUSE_FILTER_STOP
-	put(parent, blocker, Rect2(0, 0, 1280, 720))
 
 func modal(title: String, bounds: Rect2, on_close: Callable = Callable()) -> Panel:
 	cabin_art()
@@ -605,9 +523,8 @@ func sell_item(id: int) -> void:
 		show_trade("到账  +%s 度" % str(amount))
 
 func open_market_map(location: String) -> void:
-	selected_station = location
-	outside_tab = false
-	show_map()
+	ensure_map_scene()
+	map_scene.enter(location)
 
 func find_buyer(kind: String) -> void:
 	var routes := Rail.routes_from(state.station)
@@ -628,124 +545,19 @@ func find_buyer(kind: String) -> void:
 	else:
 		open_market_map(destination)
 
+func ensure_map_scene() -> void:
+	if not is_instance_valid(map_scene):
+		map_scene = preload("res://scenes/map/metro_map.tscn").instantiate()
+		map_scene.configure(self, show_cabin)
+
 func show_news() -> void:
-	show_map()
-	screen = "news"
-	overlay(view, Color("141021bb"))
-	var card := plate(view, Rect2(318, 173, 644, 372), Color("2c253b"), Color("746582"))
-	card.name = "NewsCard"
-	label(card, "当日新闻", Rect2(28, 20, 430, 48), 30)
-	action(card, "关闭", Rect2(550, 25, 66, 36), show_map)
-	label(card, "%s    地面天气 · %s" % [state.date_text(), state.weather()], Rect2(28, 75, 522, 25), 16, MINT)
-	plate(card, Rect2(28, 113, 588, 1), BORDER)
-	wrapped(card, state.news(), Rect2(28, 138, 588, 123), 21)
-	action(card, "关闭并查看线路图", Rect2(28, 293, 588, 47), show_map, true)
+	ensure_map_scene()
+	map_scene.enter("", true)
 
 func show_map() -> void:
-	begin_page("map")
-	overlay(view, Color("1a1728"))
-	label(view, "上海地铁线路图", Rect2(40, 25, 420, 46), 34)
-	label(view, "中心城区", Rect2(321, 30, 200, 45), 18, MUTED)
-	action(view, "当日新闻", Rect2(1014, 28, 102, 38), show_news)
-	action(view, "返回车厢", Rect2(1132, 28, 108, 38), show_cabin.bind(""))
-	var paper := plate(view, Rect2(40, 89, 865, 585), Rail.PAPER)
-	paper.name = "NetworkMapPanel"
-	var map := Rail.new()
-	map.name = "RailMap"
-	map.setup(font, state.station, selected_station, select_station)
-	put(paper, map, Rect2(8, 50, 849, 505))
-	var legend_x := 19.0
-	for line in Rail.LINES:
-		var color := Color(line[1])
-		plate(paper, Rect2(legend_x, 16, 19, 18), color)
-		label(paper, str(line[0]), Rect2(legend_x, 16, 19, 18), 12, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
-		label(paper, "号线", Rect2(legend_x + 26, 15, 38, 20), 13, Rail.INK)
-		legend_x += 72
-	label(paper, "●  当前站     ▱  换乘站", Rect2(604, 15, 235, 20), 13, Rail.INK, HORIZONTAL_ALIGNMENT_RIGHT)
-	label(paper, "站点示意依据申通地铁 D202501 版线路图", Rect2(19, 554, 810, 22), 12, Color("625b65"))
-	var detail := plate(view, Rect2(923, 89, 317, 585), DARK, BORDER)
-	detail.name = "StationDetails"
-	label(detail, "当前站 · %s" % state.station, Rect2(20, 15, 280, 29), 15, MINT)
-	if selected_station.is_empty():
-		label(detail, "选择目的地", Rect2(20, 60, 280, 39), 26)
-		wrapped(detail, "点击线路图上的站点查看站内设施、周边遗址和行车耗电。", Rect2(20, 125, 272, 92), 17, MUTED)
-		label(detail, "车内电源  %s" % car_power_text(), Rect2(20, 469, 275, 32), 17, MINT)
-		return
-	label(detail, selected_station, Rect2(20, 49, 280, 43), 29)
-	var lines := PackedStringArray()
-	for line in Rail.station_lines(selected_station):
-		lines.append("%d 号线" % line)
-	label(detail, "  /  ".join(lines), Rect2(20, 93, 280, 22), 14, MUTED)
-	action(detail, "站内设施", Rect2(20, 132, 135, 38), set_map_tab.bind(false), not outside_tab)
-	action(detail, "站外情报", Rect2(162, 132, 135, 38), set_map_tab.bind(true), outside_tab)
-	var info := Rail.station_info(selected_station)
-	if outside_tab:
-		label(detail, "区域辐射 · %s" % RADIATION[info.radiation], Rect2(20, 186, 270, 28), 18, AMBER)
-		label(detail, "附近建筑遗址", Rect2(20, 224, 270, 27), 15, MUTED)
-		wrapped(detail, info.outside, Rect2(20, 256, 270, 66), 17)
-	else:
-		show_map_market(detail, selected_station)
-	plate(detail, Rect2(20, 333, 277, 1), BORDER)
-	var path := Rail.route(state.station, selected_station)
-	var steps := maxi(0, path.size() - 1)
-	var fare := steps * state.travel_cost_per_stop()
-	label(detail, "行车路线 · %d 站" % steps, Rect2(20, 345, 275, 27), 16, MINT)
-	var itinerary := "  →  ".join(PackedStringArray(path))
-	wrapped(detail, itinerary, Rect2(20, 382, 276, 103), 14, MUTED)
-	label(detail, "车内电源  %s" % car_power_text(), Rect2(20, 485, 275, 27), 17, MINT)
-	var caption := "前往 · 耗电 %d 度" % fare
-	if steps == 0:
-		caption = "已在本站" if selected_station == state.station else "线路未接通"
-	elif state.car_power < fare:
-		caption = "车电不足 · 需 %d 度" % fare
-	var go := action(detail, caption, Rect2(20, 523, 277, 43), travel, true)
-	go.disabled = steps == 0 or state.car_power < fare
-
-func show_map_market(detail: Control, location: String) -> void:
-	var market := State.Markets.profile(location)
-	var facility: String = "学校 · 汽修培训" if location == AutoRepair.STATION else market.facility
-	label(detail, facility, Rect2(20, 183, 277, 26), 16, MINT)
-	if state.has_charger(location):
-		var stock := state.charger_stock(location)
-		var service := "充电站停电" if state.is_blackout() else "电站余 %s 度" % energy_text(stock)
-		label(detail, service, Rect2(181, 183, 116, 26), 13, MINT if stock > 0 else AMBER, HORIZONTAL_ALIGNMENT_RIGHT)
-	var quotes := ScrollContainer.new()
-	quotes.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	put(detail, quotes, Rect2(20, 210, 277, 119))
-	var columns := Control.new()
-	var demand := State.Markets.demand(location)
-	columns.custom_minimum_size = Vector2(262, 24 + maxi(market.stock.size(), demand.size()) * 22)
-	quotes.add_child(columns)
-	map_quote_column(columns, location, market.stock, "stock", 0, "本站供应 / 度", "售罄")
-	map_quote_column(columns, location, demand, "demand", 132, "本站收购 / 度", "满额")
-
-func map_quote_column(detail: Control, location: String, items: Dictionary, side: String, x: float, title: String, exhausted: String) -> void:
-	label(detail, title, Rect2(x, 0, 130, 21), 13, MUTED)
-	var row := 0
-	for kind in items:
-		var offer := state.market_offer(side, kind, location)
-		var y := 22 + row * 22
-		label(detail, state.item_name(kind), Rect2(x, y, 81, 20), 12, state.rarity_color(kind))
-		var price := energy_text(offer.price) if offer.remaining > 0 else exhausted
-		if side == "demand" and kind == "aaa" and offer.remaining > 0:
-			var empty := state.market_offer(side, kind, location, 0)
-			price = "%s–%s" % [energy_text(empty.price), price]
-		label(detail, price, Rect2(x + 81, y, 49, 20), 12, TEXT if offer.remaining > 0 else MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
-		row += 1
-
-func select_station(station: String) -> void:
-	selected_station = station
-	outside_tab = false
-	show_map()
-
-func set_map_tab(outside: bool) -> void:
-	outside_tab = outside
-	show_map()
-
-func travel() -> void:
-	var steps := Rail.route(state.station, selected_station).size() - 1
-	if state.travel_to(selected_station, steps):
-		show_cabin("已抵达 %s · 消耗车内电源 %d 度" % [state.station, steps * state.travel_cost_per_stop()])
+	ensure_map_scene()
+	if map_scene.active: map_scene.show_map()
+	else: map_scene.enter()
 
 func add_grid(parent: Control, target: String, at: Vector2, pixels: int) -> void:
 	var grid := CargoGrid.new()

@@ -1,0 +1,9 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+[ext_resource type="Script" path="res://scripts/items/item_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+id = "computer"
+display_name = "电脑"
+inventory_size = Vector2i(2, 2)
+texture_path = "res://assets/textures/LapTop.png"
+furniture_kind = "computer"

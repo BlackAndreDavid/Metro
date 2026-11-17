@@ -1,142 +1,142 @@
 extends SceneTree
-const Furniture = preload("res://scripts/items/furniture.gd")
+const Catalog = preload("res://scripts/items/furniture_catalog.gd")
 var checks := 0
 var failures := 0
-
 func check(ok: bool, message: String) -> void:
 	checks += 1
 	if not ok:
 		failures += 1
 		push_error(message)
-
-func _initialize() -> void:
-	call_deferred("run")
-
-func click(at: Vector2) -> void:
-	var press := InputEventMouseButton.new()
-	press.position = at
-	press.global_position = at
-	press.button_index = MOUSE_BUTTON_LEFT
-	press.pressed = true
-	root.push_input(press)
-	var release = press.duplicate()
-	release.pressed = false
-	root.push_input(release)
-
-func click_button(button: Button) -> void:
+func _initialize() -> void: call_deferred("run")
+func button(at: Vector2, pressed: bool) -> void:
+	var e := InputEventMouseButton.new()
+	e.position = at
+	e.global_position = at
+	e.button_index = MOUSE_BUTTON_LEFT
+	e.pressed = pressed
+	root.push_input(e)
+func motion(at: Vector2, previous: Vector2) -> void:
+	var e := InputEventMouseMotion.new()
+	e.position = at
+	e.global_position = at
+	e.relative = at - previous
+	e.button_mask = MOUSE_BUTTON_MASK_LEFT
+	root.push_input(e)
+func click(control: Control) -> void:
 	await process_frame
-	click(button.get_global_rect().get_center())
+	var at := control.get_global_rect().get_center()
+	button(at, true)
+	button(at, false)
 	await process_frame
-
 func painted_point(item) -> Vector2:
 	for y in range(item.padded_image.get_height() - 1, -1, -1):
 		for x in range(item.padded_image.get_width() - 1, -1, -1):
-			if item.padded_image.get_pixel(x, y).a > 0.9:
-				return item.get_global_transform() * ((Vector2(x, y) + Vector2(0.5, 0.5)) / Vector2(item.padded_image.get_size()) * item.size)
+			if item.padded_image.get_pixel(x,y).a > 0.9:
+				return item.get_global_transform() * ((Vector2(x,y) + Vector2(0.5,0.5)) / Vector2(item.padded_image.get_size()) * item.size)
 	return item.global_position
-
+func drop_point(mode, placement: Dictionary) -> Vector2:
+	var local: Vector2
+	if placement.has("mount"):
+		local = Catalog.mount_rect(placement.car, placement.mount).get_center()
+	else:
+		local = Catalog.floor_rect(placement.car).position + (Vector2(placement.x,placement.y) + Vector2(mode.grab_cell) + Vector2(0.5,0.5)) * Catalog.CELL_SIZE
+	return mode.backdrop.carriage.get_global_transform() * local
 func run() -> void:
-	root.size = Vector2i(1280, 720)
+	root.size = Vector2i(1280,720)
 	var home = load("res://scenes/game/home.tscn").instantiate()
 	root.add_child(home)
 	home.state.carriage_count = 2
 	home.show_cabin()
 	await process_frame
 	var mode = home.construction
-	check(mode.scene_file_path == "res://scenes/construction/construction_mode.tscn", "independent module scene")
-	check(not mode.active and not mode.visible, "normal mode starts inactive")
-	await click_button(home.view.get_node("BuildModeButton"))
+	await click(home.view.get_node("BuildModeButton"))
+	mode.set_process(false) # Deterministic boundary checks while real GUI input remains enabled.
+	check(mode.active and current_scene == mode and not home.visible, "independent scene entered by real click")
+	check(not mode.actions.has_node("Move") and not mode.actions.has_node("Cancel"), "removed Move and Cancel buttons")
+	check(mode.state == home.state, "shared model")
+	check(mode.backdrop.carriage.has_node("FurnitureGrid"), "ground grid replaces slots")
+	check(mode.backdrop.carriage.get_node("HangingFixtures").has_node("MountGrid"), "separate front mounting grid")
+	var item = mode.backdrop.get_node("Carriage/FurnitureSlots/Door")
+	var at := painted_point(item)
+	var original: Dictionary = home.state.furniture_layout.duplicate(true)
+	button(at,true)
+	mode._process(1.0)
+	check(mode.get_node("HoldProgress").visible and is_equal_approx(mode.get_node("HoldProgress").progress,0.5), "charge ring half full after one second")
+	check(mode.get_node("HoldProgress").position.x > at.x and mode.get_node("HoldProgress").position.y < at.y, "ring above and right of cursor")
+	check(not mode.moving and home.state.furniture_layout == original, "one second cannot move")
+	button(at,false)
 	await process_frame
-	check(mode.active and mode.visible, "single build entry opens scene via real click")
-	check(mode.get_parent() == root and current_scene == mode, "construction is an independent active scene")
-	check(mode.state == home.state, "construction shares the Home model")
-	check(mode.has_node("World") and mode.find_child("SettingsButton", true, false) == null and not home.is_ancestor_of(mode), "Home UI is absent from construction tree")
-	check(not home.visible and home.process_mode == Node.PROCESS_MODE_DISABLED, "no duplicate exit entry")
-	check(mode.actions.get_node("Exit").text == "退出建造模式", "explicit exit button")
-	for node in mode.actions.get_children():
-		if node is Button:
-			check(not node.text.begins_with("摆放"), "no per-furniture placement button")
-	check(mode.get_node("Toolbar").get_global_rect().end.y <= 144, "module toolbar clears carriage")
-	var door = mode.backdrop.get_node("Carriage/FurnitureSlots/Door")
-	check(is_instance_of(door, Furniture), "furniture is a reusable class")
-	check(mode.registered.size() == 3, "all installed furniture registered generically")
-	var original: Dictionary = home.state.furniture_layout.duplicate()
-	click(painted_point(door))
+	check(mode.selected_id == "door" and not mode.moving and home.state.furniture_layout == original, "short release selects only")
+	item = mode.backdrop.get_node("Carriage/FurnitureSlots/Door")
+	at = painted_point(item)
+	button(at,true)
+	mode._process(1.99)
+	check(not mode.moving, "less than two seconds cannot drag")
+	mode._process(0.02)
+	check(mode.moving and mode.dragging_furniture and not mode.get_node("HoldProgress").visible, "two seconds unlocks dragging")
+	check(mode.backdrop.camera_locked and not mode.backdrop.dragging, "furniture drag cannot pan camera")
+	var target := {"car":1,"x":4,"y":0}
+	var destination := drop_point(mode,target)
+	motion(destination,at)
+	check(mode.candidate == target and mode.backdrop.carriage.get_node("FloorPreview").valid, "snapped valid drag preview")
+	check(home.state.furniture_layout == original, "drag preview is not a state mutation")
+	button(destination,false)
 	await process_frame
-	check(mode.screen == "construction" and mode.selected_id == "door", "world click selects door without exploring")
-	check(home.state.furniture_layout == original and not mode.moving, "selection neither moves nor dismantles")
-	check(not mode.actions.get_node("Move").disabled and not mode.actions.get_node("Dismantle").disabled, "shared actions enabled for selection")
-	door = mode.backdrop.get_node("Carriage/FurnitureSlots/Door")
-	check(door.is_selected and door.visual.material.get_shader_parameter("highlighted"), "selected furniture outlined")
-	await click_button(mode.actions.get_node("Move"))
+	check(home.state.furniture_layout.door == target and mode.focused_carriage == 1, "release commits grid placement in destination carriage")
+	check(not mode.moving and not mode.backdrop.camera_locked, "release clears drag and camera lock")
+	var before_invalid: Dictionary = home.state.furniture_layout.duplicate(true)
+	item = mode.backdrop.get_node("Carriage/FurnitureSlots/Door")
+	at = painted_point(item)
+	button(at,true)
+	mode._process(2.0)
+	motion(Vector2(1270,710),at)
+	button(Vector2(1270,710),false)
 	await process_frame
-	check(mode.moving and home.state.furniture_layout == original, "move previews without mutating layout")
-	check(not mode.can_place_at(5) and not mode.can_place_at(6), "door footprint and mount constraints preserved")
-	var layer = mode.backdrop.get_node("Carriage/FurnitureSlots")
-	check(layer.has_node("Slot13"), "compatible two-cell destination offered in added car")
-	await click_button(mode.actions.get_node("Cancel"))
-	check(not mode.moving and mode.selected_id.is_empty() and home.state.furniture_layout == original, "cancel is nondestructive")
+	check(home.state.furniture_layout == before_invalid and not mode.moving, "invalid release preserves original placement")
+	item = mode.backdrop.get_node("Carriage/FurnitureSlots/Door")
+	at = painted_point(item)
+	button(at,true)
+	mode._process(0.5)
+	motion(at + Vector2(16,0),at)
+	mode._process(3)
+	button(at + Vector2(16,0),false)
+	check(not mode.moving and home.state.furniture_layout == before_invalid, "movement before charging cancels hold")
 	mode.select_furniture("door")
-	mode.begin_move()
-	await process_frame
-	var target = mode.backdrop.get_node("Carriage/FurnitureSlots/Slot13")
-	click(target.get_global_rect().get_center())
-	await process_frame
-	check(home.state.furniture_layout.door == 13 and mode.focused_carriage == 1, "mouse move commits in destination carriage")
-	check(not mode.moving and mode.selected_id == "door", "selection retained after move")
-	await click_button(mode.actions.get_node("Dismantle"))
-	check(home.state.furniture_layout.door == -1 and mode.selected_id.is_empty(), "explicit dismantle stores selected furniture")
-	await click_button(mode.actions.get_node("Warehouse"))
-	check(mode.get_node("Warehouse").visible and mode.inventory.item_count == 3, "single warehouse includes dismantled and unplaced items")
+	await click(mode.actions.get_node("Dismantle"))
+	check(home.state.furniture_layout.door == null, "shared dismantle stores furniture")
+	await click(mode.actions.get_node("Warehouse"))
+	check(mode.inventory.item_count == 3, "warehouse holds bed computer and dismantled door")
 	var index := -1
 	for i in range(mode.inventory.item_count):
-		if mode.inventory.get_item_metadata(i) == "door":
-			index = i
-	check(index >= 0, "dismantled door available for reuse")
+		if mode.inventory.get_item_metadata(i) == "screen": index = i
+	check(index == -1, "installed furniture not duplicated in warehouse")
+	for i in range(mode.inventory.item_count):
+		if mode.inventory.get_item_metadata(i) == "bed": index = i
 	mode.inventory.select(index)
-	await click_button(mode.place_button)
+	await click(mode.place_button)
+	var bed := {"car":0,"x":10,"y":0}
+	var point := drop_point(mode,bed)
+	motion(point,mode.pointer)
+	button(point,true)
+	button(point,false)
 	await process_frame
-	check(mode.selected_id == "door" and mode.moving and not mode.get_node("Warehouse").visible, "shared warehouse placement starts preview")
-	mode.place_at(3)
-	check(home.state.furniture_layout.door == 3, "dismantled object can be restored without duplication")
-	mode.select_furniture("screen")
-	mode.begin_move()
-	check(mode.can_place_at(7) and not mode.can_place_at(5), "screen uses only railing mounts")
-	mode.place_at(7)
-	check(home.state.furniture_layout.screen == 7, "same module moves screen")
-	mode.select_furniture("locker")
-	check(mode.screen == "construction" and mode.selected_id == "locker", "same module selects storage furniture")
-	await click_button(mode.actions.get_node("Exit"))
+	check(home.state.furniture_layout.bed == bed, "warehouse item placed using same grid")
+	var screen = mode.backdrop.get_node("Carriage/HangingFixtures/Screen")
+	at = painted_point(screen)
+	button(at,true)
+	mode._process(2)
+	var hanging := {"car":1,"mount":3,"x":0,"y":0}
+	point = drop_point(mode,hanging)
+	motion(point,at)
+	check(mode.candidate == hanging and mode.backdrop.carriage.get_node("HangingFixtures/HangingPreview").valid, "screen preview uses independent front mounting plane")
+	button(point,false)
 	await process_frame
-	check(not mode.active and not mode.visible and not mode.moving and mode.selected_id.is_empty(), "exit button fully leaves construction")
-	check(home.view.get_node("BuildModeButton").visible, "normal entry restored")
-	home.home_backdrop.get_node("Carriage/FurnitureSlots/Locker").use()
-	check(home.screen == "locker", "normal furniture action restored after exit")
-	home.show_cabin()
-	mode.enter()
-	await click_button(mode.actions.get_node("Expand"))
-	check(mode.screen == "expansion" and mode.active and mode.get_node("Expansion").visible, "expansion uses module action without overlay")
-	await click_button(mode.get_node("Expansion/Center/Panel/Margin/Items/Buttons/Back"))
-	check(mode.visible and mode.selected_id.is_empty(), "real expansion Back button preserves construction")
-	for kind in mode.state.EXPANSION_COST:
-		for i in range(mode.state.EXPANSION_COST[kind]):
-			mode.state.add_supply(kind, "locker")
-	await click_button(mode.actions.get_node("Expand"))
-	await click_button(mode.get_node("Expansion/Center/Panel/Margin/Items/Buttons/Confirm"))
-	check(mode.state.carriage_count == 3 and home.state.carriage_count == 3 and mode.screen == "construction", "independent expansion confirmation updates shared model")
-	mode.select_furniture("door")
-	mode.begin_move()
-	var before_escape: Dictionary = home.state.furniture_layout.duplicate()
-	var esc := InputEventKey.new()
-	esc.keycode = KEY_ESCAPE
-	esc.pressed = true
-	mode._unhandled_key_input(esc)
-	check(mode.active and not mode.moving and home.state.furniture_layout == before_escape, "escape cancels current move")
-	mode._unhandled_key_input(esc)
-	check(not mode.active, "escape exits with no selection")
+	check(home.state.furniture_layout.screen == hanging, "screen drag snaps to mount capacity")
+	await click(mode.actions.get_node("Exit"))
+	check(not mode.active and home.visible, "explicit exit restores Home")
+	check(home.state.furniture_layout.bed == bed and home.state.furniture_layout.screen == hanging, "exit retains shared edits")
 	home.queue_free()
 	await process_frame
-	print("CONSTRUCTION_FLOW: %d checks, %d failures" % [checks, failures])
-	if failures == 0:
-		print("CONSTRUCTION_FLOW_OK")
+	print("CONSTRUCTION_FLOW: %d checks, %d failures" % [checks,failures])
+	if failures == 0: print("CONSTRUCTION_FLOW_OK")
 	quit(1 if failures else 0)

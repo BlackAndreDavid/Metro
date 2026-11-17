@@ -6,6 +6,6 @@ id = "locker"
 display_name = "柜子"
 function_text = "整理物品"
 action = "locker"
-slot_span = 1
 texture_path = "res://assets/textures/Locker.png"
 source_origin = Vector2(2, 22)
+grid_size = Vector2i(2, 2)

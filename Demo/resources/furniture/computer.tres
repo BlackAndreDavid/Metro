@@ -8,3 +8,4 @@ function_text = "使用电脑"
 action = "news"
 texture_path = "res://assets/textures/LapTop.png"
 source_origin = Vector2(151, 70)
+grid_size = Vector2i(2, 2)

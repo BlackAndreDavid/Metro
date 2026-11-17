@@ -26,8 +26,8 @@ func run() -> void:
 	var home = load("res://scenes/game/home.tscn").instantiate()
 	root.add_child(home)
 	await process_frame
-	home.state.place_furniture("computer", 0)
-	home.state.place_furniture("bed", 1)
+	home.state.place_furniture("computer", home.state.Furniture.default_placement("computer"))
+	home.state.place_furniture("bed", home.state.Furniture.default_placement("bed"))
 	home.show_cabin()
 	await process_frame
 	check(home.name == "Home", "renamed home scene")
@@ -77,11 +77,11 @@ func run() -> void:
 	root.push_input(mouse_button(point, true))
 	root.push_input(mouse_button(point, false))
 	await process_frame
-	check(home.screen == "news", "computer GUI click opens news")
+	check(home.map_scene.active and home.map_scene.screen == "news", "computer GUI click opens news")
 	home.show_map()
-	check(home.screen == "map", "news close reveals map")
-	home.select_station("四平路")
-	check(home.selected_station == "四平路", "computer map station selection")
+	check(home.map_scene.screen == "map", "news close reveals map")
+	home.map_scene.select_station("四平路")
+	check(home.map_scene.selected_station == "四平路", "computer map station selection")
 	home.show_cabin()
 	home.use_hotspot("gear")
 	check(home.view.scene_file_path == "res://scenes/game/exploration_setup.tscn", "separate departure setup scene")

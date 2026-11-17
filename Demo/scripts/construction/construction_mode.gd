@@ -3,6 +3,7 @@ extends Control
 ## One controller and palette for every catalog furniture instance.
 const Catalog = preload("res://scripts/items/furniture_catalog.gd")
 const BACKDROP = preload("res://scenes/game/home_backdrop.tscn")
+var map_scene: Control
 var state: RefCounted
 var focused_carriage := 0
 var font: Font
@@ -17,6 +18,15 @@ var _previous_current_scene: Node
 var active := false
 var selected_id := ""
 var moving := false
+const HOLD_SECONDS := 2.0
+var hold_kind := ""
+var hold_elapsed := 0.0
+var hold_cancelled := false
+var dragging_furniture := false
+var pointer := Vector2.ZERO
+var press_position := Vector2.ZERO
+var grab_cell := Vector2i.ZERO
+var candidate: Dictionary = {}
 var registered: Dictionary = {}
 @onready var actions: HBoxContainer = $Toolbar/Margin/Actions
 @onready var inventory: ItemList = $Warehouse/Center/Panel/Margin/Items/Inventory
@@ -26,9 +36,8 @@ func _ready() -> void:
 	_setup_theme()
 	$Expansion/Center/Panel/Margin/Items/Buttons/Confirm.pressed.connect(confirm_expansion)
 	$Expansion/Center/Panel/Margin/Items/Buttons/Back.pressed.connect(func(): _refresh(""))
-	actions.get_node("Move").pressed.connect(begin_move)
 	actions.get_node("Dismantle").pressed.connect(dismantle)
-	actions.get_node("Cancel").pressed.connect(cancel_selection)
+	actions.get_node("Map").pressed.connect(open_map)
 	actions.get_node("Warehouse").pressed.connect(open_warehouse)
 	actions.get_node("Expand").pressed.connect(request_expansion)
 	actions.get_node("Exit").pressed.connect(exit)
@@ -90,6 +99,7 @@ func exit() -> void:
 		source.show_cabin()
 
 func deactivate() -> void:
+	clear_gesture()
 	active = false
 	selected_id = ""
 	moving = false
@@ -107,41 +117,39 @@ func select_furniture(kind: String) -> void:
 		return
 	selected_id = kind
 	moving = false
-	_refresh("已选中%s，可移动或拆除。" % Catalog.DEFINITIONS[kind].display_name)
+	_refresh("已选中%s，长按2秒可拖动，也可拆除。" % Catalog.DEFINITIONS[kind].display_name)
 
-func begin_move() -> void:
-	if not active or selected_id.is_empty():
-		return
-	moving = true
-	_refresh("点击兼容空位完成移动；取消不会改变原摆放位置。")
+func can_place_at(placement: Dictionary) -> bool:
+	return active and moving and not selected_id.is_empty() and state.furniture_placement_problem(selected_id, placement).is_empty()
 
-func can_place_at(slot: int) -> bool:
-	return active and moving and not selected_id.is_empty() and state.furniture_placement_problem(selected_id, slot).is_empty()
-
-func place_at(slot: int) -> void:
+func place_at(placement: Dictionary) -> void:
 	if not active or not moving or selected_id.is_empty():
 		return
-	var problem: String = state.place_furniture(selected_id, slot)
+	var problem: String = state.place_furniture(selected_id, placement)
 	if problem.is_empty():
-		focused_carriage = floori(slot / float(Catalog.SLOTS_PER_CARRIAGE))
+		focused_carriage = int(placement.car)
 		moving = false
+		clear_gesture()
 	_refresh("家具位置已更新，请在床铺保存。" if problem.is_empty() else problem)
 
 func dismantle() -> void:
 	if not active or selected_id.is_empty():
 		return
-	var problem: String = state.store_furniture(selected_id)
+	var kind := selected_id
+	var problem: String = state.store_furniture(kind)
 	if problem.is_empty():
 		selected_id = ""
 		moving = false
-	_refresh("家具已拆除并收纳到家具仓库。" if problem.is_empty() else problem)
+	_refresh(("电脑已收纳到柜子或背包。" if kind == "computer" else "家具已拆除并收纳到家具仓库。") if problem.is_empty() else problem)
 
 func cancel_selection() -> void:
+	clear_gesture()
 	selected_id = ""
 	moving = false
 	_refresh("")
 
 func request_expansion() -> void:
+	clear_gesture()
 	if not active:
 		return
 	selected_id = ""
@@ -151,9 +159,10 @@ func request_expansion() -> void:
 func open_warehouse() -> void:
 	if not active:
 		return
+	cancel_selection()
 	inventory.clear()
 	for kind in Catalog.IDS:
-		if int(state.furniture_layout[kind]) >= 0:
+		if not state.stored_furniture_available(kind):
 			continue
 		var data: Resource = Catalog.DEFINITIONS[kind]
 		inventory.add_item(data.display_name, data.texture)
@@ -174,22 +183,21 @@ func take_from_warehouse() -> void:
 	if selected.is_empty():
 		return
 	var kind: String = inventory.get_item_metadata(selected[0])
-	if int(state.furniture_layout[kind]) >= 0:
+	if not state.stored_furniture_available(kind):
 		return
 	selected_id = kind
 	moving = true
 	$Warehouse.hide()
-	_refresh("请点击兼容空位放置%s。" % Catalog.DEFINITIONS[kind].display_name)
+	grab_cell = Vector2i.ZERO
+	_refresh("请点击兼容格放置%s。" % Catalog.DEFINITIONS[kind].display_name)
 
 func refresh_ui() -> void:
 	visible = active
 	if not visible:
 		return
 	var has_selection := not selected_id.is_empty()
-	actions.get_node("Selection").text = "建造模式 · " + (("移动中：" if moving else "已选中：") + Catalog.DEFINITIONS[selected_id].display_name if has_selection else "点击家具选中，再移动或拆除")
-	actions.get_node("Move").disabled = not has_selection or moving
-	actions.get_node("Dismantle").disabled = not has_selection or int(state.furniture_layout[selected_id]) < 0
-	actions.get_node("Cancel").disabled = not has_selection
+	actions.get_node("Selection").text = "建造模式 · " + (("移动中：" if moving else "已选中：") + Catalog.DEFINITIONS[selected_id].display_name if has_selection else "长按家具2秒后拖动，或点击选中拆除")
+	actions.get_node("Dismantle").disabled = not has_selection or state.furniture_layout[selected_id] == null
 
 func _refresh(message: String) -> void:
 	screen = "construction"
@@ -205,7 +213,10 @@ func _refresh(message: String) -> void:
 	$Message.text = message
 	$Toolbar.show()
 	show()
+	backdrop.camera_locked = moving
 	refresh_ui()
+	if moving:
+		update_drag_preview()
 
 func action(parent: Control, caption: String, bounds: Rect2, callback: Callable) -> Button:
 	var button := Button.new()
@@ -246,8 +257,118 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_refresh("")
 		elif $Warehouse.visible:
 			$Warehouse.hide()
-		elif not selected_id.is_empty():
+		elif not selected_id.is_empty() or not hold_kind.is_empty() or moving:
 			cancel_selection()
 		else:
 			exit()
 		get_viewport().set_input_as_handled()
+
+func clear_gesture() -> void:
+	hold_kind = ""
+	hold_elapsed = 0
+	hold_cancelled = false
+	dragging_furniture = false
+	candidate = {}
+	if has_node("HoldProgress"):
+		$HoldProgress.hide()
+	if is_instance_valid(backdrop):
+		backdrop.camera_locked = false
+
+func press_furniture(kind: String, at: Vector2) -> void:
+	if not active or screen != "construction" or moving:
+		return
+	hold_kind = kind
+	hold_elapsed = 0
+	hold_cancelled = false
+	pointer = at
+	press_position = at
+	backdrop.dragging = false
+	backdrop.pending_action = Callable()
+	backdrop.camera_locked = true
+	var placement: Dictionary = state.furniture_layout[kind]
+	var local: Vector2 = backdrop.carriage.get_global_transform().affine_inverse() * at
+	var rect := Catalog.placement_rect(kind, placement)
+	grab_cell = Vector2i((local - rect.position) / Catalog.CELL_SIZE).clamp(Vector2i.ZERO, Catalog.DEFINITIONS[kind].grid_size - Vector2i.ONE)
+	show_hold_progress()
+
+func show_hold_progress() -> void:
+	$HoldProgress.visible = not hold_cancelled
+	$HoldProgress.position = (pointer + Vector2(24, -24)).clamp(Vector2(14, 14), size - Vector2(14, 14))
+	$HoldProgress.progress = hold_elapsed / HOLD_SECONDS
+	$HoldProgress.queue_redraw()
+
+func _process(delta: float) -> void:
+	if not active or screen != "construction" or hold_kind.is_empty() or hold_cancelled:
+		return
+	hold_elapsed = minf(HOLD_SECONDS, hold_elapsed + delta)
+	show_hold_progress()
+	if hold_elapsed >= HOLD_SECONDS:
+		selected_id = hold_kind
+		hold_kind = ""
+		$HoldProgress.hide()
+		dragging_furniture = true
+		moving = true
+		_refresh("拖到目标格后松开；红色位置不可放置，Esc 可取消。")
+
+func target_at(at: Vector2) -> Dictionary:
+	if selected_id.is_empty() or $Toolbar.get_global_rect().has_point(at):
+		return {}
+	var local: Vector2 = backdrop.carriage.get_global_transform().affine_inverse() * at
+	if Catalog.DEFINITIONS[selected_id].placement_type == "hanging":
+		for car in range(state.carriage_count):
+			for mount in range(Catalog.HANGING_ORIGINS.size()):
+				if Catalog.mount_rect(car, mount).has_point(local):
+					return {"car": car, "mount": mount, "x": 0, "y": 0}
+		return {}
+	var car := floori((local.x - 154) / Catalog.CARRIAGE_PITCH)
+	if car < 0 or car >= state.carriage_count or local.y < 144 or local.y > 576:
+		return {}
+	var cell := Vector2i(((local - Catalog.floor_rect(car).position) / Catalog.CELL_SIZE).floor()) - grab_cell
+	return {"car": car, "x": cell.x, "y": cell.y}
+
+func update_drag_preview() -> void:
+	candidate = target_at(pointer)
+	backdrop.update_preview(selected_id, candidate, not candidate.is_empty() and can_place_at(candidate))
+
+func finish_drag() -> void:
+	var placement := target_at(pointer)
+	if not placement.is_empty() and can_place_at(placement):
+		place_at(placement)
+	else:
+		moving = false
+		clear_gesture()
+		_refresh("落点无效，已保留原位置。")
+
+func _input(event: InputEvent) -> void:
+	if not active or screen != "construction" or $Warehouse.visible or $Expansion.visible:
+		return
+	if event is InputEventMouse:
+		pointer = event.position
+	if event is InputEventMouseMotion:
+		if not hold_kind.is_empty() and pointer.distance_to(press_position) > 8 and hold_elapsed < HOLD_SECONDS:
+			hold_cancelled = true
+			$HoldProgress.hide()
+			backdrop.camera_locked = false
+		if moving:
+			update_drag_preview()
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if not event.pressed and not hold_kind.is_empty():
+			var kind := hold_kind
+			var cancelled := hold_cancelled
+			clear_gesture()
+			if not cancelled:
+				select_furniture(kind)
+			get_viewport().set_input_as_handled()
+		elif not event.pressed and dragging_furniture:
+			finish_drag()
+			get_viewport().set_input_as_handled()
+		elif event.pressed and moving and not $Toolbar.get_global_rect().has_point(pointer):
+			finish_drag()
+			get_viewport().set_input_as_handled()
+
+func open_map() -> void:
+	cancel_selection()
+	if not is_instance_valid(map_scene):
+		map_scene = preload("res://scenes/map/metro_map.tscn").instantiate()
+		map_scene.configure(self, _refresh)
+	map_scene.enter()

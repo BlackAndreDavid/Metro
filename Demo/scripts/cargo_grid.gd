@@ -89,6 +89,16 @@ func _draw() -> void:
 		var short_name: String = {"copper": "铜线", "tools": "工具", "book": "手册", "meds": "医疗", "circuit": "电路", "powercore": "电源", "relic": "相机", "aaa": "电池", "water": "饮水", "ration": "口粮", "car_battery": "车电池"}.get(entry.kind, host.state.item_name(entry.kind))
 		var title: String = host.state.item_name(entry.kind) if box.size.x >= 2 else short_name
 		draw_string(host.font, rect.position + Vector2(7, 28), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color("f0ebdf"))
+		if host.state.ITEM_DEFINITIONS.has(entry.kind):
+			var texture: Texture2D = host.state.ITEM_DEFINITIONS[entry.kind].texture
+			var area := rect.size - Vector2(12, 44)
+			var raw := Vector2(texture.get_size())
+			var oriented := Vector2(raw.y, raw.x) if entry.rotated else raw
+			var fit := minf(area.x / oriented.x, area.y / oriented.y)
+			var center := rect.position + Vector2(rect.size.x / 2, 36 + area.y / 2)
+			draw_set_transform(center, PI / 2 if entry.rotated else 0.0)
+			draw_texture_rect(texture, Rect2(-raw * fit / 2, raw * fit), false)
+			draw_set_transform(Vector2.ZERO)
 		if entry.kind == "aaa":
 			draw_string(host.font, rect.position + Vector2(7, 43), "%d%%" % entry.charge, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, tint)
 		elif box.size.y >= 2:

@@ -8,7 +8,7 @@ extends Resource
 var texture: Texture2D:
 	get:
 		return load(texture_path) as Texture2D
-@export_range(1, 2) var slot_span := 1
+@export var grid_size := Vector2i(2, 2)
 @export_enum("floor", "hanging") var placement_type := "floor"
 # Offset of the cropped image in the original 243x108 carriage canvas.
 @export var source_origin := Vector2.ZERO
