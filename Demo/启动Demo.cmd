@@ -8,5 +8,5 @@ if not exist "%GODOT_EXE%" (
   pause
   exit /b 1
 )
-if not exist "%~dp0tests\logs" mkdir "%~dp0tests\logs"
-start "" "%GODOT_EXE%" --path "%~dp0." --log-file "%~dp0tests\logs\play.log"
+if not exist "%~dp0..\test\results\logs" mkdir "%~dp0..\test\results\logs"
+start "" "%GODOT_EXE%" --path "%~dp0." --log-file "%~dp0..\test\results\logs\play.log"

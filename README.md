@@ -15,3 +15,5 @@
 中心城区线路示意参考申通地铁 D202501 版，设施、辐射和物价采用游戏设定。[上海轨道交通网络示意图](https://www.shanghai.gov.cn/shanghai/newshanghai/shgl2025.pdf)
 
 工程目录、场景流转和模块职责见 [架构说明](Demo/ARCHITECTURE.md)。
+
+测试独立位于根目录 [test/](test/README.md)，统一运行命令：`python3 test/tools/run_tests.py --godot <Godot可执行文件>`。

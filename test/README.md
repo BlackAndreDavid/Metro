@@ -1,0 +1,45 @@
+# 测试
+
+测试用例、运行工具和结果统一存放于此目录，与 `Demo/` 游戏工程分离。
+
+```text
+test/
+├─ cases/
+│  ├─ test_state.gd          经济、许可证、存档：33 项断言
+│  ├─ test_menu_flow.gd      菜单与三栏位：18 项检查，包含状态回归
+│  └─ test_cabin_smoke.gd    规则页 → 车厢 UI 初始化
+├─ tools/
+│  └─ run_tests.py           统一入口：资源导入 → 菜单与状态 → 车厢冒烟
+├─ results/
+│  ├─ <UTC时间-唯一编号>/   每次运行独立保存
+│  │  ├─ summary.json       各步骤退出码、通过状态和日志路径
+│  │  ├─ import.log
+│  │  ├─ menu_flow.log
+│  │  ├─ cabin_smoke.log
+│  │  └─ 生成的存档、配置与缓存
+│  ├─ legacy/              迁移前已有的测试存档（如存在）
+│  └─ logs/                Windows 游戏、编辑器启动日志
+└─ README.md
+```
+
+## 运行
+
+需要 Python 3 和 Godot 4.7.2，无额外 Python 包。从仓库根目录运行：
+
+```sh
+python3 test/tools/run_tests.py --godot /path/to/Godot_v4.7.2-stable_linux.x86_64
+```
+
+Windows 示例：
+
+```powershell
+python test/tools/run_tests.py --godot "C:\Godot\Godot_v4.7.2-stable_win64.exe"
+```
+
+支持 `GODOT_EXE` 环境变量；未指定时使用 PATH 中的 `godot`。运行工具也可以从其他工作目录调用，它自动定位 `Demo/`。所有步骤成功才返回退出码 0；失败或超时返回非零，检查对应结果目录中的日志。导入失败时不执行依赖该步骤的测试，汇总中仅记录已执行步骤，整体判为失败。
+
+工具注入 `METRO_TEST_ROOT` 和 `METRO_TEST_RESULTS`，以绝对路径加载工程外的用例。独立运行 GDScript 用例时也必须提供这两个目录；推荐始终使用统一入口。测试隔离用户配置与游戏存档，结果目录不会提交到 Git。每次运行保留独立结果，便于对比；可在不需要时删除。
+
+Godot AI 第三方插件内置的测试框架仍位于 `Demo/addons/godot_ai/testing/`，状态用例依赖其断言与结果统计；不移动或复制第三方实现。工程外用例不再由 MCP 默认的 `res://tests/` 自动发现。
+
+验证范围为无界面的场景、状态和存档流程，不包含人工图形、音频体验。

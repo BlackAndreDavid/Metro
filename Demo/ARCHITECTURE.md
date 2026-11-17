@@ -21,6 +21,10 @@ scenes/game/main.tscn              独立保留的早期横版原型，编辑器
 ```text
 Metro/
 ├─ README.md
+├─ test/
+│  ├─ cases/                    状态、菜单流程与车厢冒烟用例
+│  ├─ tools/run_tests.py        统一测试入口
+│  └─ results/                 每次运行的日志、汇总及测试存档
 └─ Demo/
    ├─ project.godot               默认主菜单，GameSession 自动加载
    ├─ export_presets.cfg          原 Windows 导出配置
@@ -45,7 +49,6 @@ Metro/
    │  ├─ surface_minimap.gd      地表小地图
    │  └─ main.gd / world.gd / player.gd / state.gd
    │                             早期横版原型；state.gd 也被车厢状态继承
-   ├─ tests/                     test_state.gd、test_menu_flow.gd
    ├─ addons/godot_ai/            第三方编辑器与测试插件，保留其内部目录
    ├─ README.md / ARCHITECTURE.md
    └─ 启动Demo.cmd / 打开编辑器.cmd
@@ -76,8 +79,9 @@ Metro/
 使用 Godot 4.7.2：
 
 ```sh
-Godot_v4.7.2-stable_linux.x86_64 --headless --editor --path Demo --import
-Godot_v4.7.2-stable_linux.x86_64 --headless --path Demo --script res://tests/test_menu_flow.gd
+python3 test/tools/run_tests.py --godot /path/to/Godot_v4.7.2-stable_linux.x86_64
 ```
 
-菜单流程测试包含 18 项检查，并运行原 `game_state` 测试（33 项断言）。新测试使用独立临时目录验证三个栏位、命名、覆盖保护、读取、日期推进隔离、损坏文件处理和场景初始化。图形与音频效果需在桌面上人工体验。
+菜单流程测试包含 18 项检查，并运行原 `game_state` 测试（33 项断言）。新测试使用 `test/results/<运行编号>/` 独立目录验证三个栏位、命名、覆盖保护、读取、日期推进隔离、损坏文件处理和场景初始化。图形与音频效果需在桌面上人工体验。
+
+测试代码与工具均位于工程外的根目录 `test/`，运行时仍以 `Demo/` 为 Godot 项目以解析游戏资源。第三方插件内置测试框架保持原位，由工具加载；插件默认 MCP 用例扫描不再适用于工程外用例。详见 [test/README.md](../test/README.md)。

@@ -11,5 +11,5 @@ if not exist "%GODOT_EXE%" (
 set "UV_OFFLINE=1"
 set "UV_PYTHON_DOWNLOADS=never"
 set "GODOT_AI_DISABLE_TELEMETRY=true"
-if not exist "%~dp0tests\logs" mkdir "%~dp0tests\logs"
-start "" "%GODOT_EXE%" --editor --path "%~dp0." --log-file "%~dp0tests\logs\editor.log"
+if not exist "%~dp0..\test\results\logs" mkdir "%~dp0..\test\results\logs"
+start "" "%GODOT_EXE%" --editor --path "%~dp0." --log-file "%~dp0..\test\results\logs\editor.log"

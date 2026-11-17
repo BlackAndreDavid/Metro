@@ -14,7 +14,7 @@ func _initialize() -> void:
 
 func run() -> void:
 	var session = root.get_node("GameSession")
-	session.save_directory = "/tmp/metro-menu-test-%d" % Time.get_ticks_usec()
+	session.save_directory = OS.get_environment("METRO_TEST_RESULTS").path_join("slots")
 	check(session.create_slot(0, "无效") == ERR_INVALID_PARAMETER, "reject invalid slot")
 	check(session.create_slot(1, "  ") == ERR_INVALID_PARAMETER, "reject blank base name")
 	for slot in range(1, 4):
@@ -46,9 +46,10 @@ func run() -> void:
 	broken.store_string("bad json")
 	broken.close()
 	check(not session.select_slot(3), "reject corrupt save")
-	var suite = load("res://tests/test_state.gd").new()
+	var suite = load(OS.get_environment("METRO_TEST_ROOT").path_join("cases/test_state.gd")).new()
 	var runner = load("res://addons/godot_ai/testing/test_runner.gd").new()
 	var result = runner.run_suites([suite], "game_state", "", {}, true)
+	print("STATE_RESULT: ", JSON.stringify(result))
 	check(result.total == 1 and result.failed == 0 and result.skipped == 0 and result.results[0].assertion_count == 33, "existing state regression")
 	for slot in range(1, 4):
 		DirAccess.remove_absolute(session.slot_path(slot))

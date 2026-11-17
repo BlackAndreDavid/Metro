@@ -96,9 +96,9 @@ F5 打开主菜单：开始 → 三栏位存档（创建时命名基地／读取
 
 - 正常试玩存档：`Demo/saves/slot_1.json`。
 - 在住处休息时才会保存，并进入下一天；退出不会自动保存。
-- 测试文件：`Demo/tests/`，与正常存档分开。
-- 直接试玩日志：`Demo/tests/logs/play.log`。
-- 编辑器启动日志：`Demo/tests/logs/editor.log`。
+- 测试文件：`test/cases/`，与正常存档分开。
+- 直接试玩日志：`test/results/logs/play.log`。
+- 编辑器启动日志：`test/results/logs/editor.log`。
 
 源码运行时的存档保存在本 Demo 文件夹内，不再写到 Godot 引擎所在文件夹。
 
@@ -112,7 +112,7 @@ F5 打开主菜单：开始 → 三栏位存档（创建时命名基地／读取
 - 住处休息进入下一天，以及单独测试存档的读写恢复。
 - 原有 32 项经济、检查、升级和存档检查，另有 1 项检查数量校验，全部通过。
 
-状态测试可以在连接本工程的 Godot AI MCP 中调用 `test_run(suite="game_state")`。
+当前测试统一从仓库根目录运行 `python3 test/tools/run_tests.py --godot <Godot可执行文件>`，说明见 [测试目录](../test/README.md)。用例已移出 Godot 工程，不再由插件默认的 `res://tests/` 扫描发现。
 本工程的 `addons/godot_ai` 复制自你本机已有的同版本插件；没有重新下载引擎或插件。
 编辑器入口为依赖管理器设置了离线模式，避免自动获取新依赖。
 
@@ -122,7 +122,7 @@ F5 打开主菜单：开始 → 三栏位存档（创建时命名基地／读取
 - `scripts/player.gd`：移动、负重速度、跳跃、梯子。
 - `scripts/world.gd`：程序绘制场景、照明、环境动画。
 - `scripts/main.gd`：关卡流程、界面、敌人、互动、程序合成声音。
-- `tests/test_state.gd`：通过 MCP 执行的状态检查。
+- `../test/cases/test_state.gd`：由统一测试工具加载的状态检查。
 
 ## 原型范围
 
