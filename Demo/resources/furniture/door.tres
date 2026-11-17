@@ -8,4 +8,4 @@ function_text = "出站探索"
 action = "gear"
 texture_path = "res://assets/textures/Door.png"
 source_origin = Vector2(59, 17)
-grid_size = Vector2i(4, 12)
+grid_size = Vector2i(6, 12)

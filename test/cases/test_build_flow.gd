@@ -50,6 +50,18 @@ func run() -> void:
 	legacy.furniture_layout = {"bed": 11, "computer": 0, "door": 3, "locker": 2, "screen": 9}
 	restored.write_save(path, legacy)
 	check(restored.load_cabin(path, Rail.STATIONS.keys()) and restored.furniture_layout.bed.car == 1 and restored.furniture_layout.screen.mount == 3, "legacy slot save migrates carriage and mount")
+	var grid_legacy := state.save_data()
+	grid_legacy.version = 6
+	grid_legacy.furniture_layout = {"bed":{"car":1,"x":0,"y":11}, "computer":null, "door":{"car":0,"x":4,"y":0}, "locker":{"car":1,"x":0,"y":0}, "screen":{"car":0,"mount":3,"x":0,"y":0}}
+	restored.write_save(path,grid_legacy)
+	check(restored.load_cabin(path,Rail.STATIONS.keys()), "version 6 rectangular grid migrates")
+	check(restored.furniture_layout.locker.car == 1 and restored.furniture_layout.locker.y == 0 and restored.furniture_layout.bed.car == 1 and restored.furniture_layout.bed.x >= 2, "expanded locker relocates colliding bed in same carriage")
+	check(restored.furniture_layout.computer == null and restored.material_count("computer") == 1 and restored.furniture_layout.screen.mount == 3, "grid migration preserves stored computer and hanging mount")
+	check(restored.valid_home_layout(restored.save_data()), "migrated square layout is valid")
+	grid_legacy.furniture_layout.door.x = 15
+	restored.write_save(path,grid_legacy)
+	before = restored.save_data()
+	check(not restored.load_cabin(path,Rail.STATIONS.keys()) and before == restored.save_data(), "invalid old grid rejected before migration")
 	legacy.version = 4
 	legacy.furniture_layout = {"bed": 3, "computer": 0}
 	restored.write_save(path, legacy)

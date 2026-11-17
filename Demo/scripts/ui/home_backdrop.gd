@@ -170,11 +170,10 @@ func configure_world(home: Control) -> void:
 		var data: Resource = DEFINITIONS[kind]
 		var item = FURNITURE.instantiate()
 		item.name = kind.capitalize()
-		var padded := (Vector2(data.texture.get_size()) + Vector2(4, 4))
-		var fit := minf(bounds.size.x / data.texture.get_width(), bounds.size.y / data.texture.get_height())
-		item.size = padded * fit
-		var raw_size: Vector2 = Vector2(data.texture.get_size()) * fit
-		item.position = bounds.position + Vector2((bounds.size.x - raw_size.x) / 2, bounds.size.y - raw_size.y) - Vector2(2,2) * fit
+		var raw := Vector2(data.texture.get_size())
+		var pixel_scale := bounds.size / raw
+		item.size = (raw + Vector2(4, 4)) * pixel_scale
+		item.position = bounds.position - Vector2(2, 2) * pixel_scale
 		(hanging_layer if data.placement_type == "hanging" else floor_layer).add_child(item)
 		home.construction.register_furniture(item, data)
 		item.configure(data, home, self)
