@@ -6,7 +6,7 @@ const CargoGrid = preload("res://scripts/cargo_grid.gd")
 const SurfaceBlock = preload("res://scripts/surface_block.gd")
 const SurfaceMinimap = preload("res://scripts/surface_minimap.gd")
 const AutoRepair = preload("res://scripts/auto_repair.gd")
-const CABIN = preload("res://art/cabin.png")
+const CABIN = preload("res://assets/textures/cabin.png")
 
 const TEXT := Color("f2eadd")
 const MUTED := Color("b9b3cb")
@@ -59,6 +59,14 @@ func _ready() -> void:
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--save-file="):
 			save_path = argument.trim_prefix("--save-file=")
+	if not GameSession.active_save_path.is_empty():
+		save_path = GameSession.active_save_path
+	var menu_button := Button.new()
+	menu_button.text = "返回主菜单"
+	menu_button.position = Vector2(1100, 8)
+	menu_button.z_index = 100
+	menu_button.pressed.connect(return_to_menu)
+	add_child(menu_button)
 	var has_save := FileAccess.file_exists(save_path)
 	var loaded := state.load_cabin(save_path, Rail.STATIONS.keys())
 	if not state.game_over_reason.is_empty():
@@ -501,6 +509,7 @@ func show_game_over() -> void:
 
 func restart_game() -> void:
 	var fresh := State.new()
+	fresh.base_name = state.base_name
 	var err := fresh.save_current(save_path)
 	if err != OK:
 		report("新存档写入失败（%s）。" % error_string(err))
@@ -1165,3 +1174,11 @@ class SurfaceScenery extends Control:
 			var p := Vector2((i * 97) % 775, 316 + (i * 73) % 206)
 			draw_rect(Rect2(p, Vector2(3 + i % 7, 2)), Color("584959") if i % 2 == 0 else Color("383445"))
 		draw_rect(Rect2(Vector2.ZERO, size), Color("81708b"), false, 2.0)
+
+func return_to_menu() -> void:
+	var dialog := ConfirmationDialog.new()
+	dialog.dialog_text = "返回主菜单？未在床铺保存的进度将丢失。"
+	dialog.confirmed.connect(func(): get_tree().change_scene_to_file("res://scenes/ui/main_menu.tscn"))
+	dialog.canceled.connect(dialog.queue_free)
+	add_child(dialog)
+	dialog.popup_centered()

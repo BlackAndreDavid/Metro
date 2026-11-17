@@ -1,7 +1,7 @@
 extends Control
 ## A side-view street block. Buildings use the same placements in the foreground and parallax layer.
 
-const InteriorLight = preload("res://scripts/surface_light.gdshader")
+const InteriorLight = preload("res://assets/shaders/surface_light.gdshader")
 const AutoRepair = preload("res://scripts/auto_repair.gd")
 
 signal pickup_requested(slot: int)

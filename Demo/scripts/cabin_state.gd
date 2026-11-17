@@ -1,5 +1,7 @@
 extends "res://scripts/state.gd"
 
+var base_name: String = "未命名基地"
+
 const Markets = preload("res://scripts/cabin_markets.gd")
 const Rail = preload("res://scripts/cabin_map.gd")
 const AutoRepair = preload("res://scripts/auto_repair.gd")
@@ -618,7 +620,7 @@ func save_current(path: String) -> Error:
 
 func save_data() -> Dictionary:
 	return {
-		"version": CABIN_SAVE_VERSION, "day": day, "account": account, "station": station,
+		"base_name": base_name, "version": CABIN_SAVE_VERSION, "day": day, "account": account, "station": station,
 		"wide": wide_bag, "bag": inventory, "locker": locker,
 		"installed_charge": installed_charge, "debt": debt,
 		"days_in_debt": days_in_debt, "days_without_water": days_without_water,
@@ -686,7 +688,10 @@ func load_cabin(path: String, known_stations: Array) -> bool:
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
 		return false
-	var data: Variant = JSON.parse_string(file.get_as_text())
+	var parser := JSON.new()
+	if parser.parse(file.get_as_text()) != OK:
+		return false
+	var data: Variant = parser.data
 	if not data is Dictionary:
 		return false
 	var version: Variant = data.get("version")
@@ -717,6 +722,7 @@ func load_cabin(path: String, known_stations: Array) -> bool:
 	for entry in inventory + locker:
 		entry.id = next_id
 		next_id += 1
+	base_name = str(data.get("base_name", "未命名基地"))
 	station = data.station
 	wide_bag = data.wide
 	account = balance
