@@ -124,7 +124,7 @@ func run() -> void:
 	backdrop._process(0.1)
 	var first: float = backdrop.offset.x
 	backdrop._process(0.1)
-	check(is_equal_approx(100 - first, first - backdrop.offset.x) and is_equal_approx(first, 84), "constant speed return")
+	check(is_equal_approx(100 - first, first - backdrop.offset.x) and is_equal_approx(first, 68), "constant speed return")
 	backdrop._process(10.0)
 	check(backdrop.offset == Vector2.ZERO, "return stops at center without overshoot")
 	backdrop.start_drag(Vector2(500, 300))
@@ -138,10 +138,10 @@ func run() -> void:
 			check(child.get_rect().end.y <= 144, "option buttons above carriage: %s %s" % [child.text, child.get_rect()])
 	add_recipe(home.state)
 	home.construction.enter()
-	home.show_expansion()
-	home.confirm_expansion()
+	home.construction.request_expansion()
+	home.construction.confirm_expansion()
 	await process_frame
-	backdrop = home.home_backdrop
+	backdrop = home.construction.backdrop
 	check(backdrop.train_count == 2 and backdrop.carriage.has_node("Carriage2"), "new car uses carriage texture")
 	check(home.state.carriage_count == 2 and home.state.SLOTS_PER_CARRIAGE == 10, "expansion adds floor cells and hanging points")
 	var center: Vector2 = backdrop.carriage.position + Vector2(640 + 972 * backdrop.focused_carriage, 360) * backdrop.train_zoom
@@ -149,38 +149,38 @@ func run() -> void:
 	backdrop.set_process(false)
 	# Start on car 2; drag slightly right across the midpoint to car 1.
 	backdrop.start_drag(Vector2(500, 300))
-	backdrop.pan_by(Vector2(256, 30))
+	backdrop.pan_by(Vector2(128, 30))
 	var release := InputEventMouseButton.new()
 	release.button_index = MOUSE_BUTTON_LEFT
 	release.pressed = false
 	backdrop._input(release)
-	check(backdrop.focused_carriage == 0 and home.focused_carriage == 0, "multi-car return picks nearest center")
+	check(backdrop.focused_carriage == 0 and home.construction.focused_carriage == 0, "multi-car return picks nearest center")
 	var before_return: Vector2 = backdrop.offset
 	backdrop._process(0.1)
-	check(is_equal_approx(before_return.distance_to(backdrop.offset), 16), "multi-car return uses constant speed")
+	check(is_equal_approx(before_return.distance_to(backdrop.offset), 32), "multi-car return uses constant speed")
 	backdrop._process(10.0)
 	var first_center: Vector2 = backdrop.carriage.position + Vector2(640, 360) * backdrop.train_zoom
 	check(first_center.is_equal_approx(Vector2(640, 360)), "nearest first carriage ends centered")
 	backdrop.start_drag(Vector2(500, 300))
-	backdrop.pan_by(Vector2(-256, 0))
+	backdrop.pan_by(Vector2(-128, 0))
 	backdrop.dragging = false
 	backdrop.choose_nearest_carriage()
 	check(backdrop.focused_carriage == 1, "opposite drag focuses second carriage")
 	backdrop._process(10.0)
-	home.show_cabin()
-	check(home.home_backdrop.focused_carriage == 1, "page refresh preserves focused carriage")
+	home.construction._refresh("")
+	check(home.construction.backdrop.focused_carriage == 1, "page refresh preserves focused carriage")
 	select_for_move(home, "bed")
 	home.construction.place_at(State.SLOTS_PER_CARRIAGE + 1)
 	check(home.state.furniture_layout.bed == State.SLOTS_PER_CARRIAGE + 1, "UI moves bed into added car")
-	var moved_bed = home.home_backdrop.get_node("Carriage/FurnitureSlots/Bed")
+	var moved_bed = home.construction.backdrop.get_node("Carriage/FurnitureSlots/Bed")
 	moved_bed.use()
 	home.construction.dismantle()
 	check(home.state.furniture_layout.bed == -1, "shared dismantle action stores selected furniture")
 	# A third carriage must participate in nearest-center selection as well.
 	home.state.carriage_count = 3
-	home.focused_carriage = 1
-	home.show_cabin()
-	backdrop = home.home_backdrop
+	home.construction.focused_carriage = 1
+	home.construction._refresh("")
+	backdrop = home.construction.backdrop
 	backdrop.set_process(false)
 	backdrop.pan_by(Vector2(220, 0))
 	backdrop.choose_nearest_carriage()

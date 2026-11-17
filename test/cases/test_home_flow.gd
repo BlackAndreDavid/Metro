@@ -38,7 +38,7 @@ func run() -> void:
 	var car_rect: Rect2 = backdrop.carriage.get_node("Texture").get_rect()
 	check(car_rect.get_center().is_equal_approx(Vector2(640, 360)), "visible carriage centered after trim")
 	backdrop.pan_by(Vector2(100000, -100000))
-	check(backdrop.offset.is_equal_approx(Vector2(256, -144)), "pan clamps at 20 percent")
+	check(backdrop.offset.is_equal_approx(Vector2(128, -72)), "pan clamps at 10 percent")
 	check(backdrop.carriage.position == backdrop.offset, "furniture and texture pan together")
 	check(backdrop.background.position.is_equal_approx(Vector2(-256, -144) + backdrop.offset * 0.25), "background parallax")
 	backdrop.pan_by(-backdrop.offset)
@@ -70,8 +70,9 @@ func run() -> void:
 	gui_motion.button_mask = MOUSE_BUTTON_MASK_LEFT
 	root.push_input(gui_motion)
 	root.push_input(mouse_button(gui_motion.position, false))
+	var gui_drag_offset: Vector2 = backdrop.offset
 	await process_frame
-	check(home.screen == "cabin" and not backdrop.offset.is_zero_approx(), "real hotspot GUI drag pans without opening computer")
+	check(home.screen == "cabin" and not gui_drag_offset.is_zero_approx(), "real hotspot GUI drag pans without opening computer")
 	backdrop.pan_by(-backdrop.offset)
 	root.push_input(mouse_button(point, true))
 	root.push_input(mouse_button(point, false))

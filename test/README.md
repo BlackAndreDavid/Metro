@@ -11,7 +11,7 @@ test/
 │  ├─ test_home_flow.gd      31 项检查：视角、真实电脑点击、设置与地表流程
 │  ├─ test_build_flow.gd     家具、材料、扩建、耗电、存档迁移和多车厢回正
 │  ├─ test_fixture_flow.gd   门／柜子／屏幕、两格门、四挂点、Tooltip 和旧档迁移
-│  └─ test_construction_flow.gd  39 项检查：统一选择、移动、拆除、仓库、取消与退出
+│  └─ test_construction_flow.gd  独立场景、状态共享、真实鼠标选择／按钮、移动、拆除、仓库及退出
 ├─ tools/
 │  ├─ capture_home.gd       可选 OpenGL 图形截图验证
 │  └─ run_tests.py           统一入口：资源导入 → 菜单与状态 → Home 冒烟 → Home 集成 → 家具与建造 → 独立设施 → 建造模块
@@ -62,3 +62,5 @@ Godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Du
 ```
 
 此步骤需要图形驱动，不能加 `--headless`；目录须位于测试结果目录。`METRO_TEST_RESULTS` 指向截图输出目录。常规自动测试仍支持无界面运行。
+
+按钮回归使用 `InputEventMouseButton` 注入视口，验证实际 GUI 命中与状态变化，防止 `pressed.emit()` 绕过输入遮挡。旧问题的复现记录可保存在 results 中；图形捕获包含无 Home UI 的独立建造场景。

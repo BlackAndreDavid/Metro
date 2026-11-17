@@ -38,7 +38,7 @@ func run() -> void:
 		await capture("home_" + fixture.to_lower() + "_outline")
 		item.set_highlighted(false)
 	home.construction.enter()
-	home.home_backdrop.get_node("Carriage/FurnitureSlots/Door").use()
+	home.construction.backdrop.get_node("Carriage/FurnitureSlots/Door").use()
 	await capture("construction_selected")
 	home.construction.dismantle()
 	home.construction.open_warehouse()
@@ -54,8 +54,11 @@ func run() -> void:
 	for kind in home.state.EXPANSION_COST:
 		for i in range(home.state.EXPANSION_COST[kind]):
 			home.state.add_supply(kind, "locker")
-	home.confirm_expansion()
+	home.construction.enter()
+	home.construction.request_expansion()
+	home.construction.confirm_expansion()
 	await capture("home_expanded")
+	home.construction.exit()
 	home.show_settings()
 	await capture("home_settings")
 	home.close_settings()

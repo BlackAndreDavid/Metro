@@ -87,7 +87,7 @@ func run() -> void:
 	check(toolbar.has_node("Move") and toolbar.has_node("Dismantle") and toolbar.has_node("Expand") and toolbar.has_node("Exit"), "universal construction actions integrated")
 	home.construction.select_furniture("screen")
 	home.construction.begin_move()
-	layer = home.home_backdrop.get_node("Carriage/FurnitureSlots")
+	layer = home.construction.backdrop.get_node("Carriage/FurnitureSlots")
 	check(layer.has_node("Screen") and layer.has_node("Slot7") and layer.has_node("Slot8") and layer.has_node("Slot9"), "four hanger positions displayed including occupied point")
 	check(not layer.has_node("Slot0") and not layer.has_node("Slot5"), "screen selection hides incompatible floor cells")
 	var hanger = layer.get_node("Slot7")
@@ -102,7 +102,7 @@ func run() -> void:
 	release.pressed = false
 	root.push_input(release)
 	await process_frame
-	check(home.screen == "cabin" and home.state.furniture_layout.screen == 7, "hanger GUI click takes priority over door behind it")
+	check(home.construction.screen == "construction" and home.state.furniture_layout.screen == 7, "hanger GUI click takes priority over door behind it")
 	home.construction.begin_move()
 	home.construction.place_at(8)
 	check(home.state.furniture_layout.screen == 8, "UI hangs screen on chosen railing point")

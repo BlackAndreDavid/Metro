@@ -28,11 +28,9 @@ func configure(data: Resource, owner_home: Control, surface: Control) -> void:
 		add_child(info)
 
 func use() -> void:
-	if home.screen != "cabin":
-		return
 	if build_controller != null and build_controller.active:
 		selection_requested.emit(definition.id)
-	else:
+	elif home.screen == "cabin":
 		definition.perform(home)
 
 func set_highlighted(value: bool) -> void:

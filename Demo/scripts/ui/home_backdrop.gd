@@ -1,9 +1,9 @@
 extends Control
 ## This layer moves scenery and furniture hit targets together; HUD stays fixed.
-@export_range(0.0, 0.2) var max_offset_ratio := 0.2
+@export_range(0.0, 0.1) var max_offset_ratio := 0.1
 @export_range(0.0, 1.0) var drag_sensitivity := 0.35
 @export_range(0.0, 1.0) var background_parallax := 0.25
-@export_range(1.0, 1000.0) var return_speed := 160.0
+@export_range(1.0, 1000.0) var return_speed := 320.0
 const FURNITURE = preload("res://scenes/items/furniture.tscn")
 const Catalog = preload("res://scripts/items/furniture_catalog.gd")
 const DEFINITIONS = Catalog.DEFINITIONS
@@ -67,7 +67,7 @@ func _input(event: InputEvent) -> void:
 			callback.call()
 
 func pan_by(delta: Vector2) -> void:
-	var limit := size * minf(max_offset_ratio, 0.2)
+	var limit := size * minf(max_offset_ratio, 0.1)
 	offset = focus_anchor + (offset + delta - focus_anchor).clamp(-limit, limit)
 	_apply_offset()
 
@@ -118,7 +118,7 @@ func furniture_rect(kind: String, slot: int) -> Rect2:
 		bounds = bounds.merge(slot_rect(cell))
 	return bounds
 
-func configure_home(home: Control) -> void:
+func configure_world(home: Control) -> void:
 	train_count = home.state.carriage_count
 	home_controller = home
 	focused_carriage = clampi(home.focused_carriage, 0, train_count - 1)
@@ -140,7 +140,7 @@ func configure_home(home: Control) -> void:
 	fixtures.name = "Fixtures"
 	fixtures.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	carriage.add_child(fixtures)
-	for index in range(train_count):
+	for index in range(0 if home.construction.active else train_count):
 		# The window remains part of the carriage art. Reuse the common item
 		# component over that exact region instead of an invisible tooltip button.
 		var image: Image = $Carriage/Texture.texture.get_image().get_region(Rect2i(137, 17, 101, 49))
@@ -196,9 +196,9 @@ func _open_trade() -> void:
 		home_controller.use_hotspot("trade")
 
 func zoom_for_count() -> float:
-	# Keep adjacent centers closer than twice the 20% pan limit, allowing
+	# Keep adjacent centers closer than twice the 10% pan limit, allowing
 	# a gentle drag to cross the midpoint and focus the neighboring car.
-	return minf(0.5, 1120.0 / (972.0 * train_count)) if train_count > 1 else 1.0
+	return minf(0.25, 1120.0 / (972.0 * train_count)) if train_count > 1 else 1.0
 
 func target_for_carriage(index: int) -> Vector2:
 	return Vector2(((train_count - 1) * 0.5 - index) * 972.0 * zoom_for_count(), 0)

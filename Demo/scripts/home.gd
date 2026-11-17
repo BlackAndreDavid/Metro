@@ -58,9 +58,7 @@ func _ready() -> void:
 	ui_theme.default_font = font
 	theme = ui_theme
 	construction = CONSTRUCTION_SCENE.instantiate()
-	add_child(construction)
 	construction.configure(self)
-	construction.expansion_requested.connect(show_expansion)
 	var directory := OS.get_executable_path().get_base_dir() if OS.has_feature("template") else ProjectSettings.globalize_path("res://")
 	save_path = directory.path_join("saves/cabin_slot.json")
 	for argument in OS.get_cmdline_user_args():
@@ -206,7 +204,7 @@ func cabin_art() -> void:
 	home_backdrop = BACKDROP.instantiate()
 	view.add_child(home_backdrop)
 	home_backdrop.interaction_enabled = screen == "cabin"
-	home_backdrop.configure_home(self)
+	home_backdrop.configure_world(self)
 
 func begin_page(kind: String, scene: PackedScene = null) -> void:
 	home_backdrop = null
@@ -1171,25 +1169,3 @@ func close_settings() -> void:
 	get_tree().paused = settings_was_paused
 	settings_panel.queue_free()
 	settings_panel = null
-
-func show_expansion() -> void:
-	begin_page("expansion")
-	var panel := modal("车厢扩建 · %d / %d 节" % [state.carriage_count, State.MAX_CARRIAGES], Rect2(300, 145, 680, 430))
-	label(panel, "材料从柜子和背包扣除，增加 6 个地面槽位、4 个挂点。", Rect2(24, 84, 632, 28), 18, MINT)
-	var row := 0
-	for kind in State.EXPANSION_COST:
-		label(panel, "%s  × %d     当前拥有 %d" % [state.item_name(kind), State.EXPANSION_COST[kind], state.material_count(kind)], Rect2(24, 125 + row * 35, 632, 30), 18)
-		row += 1
-	label(panel, "行车：%d → %d 度/站   每日：%s → %s 度" % [state.travel_cost_per_stop(), state.travel_cost_per_stop() + State.EXTRA_TRAVEL_COST, energy_text(state.daily_power_cost()), energy_text(state.daily_power_cost() + State.EXTRA_DAILY_COST)], Rect2(24, 249, 632, 32), 18, AMBER)
-	wrapped(panel, "跨站接应也使用新的行车耗电。扩建后需在床铺保存。", Rect2(24, 291, 632, 43), 16, MUTED)
-	status = label(panel, state.expansion_problem(), Rect2(24, 335, 632, 24), 15, AMBER)
-	var confirm := action(panel, "消耗材料并扩建一节", Rect2(24, 372, 632, 38), confirm_expansion, true)
-	confirm.disabled = not state.expansion_problem().is_empty()
-
-func confirm_expansion() -> void:
-	var problem := state.expand_carriage()
-	if problem.is_empty():
-		focused_carriage = state.carriage_count - 1
-		show_cabin("扩建完成，增加 6 个地面槽位和 4 个挂点。请在床铺保存进度。")
-	else:
-		report(problem)
