@@ -10,14 +10,19 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 func _initialize() -> void: call_deferred("run")
 func run() -> void:
-	var expected := {"computer": Vector2i(2,2), "locker": Vector2i(2,12), "door": Vector2i(6,12), "bed": Vector2i(4,1), "screen": Vector2i(2,2)}
+	var expected := {"computer": Vector2i(2,2), "locker": Vector2i(3,12), "door": Vector2i(6,12), "bed": Vector2i(2,8), "screen": Vector2i(2,2)}
 	for kind in expected: check(Catalog.DEFINITIONS[kind].grid_size == expected[kind], "explicit footprint: " + kind)
 	check(Catalog.CELL_SIZE.x == Catalog.CELL_SIZE.y, "furniture cells are square")
-	check(Catalog.placement_rect("locker",Catalog.default_placement("locker")).size == Vector2(52,312), "locker display occupies 2x12 square cells")
-	check(Catalog.placement_rect("door",Catalog.default_placement("door")).size == Vector2(156,312), "door display occupies 6x12 square cells")
+	check(Catalog.placement_rect("locker",Catalog.default_placement("locker")).size.is_equal_approx(Vector2(3,12) * Catalog.CELL_SIZE), "locker display occupies 3x12 square cells")
+	check(Catalog.placement_rect("door",Catalog.default_placement("door")).size.is_equal_approx(Vector2(6,12) * Catalog.CELL_SIZE), "door display occupies 6x12 square cells")
+	var grid := Catalog.floor_rect(0)
+	check(grid.position.is_equal_approx(Catalog.INTERIOR_RECT.position), "grid reaches left wall and ceiling boundary")
+	check(absf(grid.end.x - Catalog.INTERIOR_RECT.end.x) < 0.01 and absf(grid.end.y - Catalog.INTERIOR_RECT.end.y) < 0.25, "grid covers interior through right wall and floor boundary")
+	check(Catalog.CELL_SIDE > 26 and Catalog.CELL_SIZE.x == Catalog.CELL_SIZE.y, "larger cells stay square")
+	check(Catalog.placement_rect("bed",Catalog.default_placement("bed")).size.is_equal_approx(Vector2(2,8) * Catalog.CELL_SIZE), "bed display occupies 2x8 square cells")
 	var state := State.new()
 	check(not state.place_furniture("locker", {"car":0,"x":20,"y":1}).is_empty(), "locker must fit twelve rows")
-	check(not state.place_furniture("bed", {"car":0,"x":31,"y":11}).is_empty(), "right edge bounds")
+	check(not state.place_furniture("bed", {"car":0,"x":34,"y":4}).is_empty(), "right edge bounds")
 	check(not state.place_furniture("door", {"car":0,"x":8,"y":1}).is_empty(), "door must fit all twelve rows")
 	check(not state.place_furniture("computer", {"car":0,"x":9,"y":5}).is_empty(), "floor overlap rejected")
 	check(not state.place_furniture("bed", {"car":1,"x":0,"y":0}).is_empty(), "missing carriage rejected")

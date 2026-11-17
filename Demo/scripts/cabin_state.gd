@@ -29,7 +29,7 @@ const RARITY := {
 const RARITY_NAMES := ["普通", "少见", "稀有", "珍稀"]
 const RARITY_COLORS := [Color("bfc3ce"), Color("e4be76"), Color("ffa271"), Color("ff7873")]
 const EPOCH := "2026-07-11T00:00:00"
-const CABIN_SAVE_VERSION := 7
+const CABIN_SAVE_VERSION := 8
 const ITEM_DEFINITIONS := {"computer": preload("res://resources/items/computer.tres")}
 const Furniture = preload("res://scripts/items/furniture_catalog.gd")
 const MAX_CARRIAGES := 3
@@ -712,7 +712,7 @@ func load_cabin(path: String, known_stations: Array) -> bool:
 	if not data is Dictionary:
 		return false
 	var version: Variant = data.get("version")
-	if version != 1 and version != 2 and version != 3 and version != 4 and version != 5 and version != 6 and version != CABIN_SAVE_VERSION:
+	if version != 1 and version != 2 and version != 3 and version != 4 and version != 5 and version != 6 and version != 7 and version != CABIN_SAVE_VERSION:
 		return false
 	if version >= 3 and not valid_car_state(data):
 		return false
@@ -910,16 +910,16 @@ func valid_home_layout(data: Dictionary, version: int = CABIN_SAVE_VERSION) -> b
 		var p: Variant = layout.get(kind)
 		if p == null:
 			continue
-		if not Furniture.valid_placement(kind, p, int(data.carriage_count), version == 6):
+		if not Furniture.valid_placement(kind, p, int(data.carriage_count), version):
 			return false
 		for other in ids:
-			if other != kind and layout[other] != null and Furniture.valid_placement(other, layout[other], int(data.carriage_count), version == 6) and Furniture.overlaps(kind, p, other, layout[other], version == 6):
+			if other != kind and layout[other] != null and Furniture.valid_placement(other, layout[other], int(data.carriage_count), version) and Furniture.overlaps(kind, p, other, layout[other], version):
 				return false
 	return true
 
 func migrate_furniture(data: Dictionary, version: int) -> Dictionary:
-	if version == 6:
-		return Furniture.migrate_rectangular_layout(data.furniture_layout)
+	if version in [6, 7]:
+		return Furniture.migrate_grid_layout(data.furniture_layout, version)
 	var layout := Furniture.initial_layout()
 	if version <= 3:
 		layout.bed = Furniture.default_placement("bed")

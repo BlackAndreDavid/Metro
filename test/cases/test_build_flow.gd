@@ -62,6 +62,12 @@ func run() -> void:
 	restored.write_save(path,grid_legacy)
 	before = restored.save_data()
 	check(not restored.load_cabin(path,Rail.STATIONS.keys()) and before == restored.save_data(), "invalid old grid rejected before migration")
+	grid_legacy.version = 7
+	grid_legacy.furniture_layout = {"bed":{"car":1,"x":2,"y":11}, "computer":null, "door":{"car":0,"x":9,"y":0}, "locker":{"car":1,"x":0,"y":0}, "screen":{"car":0,"mount":2,"x":0,"y":0}}
+	restored.write_save(path,grid_legacy)
+	check(restored.load_cabin(path,Rail.STATIONS.keys()) and restored.valid_home_layout(restored.save_data()), "version 7 square grid migrates enlarged footprints")
+	check(restored.furniture_layout.bed.car == 1 and restored.furniture_layout.bed.x >= 3 and restored.furniture_layout.bed.y <= 4, "taller bed moves away from enlarged cabinet and fits interior")
+	check(restored.furniture_layout.screen.mount == 2 and restored.material_count("computer") == 1, "version 7 migration preserves mounts and inventory")
 	legacy.version = 4
 	legacy.furniture_layout = {"bed": 3, "computer": 0}
 	restored.write_save(path, legacy)

@@ -8,4 +8,4 @@ function_text = "整理物品"
 action = "locker"
 texture_path = "res://assets/textures/Locker.png"
 source_origin = Vector2(2, 22)
-grid_size = Vector2i(2, 12)
+grid_size = Vector2i(3, 12)
