@@ -18,7 +18,6 @@ config/icon="res://assets/icons/icon.svg"
 [autoload]
 
 GameSession="*res://scripts/core/game_session.gd"
-
 _mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
 
 [display]
