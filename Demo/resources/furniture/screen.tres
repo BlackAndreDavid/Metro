@@ -4,8 +4,8 @@
 script = ExtResource("1")
 id = "screen"
 display_name = "屏幕"
-function_text = "查看站点信息"
-action = "map"
+function_text = "当天信息"
+action = "none"
 placement_type = "hanging"
 texture_path = "res://assets/textures/Screen.png"
 source_origin = Vector2(28, 22)

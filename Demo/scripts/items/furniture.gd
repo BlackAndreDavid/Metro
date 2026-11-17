@@ -16,6 +16,21 @@ func configure(data: Resource, owner_home: Control, surface: Control) -> void:
 	set_highlighted(false)
 	activated.connect(use)
 	if data.id == "screen":
+		if not building:
+			caption.text = "%s · %s · %s\n%s" % [home.state.station,home.state.date_text(),home.state.weather(),home.state.news()]
+			caption.position = Vector2(size.x + 12,0)
+			caption.size = Vector2(380,110)
+			var card := StyleBoxFlat.new()
+			card.bg_color = Color("211f31f0")
+			card.content_margin_left = 10
+			card.content_margin_right = 10
+			card.content_margin_top = 8
+			card.content_margin_bottom = 8
+			caption.add_theme_stylebox_override("normal",card)
+			caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			caption.add_theme_font_size_override("font_size",14)
+			caption.z_index = 30
+			mouse_default_cursor_shape = Control.CURSOR_ARROW
 		var info := Label.new()
 		info.name = "StationInfo"
 		info.text = "%s\n%s\n%s" % [home.state.station, home.state.date_text(), home.state.weather()]
@@ -29,6 +44,8 @@ func configure(data: Resource, owner_home: Control, surface: Control) -> void:
 		add_child(info)
 
 func use() -> void:
+	if definition.action == "none" and (build_controller == null or not build_controller.active):
+		return
 	if build_controller != null and build_controller.active:
 		selection_requested.emit(definition.id)
 	elif home.screen == "cabin":
@@ -45,5 +62,10 @@ func _gui_input(event: InputEvent) -> void:
 			grab_focus()
 			build_controller.press_furniture(definition.id, event.global_position)
 		accept_event()
+		return
+	if definition.action == "none":
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed and is_instance_valid(drag_surface):
+			drag_surface.start_drag(event.global_position, Callable())
+			accept_event()
 		return
 	super._gui_input(event)

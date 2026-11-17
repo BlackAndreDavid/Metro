@@ -33,8 +33,8 @@ def main():
     base = [executable, '--headless', '--path', str(root.parent / 'Demo')]
     results = []
 
-    def run(name, arguments, expected=()):
-        command = base + arguments
+    def run(name, arguments, expected=(), command_override=None):
+        command = command_override or (base + arguments)
         log_path = output / (name + '.log')
         try:
             with log_path.open('w', encoding='utf-8') as log_file:
@@ -80,7 +80,13 @@ def main():
         run('settings_input', ['--script', str(root / 'cases/test_settings_input.gd'), '--',
                                '--save-file=' + str(output / 'settings_input_save.json')],
             ['SETTINGS_INPUT_OK'])
-    passed = len(results) == 9 and all(item['passed'] for item in results)
+    if results[0]['passed']:
+        run('commerce_flow', ['--script', str(root / 'cases/test_commerce_flow.gd'), '--',
+                              '--save-file=' + str(output / 'commerce_flow_save.json')],
+            ['COMMERCE_FLOW_OK'])
+    run('art_tools', [], ['OK'], command_override=[sys.executable, '-m', 'unittest', 'discover',
+        '-s', str(root / 'cases'), '-p', 'test_art_tools.py'])
+    passed = len(results) == 11 and all(item['passed'] for item in results)
     summary = dict(run_id=run_id, passed=passed, results=results)
     (output / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print(f'Results: {output}')

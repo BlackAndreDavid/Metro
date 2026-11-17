@@ -2,18 +2,21 @@ extends Resource
 @export var id := ""
 @export var display_name := ""
 @export var function_text := ""
-@export_enum("rest", "news", "gear", "locker", "map") var action := "rest"
+@export_enum("rest", "news", "gear", "locker", "map", "none") var action := "rest"
 @export_file("*.png") var texture_path := ""
 # Keep save/placement validation independent of texture import order.
 var texture: Texture2D:
 	get:
 		return load(texture_path) as Texture2D
+@export var fill_grid := true
 @export var grid_size := Vector2i(2, 2)
 @export_enum("floor", "hanging") var placement_type := "floor"
 # Offset of the cropped image in the original 243x108 carriage canvas.
 @export var source_origin := Vector2.ZERO
 
 func perform(home: Control) -> void:
+	if action == "none":
+		return
 	if action == "map":
 		home.show_map()
 	else:

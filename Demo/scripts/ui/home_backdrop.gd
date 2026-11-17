@@ -7,7 +7,6 @@ extends Control
 const FURNITURE = preload("res://scenes/items/furniture.tscn")
 const Catalog = preload("res://scripts/items/furniture_catalog.gd")
 const DEFINITIONS = Catalog.DEFINITIONS
-const HIGHLIGHTABLE = preload("res://scenes/items/highlightable_item.tscn")
 var train_count := 1
 var train_zoom := 1.0
 var focused_carriage := 0
@@ -112,6 +111,7 @@ func update_preview(kind: String, placement: Dictionary, valid: bool) -> void:
 		preview.texture = null
 		if not kind.is_empty() and not placement.is_empty() and (placement.has("mount") == name.begins_with("Hanging")):
 			preview.bounds = Catalog.placement_rect(kind, placement)
+			preview.kind = kind
 			preview.texture = Catalog.DEFINITIONS[kind].texture
 			preview.valid = valid
 		preview.queue_redraw()
@@ -139,15 +139,13 @@ func configure_world(home: Control) -> void:
 	fixtures.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	carriage.add_child(fixtures)
 	for index in range(0 if home.construction.active else train_count):
-		# The window remains part of the carriage art. Reuse the common item
-		# component over that exact region instead of an invisible tooltip button.
-		var image: Image = $Carriage/Texture.texture.get_image().get_region(Rect2i(137, 17, 101, 49))
-		var window = HIGHLIGHTABLE.instantiate()
+		var window = preload("res://scenes/commerce/customer_window.tscn").instantiate()
 		window.name = "TradeWindow%d" % index
 		window.position = Vector2(694 + index * 972, 204)
 		window.size = Vector2(420, 212)
 		fixtures.add_child(window)
-		window.set_item(ImageTexture.create_from_image(image), "交易", self)
+		window.drag_surface = self
+		window.set_customer(home.state.day + index)
 		window.activated.connect(_open_trade)
 	if home.construction.active:
 		make_grid(carriage, false)
@@ -166,7 +164,7 @@ func configure_world(home: Control) -> void:
 		var placement: Variant = home.state.furniture_layout[kind]
 		if placement == null:
 			continue
-		var bounds := furniture_rect(kind, placement)
+		var bounds := Catalog.visual_rect(kind, furniture_rect(kind, placement))
 		var data: Resource = DEFINITIONS[kind]
 		var item = FURNITURE.instantiate()
 		item.name = kind.capitalize()

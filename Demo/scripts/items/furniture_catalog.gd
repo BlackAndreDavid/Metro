@@ -42,7 +42,7 @@ static func default_placement(kind: String, car: int = 0) -> Dictionary:
 static func initial_layout() -> Dictionary:
 	return {"bed": null, "computer": null, "locker": default_placement("locker"), "door": default_placement("door"), "screen": default_placement("screen")}
 
-static func valid_placement(kind: String, p: Variant, count: int, version: int = 10) -> bool:
+static func valid_placement(kind: String, p: Variant, count: int, version: int = 11) -> bool:
 	if not DEFINITIONS.has(kind) or not p is Dictionary:
 		return false
 	var hanging: bool = DEFINITIONS[kind].placement_type == "hanging"
@@ -58,7 +58,7 @@ static func valid_placement(kind: String, p: Variant, count: int, version: int =
 		return false
 	return Rect2i(Vector2i.ZERO, bounds).encloses(Rect2i(Vector2i(int(p.x), int(p.y)), footprint(kind, version)))
 
-static func overlaps(a_kind: String, a: Dictionary, b_kind: String, b: Dictionary, version: int = 10) -> bool:
+static func overlaps(a_kind: String, a: Dictionary, b_kind: String, b: Dictionary, version: int = 11) -> bool:
 	if int(a.car) != int(b.car) or a.has("mount") != b.has("mount"):
 		return false
 	if a.has("mount") and int(a.mount) != int(b.mount):
@@ -80,7 +80,8 @@ static func copy_layout(layout: Dictionary) -> Dictionary:
 		result[kind] = canonical(layout[kind]) if layout[kind] != null else null
 	return result
 
-static func footprint(kind: String, version: int = 10) -> Vector2i:
+static func footprint(kind: String, version: int = 11) -> Vector2i:
+	if version <= 10 and kind == "computer": return Vector2i(2, 2)
 	if version == 9 and kind == "screen": return Vector2i(3, 3)
 	if version <= 8 and kind == "screen": return Vector2i(2, 2)
 	if version == 8 and kind == "bed": return Vector2i(2, 8)
@@ -120,3 +121,10 @@ static func migrate_grid_layout(layout: Dictionary, version: int) -> Dictionary:
 					distance = d
 		result[kind] = best
 	return result
+
+static func visual_rect(kind: String, bounds: Rect2) -> Rect2:
+	var data: Resource = DEFINITIONS[kind]
+	if data.fill_grid: return bounds
+	var raw := Vector2(data.texture.get_size())
+	var fitted := raw * minf(bounds.size.x / raw.x,bounds.size.y / raw.y)
+	return Rect2(bounds.get_center() - fitted / 2,fitted)

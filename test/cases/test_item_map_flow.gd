@@ -64,12 +64,8 @@ func run() -> void:
 	check(home.visible and current_scene == home and not map.active and home.state.station == "四平路" and home.state.car_power < power, "map travel returns to home with shared state")
 	home.construction.enter()
 	var build = home.construction
-	build.open_map()
-	var build_map = build.map_scene
-	check(build_map.get_parent() == home.get_parent() and current_scene == build_map and not build.visible, "build opens same independent map scene")
-	check(build_map.state == home.state and not home.visible, "build map shares state without showing home UI")
-	build_map.exit()
-	check(build.visible and current_scene == build and not home.visible and build.active, "map returns to construction")
+	check(not build.actions.has_node("Map") and not build.has_method("open_map"), "renovation has no map function")
+	check(home.view.get_node("BuildModeButton").text == "装修", "renovation label")
 	build.exit()
 	home.queue_free()
 	await process_frame

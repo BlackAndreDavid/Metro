@@ -78,6 +78,14 @@ func run() -> void:
 	restored.write_save(path,mount_legacy)
 	var old_layout: Dictionary = restored.furniture_layout.duplicate(true)
 	check(restored.load_cabin(path,Rail.STATIONS.keys()) and restored.furniture_layout == old_layout, "version 9 screen expansion preserves exact floor layout and hooks")
+	var computer_legacy := restored.save_data()
+	computer_legacy.version = 10
+	computer_legacy.furniture_layout.computer = {"car":1,"x":25,"y":10}
+	computer_legacy.furniture_layout.bed = {"car":1,"x":27,"y":10}
+	computer_legacy.locker = computer_legacy.locker.filter(func(entry): return entry.kind != "computer")
+	computer_legacy.bag = computer_legacy.bag.filter(func(entry): return entry.kind != "computer")
+	restored.write_save(path,computer_legacy)
+	check(restored.load_cabin(path,Rail.STATIONS.keys()) and restored.valid_home_layout(restored.save_data()), "version 10 migration resolves enlarged computer footprint")
 	legacy.version = 4
 	legacy.furniture_layout = {"bed": 3, "computer": 0}
 	restored.write_save(path, legacy)

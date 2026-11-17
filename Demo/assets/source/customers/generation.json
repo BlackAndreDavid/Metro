@@ -1,0 +1,132 @@
+{
+  "style": "metro-muted-pixel-v1",
+  "selected_row": 1,
+  "candidate_count_per_role": 3,
+  "customers": {
+    "scavenger": {
+      "selected": 1,
+      "mode": "manual",
+      "pixel_block": 1,
+      "colors": 18,
+      "size": [
+        48,
+        80
+      ],
+      "candidates": [
+        {
+          "sha256": "0750f6e393286158ec62d5536376b1650ee4cf3b90aedbd7de71d181b6618cba",
+          "score": 71.046,
+          "foreground_fraction": 0.471,
+          "clipped_edges": 3
+        },
+        {
+          "sha256": "3d442928f2bb734742f7f7214696b3a42ac89bf0c277fb0033ac8b619f76aa80",
+          "score": 61.311,
+          "foreground_fraction": 0.496,
+          "clipped_edges": 4
+        },
+        {
+          "sha256": "3b1bc62c35521bbc38bee1e77ce5fbde85f4ef4de6306b8ed696e09e50cc0568",
+          "score": 62.517,
+          "foreground_fraction": 0.478,
+          "clipped_edges": 4
+        }
+      ],
+      "selection_reason": "同组比例统一，脚部完整；低饱和紫灰、青绿与赭色符合车厢画风；四种职业轮廓清晰，便于缩放表现远近。"
+    },
+    "mechanic": {
+      "selected": 1,
+      "mode": "manual",
+      "pixel_block": 1,
+      "colors": 18,
+      "size": [
+        48,
+        80
+      ],
+      "candidates": [
+        {
+          "sha256": "e730840a88316237fa0ee29eb6daae687407171418900263c880abddc071c551",
+          "score": 65.04,
+          "foreground_fraction": 0.358,
+          "clipped_edges": 4
+        },
+        {
+          "sha256": "e481f0eea4c4c0efa4cbacf035c042fa104e3d88ecff6df419468902cd9c6bd6",
+          "score": 65.441,
+          "foreground_fraction": 0.363,
+          "clipped_edges": 4
+        },
+        {
+          "sha256": "5b173e600795e1c580e1e38c64127a7e1b3666d6b542e88626650428eeddd751",
+          "score": 65.033,
+          "foreground_fraction": 0.358,
+          "clipped_edges": 4
+        }
+      ],
+      "selection_reason": "同组比例统一，脚部完整；低饱和紫灰、青绿与赭色符合车厢画风；四种职业轮廓清晰，便于缩放表现远近。"
+    },
+    "commuter": {
+      "selected": 1,
+      "mode": "manual",
+      "pixel_block": 1,
+      "colors": 18,
+      "size": [
+        48,
+        80
+      ],
+      "candidates": [
+        {
+          "sha256": "57c0125d61520570c0e4a4f682b60ef65c296bb36c84a88b99d59fb50db888d2",
+          "score": 66.443,
+          "foreground_fraction": 0.378,
+          "clipped_edges": 4
+        },
+        {
+          "sha256": "5406b71ad726ae7ded6525ac11019cb2ef29be24b4b43f8b94bbaf2f597c65fa",
+          "score": 67.243,
+          "foreground_fraction": 0.389,
+          "clipped_edges": 4
+        },
+        {
+          "sha256": "e51f4e9830f2196d4818ddd2c5eb0c98e312e7584a64a40cfdae79787d6f6bc4",
+          "score": 65.889,
+          "foreground_fraction": 0.37,
+          "clipped_edges": 4
+        }
+      ],
+      "selection_reason": "同组比例统一，脚部完整；低饱和紫灰、青绿与赭色符合车厢画风；四种职业轮廓清晰，便于缩放表现远近。"
+    },
+    "medic": {
+      "selected": 1,
+      "mode": "manual",
+      "pixel_block": 1,
+      "colors": 18,
+      "size": [
+        48,
+        80
+      ],
+      "candidates": [
+        {
+          "sha256": "6e6770e710c85ffb76b4f4f410811b2f25e0a237259e7a9b63aa6bf4ae72ed60",
+          "score": 81.98,
+          "foreground_fraction": 0.419,
+          "clipped_edges": 2
+        },
+        {
+          "sha256": "32d514f59144576918c4a321a86a961374e76247b7892e1edb1451f0e79650b6",
+          "score": 73.171,
+          "foreground_fraction": 0.437,
+          "clipped_edges": 3
+        },
+        {
+          "sha256": "96f655b30c7c0c259e168a574e8e450b37daf0ded8f2ad0d33e82ede9ecb97d6",
+          "score": 74.23,
+          "foreground_fraction": 0.41,
+          "clipped_edges": 3
+        }
+      ],
+      "selection_reason": "同组比例统一，脚部完整；低饱和紫灰、青绿与赭色符合车厢画风；四种职业轮廓清晰，便于缩放表现远近。"
+    }
+  },
+  "animation": "Runtime depth animation: scale, opacity and brightness; each source is independent."
+}

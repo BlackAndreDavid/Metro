@@ -71,13 +71,6 @@ theme_override_styles/hover = SubResource("Button")
 theme_override_styles/pressed = SubResource("Button")
 theme_override_styles/disabled = SubResource("Button")
 text = "拆除"
-[node name="Map" type="Button" parent="Toolbar/Margin/Actions"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 14
-theme_override_styles/normal = SubResource("Button")
-theme_override_styles/hover = SubResource("Button")
-theme_override_styles/pressed = SubResource("Button")
-text = "线路图"
 [node name="Expand" type="Button" parent="Toolbar/Margin/Actions"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 14
@@ -93,7 +86,7 @@ theme_override_styles/normal = SubResource("Button")
 theme_override_styles/hover = SubResource("Button")
 theme_override_styles/pressed = SubResource("Button")
 theme_override_styles/disabled = SubResource("Button")
-text = "退出建造模式"
+text = "退出装修"
 [node name="Warehouse" type="Control" parent="."]
 visible = false
 anchors_preset = 15

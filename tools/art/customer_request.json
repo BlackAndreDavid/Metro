@@ -1,0 +1,7 @@
+{
+  "style": "metro-muted-pixel-v1",
+  "subject": "四位交易客户：拾荒老人、维修工、通勤旅客、医护人员，分别完整独立成图",
+  "purpose": "车厢交易窗口，全身正面待机；三组候选，统一尺寸与落脚点",
+  "frames": 1,
+  "prompt": "Strict coarse 16-bit pixel art for a worn Shanghai metro survival game. Orthographic game sprite, crisp square pixel clusters, transparent background, no antialiasing, no text or watermark. Muted slate-purple outlines, dusty mauve, faded teal, cream, grey and ochre. Restrained shading, readable silhouette, 12-18 colors per subject. Consistent proportions, lighting from upper left and scale across frames. Subject: 四位交易客户：拾荒老人、维修工、通勤旅客、医护人员，分别完整独立成图. Function: 车厢交易窗口，全身正面待机；三组候选，统一尺寸与落脚点. Produce 1 equal-size animation frame(s), aligned feet and unchanged camera, palette and proportions. For multiple frames use a single horizontal strip, one pose per cell, no labels."
+}

@@ -29,6 +29,11 @@ func run() -> void:
 	home.state.place_furniture("computer", home.state.Furniture.default_placement("computer"))
 	home.show_cabin()
 	await capture("home_furnished")
+	var customers = home.home_backdrop.get_node("Carriage/Fixtures/TradeWindow0")
+	customers.set_process(false)
+	for depth in [0.15,0.5,1.0]:
+		customers.apply_depth(depth)
+		await capture("customer_depth_" + str(int(depth*100)))
 	home.home_backdrop.get_node("Carriage/FurnitureSlots/Bed").set_highlighted(true)
 	await capture("home_bed_outline")
 	home.home_backdrop.get_node("Carriage/FurnitureSlots/Bed").set_highlighted(false)

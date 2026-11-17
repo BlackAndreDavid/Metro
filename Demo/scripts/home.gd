@@ -185,7 +185,7 @@ func show_cabin(message: String = "") -> void:
 		show_charger.bind("") if has_charger else find_charger)
 	action(view, "电池充电", Rect2(428, 78, 122, 32), show_battery_charger.bind(""))
 	action(view, "汽修培训" if state.station == AutoRepair.STATION else "技能", Rect2(560, 78, 122, 32), show_skills.bind(""))
-	var build_button := action(view, "建造模式", Rect2(692, 78, 122, 32), construction.enter)
+	var build_button := action(view, "装修", Rect2(692, 78, 122, 32), construction.enter)
 	build_button.name = "BuildModeButton"
 	build_button.visible = not construction.active
 	if not construction.active:

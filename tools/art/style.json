@@ -1,0 +1,6 @@
+{
+  "name": "metro-muted-pixel-v1",
+  "prompt": "Strict coarse 16-bit pixel art for a worn Shanghai metro survival game. Orthographic game sprite, crisp square pixel clusters, transparent background, no antialiasing, no text or watermark. Muted slate-purple outlines, dusty mauve, faded teal, cream, grey and ochre. Restrained shading, readable silhouette, 12-18 colors per subject. Consistent proportions, lighting from upper left and scale across frames.",
+  "palette": ["#292638", "#887d9f", "#668c92", "#dfd2af", "#777785", "#ab9165"],
+  "model": "gpt-image-1"
+}

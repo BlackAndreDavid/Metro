@@ -10,7 +10,7 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 func _initialize() -> void: call_deferred("run")
 func run() -> void:
-	var expected := {"computer": Vector2i(2,2), "locker": Vector2i(3,12), "door": Vector2i(8,12), "bed": Vector2i(8,2), "screen": Vector2i(4,3)}
+	var expected := {"computer": Vector2i(3,2), "locker": Vector2i(3,12), "door": Vector2i(8,12), "bed": Vector2i(8,2), "screen": Vector2i(4,3)}
 	for kind in expected: check(Catalog.DEFINITIONS[kind].grid_size == expected[kind], "explicit footprint: " + kind)
 	check(Catalog.CELL_SIZE.x == Catalog.CELL_SIZE.y, "furniture cells are square")
 	check(Catalog.placement_rect("locker",Catalog.default_placement("locker")).size.is_equal_approx(Vector2(3,12) * Catalog.CELL_SIZE), "locker display occupies 3x12 square cells")
@@ -49,6 +49,9 @@ func run() -> void:
 		check((item.size * raw / (raw + Vector2(4,4))).is_equal_approx(bounds.size), "sprite size matches occupied grid: " + name)
 		item.set_highlighted(true)
 		check(item.caption.visible and item.visual.material.get_shader_parameter("highlighted") and item.tooltip_text.is_empty(), "single shared hover: " + name)
+	var computer_rect := Catalog.placement_rect("computer",Catalog.default_placement("computer"))
+	var visual_rect := Catalog.visual_rect("computer",computer_rect)
+	check(visual_rect.get_center().is_equal_approx(computer_rect.get_center()) and visual_rect.size.x < computer_rect.size.x, "computer maintains aspect ratio centered in 3x2 footprint")
 	var screen = backdrop.get_node("Carriage/HangingFixtures/Screen")
 	check(screen.definition.grid_size == Vector2i(4,3) and screen.get_parent().name == "HangingFixtures", "screen renders on mount plane")
 	check(screen.get_node("StationInfo").text == "%s\n%s\n%s" % [home.state.station,home.state.date_text(),home.state.weather()], "screen consistently displays station date and weather")
@@ -57,7 +60,25 @@ func run() -> void:
 		var hook: Vector2 = Vector2(154,144) + (Catalog.HANGING_ORIGINS[mount] + Vector2(14,0)) * 4
 		check(is_equal_approx(rect.get_center().x,hook.x) and is_equal_approx(rect.position.y,hook.y), "larger screen centered beneath hook")
 	screen.use()
-	check(home.map_scene.active and home.map_scene.screen == "map", "screen owns normal station action")
+	check(home.screen == "cabin" and not is_instance_valid(home.map_scene), "screen has no map action")
+	screen.set_highlighted(true)
+	check(screen.caption.visible and home.state.news() in screen.caption.text, "screen hover shows current day information")
+	var activations := [0]
+	screen.activated.connect(func(): activations[0] += 1)
+	for pressed in [true,false]:
+		var event := InputEventMouseButton.new()
+		event.button_index = MOUSE_BUTTON_LEFT
+		event.pressed = pressed
+		event.position = screen.get_global_rect().get_center()
+		event.global_position = event.position
+		root.push_input(event)
+	screen.grab_focus()
+	var enter := InputEventKey.new()
+	enter.keycode = KEY_ENTER
+	enter.pressed = true
+	root.push_input(enter)
+	await process_frame
+	check(activations[0] == 0 and home.screen == "cabin" and not is_instance_valid(home.map_scene), "screen mouse and keyboard cannot activate map")
 	home.show_cabin()
 	home.home_backdrop.get_node("Carriage/FurnitureSlots/Locker").use()
 	check(home.screen == "locker", "normal locker interaction")

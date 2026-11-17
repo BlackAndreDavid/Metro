@@ -3,7 +3,6 @@ extends Control
 ## One controller and palette for every catalog furniture instance.
 const Catalog = preload("res://scripts/items/furniture_catalog.gd")
 const BACKDROP = preload("res://scenes/game/home_backdrop.tscn")
-var map_scene: Control
 var state: RefCounted
 var focused_carriage := 0
 var font: Font
@@ -37,7 +36,6 @@ func _ready() -> void:
 	$Expansion/Center/Panel/Margin/Items/Buttons/Confirm.pressed.connect(confirm_expansion)
 	$Expansion/Center/Panel/Margin/Items/Buttons/Back.pressed.connect(func(): _refresh(""))
 	actions.get_node("Dismantle").pressed.connect(dismantle)
-	actions.get_node("Map").pressed.connect(open_map)
 	actions.get_node("Warehouse").pressed.connect(open_warehouse)
 	actions.get_node("Expand").pressed.connect(request_expansion)
 	actions.get_node("Exit").pressed.connect(exit)
@@ -196,7 +194,7 @@ func refresh_ui() -> void:
 	if not visible:
 		return
 	var has_selection := not selected_id.is_empty()
-	actions.get_node("Selection").text = "建造模式 · " + (("移动中：" if moving else "已选中：") + Catalog.DEFINITIONS[selected_id].display_name if has_selection else "长按家具1秒后拖动，或点击选中拆除")
+	actions.get_node("Selection").text = "装修 · " + (("移动中：" if moving else "已选中：") + Catalog.DEFINITIONS[selected_id].display_name if has_selection else "长按家具1秒后拖动，或点击选中拆除")
 	actions.get_node("Dismantle").disabled = not has_selection or state.furniture_layout[selected_id] == null
 
 func _refresh(message: String) -> void:
@@ -365,10 +363,3 @@ func _input(event: InputEvent) -> void:
 		elif event.pressed and moving and not $Toolbar.get_global_rect().has_point(pointer):
 			finish_drag()
 			get_viewport().set_input_as_handled()
-
-func open_map() -> void:
-	cancel_selection()
-	if not is_instance_valid(map_scene):
-		map_scene = preload("res://scenes/map/metro_map.tscn").instantiate()
-		map_scene.configure(self, _refresh)
-	map_scene.enter()
