@@ -130,7 +130,7 @@ func junction_caption(destination: int) -> String:
 	return ["去北街", "去中街", "去南街"][destination]
 
 func _process(delta: float) -> void:
-	if not state.trip_active or inspecting_vehicle or get_viewport().gui_is_dragging():
+	if state == null or not state.trip_active or inspecting_vehicle or get_viewport().gui_is_dragging():
 		return
 	var left := Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)
 	var right := Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT)

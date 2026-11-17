@@ -4,7 +4,7 @@ func _initialize() -> void:
 	call_deferred("run")
 
 func run() -> void:
-	var scene = load("res://scenes/game/cabin.tscn").instantiate()
+	var scene = load("res://scenes/game/home.tscn").instantiate()
 	root.add_child(scene)
 	await process_frame
 	if scene.screen != "rules":

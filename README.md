@@ -10,10 +10,12 @@
 - 各站有不同的供货、收购范围和当日报价，出发前可在线路图上查询。
 - 选中或拖拽物品时，用鼠标滚轮或 **R** 旋转。
 
-车厢的 Aseprite 源图在 [Demo/assets/source/SCENE.aseprite](Demo/assets/source/SCENE.aseprite)。更多玩法和编辑说明见 [Demo/README.md](Demo/README.md)。
+车厢的 Aseprite 源图在 [Demo/assets/source/Carriage.aseprite](Demo/assets/source/Carriage.aseprite)。更多玩法和编辑说明见 [Demo/README.md](Demo/README.md)。
 
 中心城区线路示意参考申通地铁 D202501 版，设施、辐射和物价采用游戏设定。[上海轨道交通网络示意图](https://www.shanghai.gov.cn/shanghai/newshanghai/shgl2025.pdf)
 
 工程目录、场景流转和模块职责见 [架构说明](Demo/ARCHITECTURE.md)。
 
 测试独立位于根目录 [test/](test/README.md)，统一运行命令：`python3 test/tools/run_tests.py --godot <Godot可执行文件>`。
+
+车厢主场景为 `Demo/scenes/game/home.tscn`；背景与车厢独立分层。电脑与探索界面的调整位置见 [结构与调整指南](Demo/ARCHITECTURE.md)。

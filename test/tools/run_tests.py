@@ -57,7 +57,10 @@ def main():
         run('cabin_smoke', ['--script', str(root / 'cases/test_cabin_smoke.gd'), '--',
                             '--save-file=' + str(output / 'smoke_save.json')],
             ['ONBOARDING_SMOKE: rules and cabin UI initialized'])
-    passed = len(results) == 3 and all(item['passed'] for item in results)
+        run('home_flow', ['--script', str(root / 'cases/test_home_flow.gd'), '--',
+                          '--save-file=' + str(output / 'home_flow_save.json')],
+            ['HOME_FLOW: 31 checks, 0 failures'])
+    passed = len(results) == 4 and all(item['passed'] for item in results)
     summary = dict(run_id=run_id, passed=passed, results=results)
     (output / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print(f'Results: {output}')

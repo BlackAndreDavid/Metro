@@ -6,7 +6,9 @@ const CargoGrid = preload("res://scripts/cargo_grid.gd")
 const SurfaceBlock = preload("res://scripts/surface_block.gd")
 const SurfaceMinimap = preload("res://scripts/surface_minimap.gd")
 const AutoRepair = preload("res://scripts/auto_repair.gd")
-const CABIN = preload("res://assets/textures/cabin.png")
+const BACKDROP = preload("res://scenes/game/home_backdrop.tscn")
+const EXPLORATION = preload("res://scenes/game/exploration.tscn")
+const SETTINGS = preload("res://scenes/ui/settings_panel.tscn")
 
 const TEXT := Color("f2eadd")
 const MUTED := Color("b9b3cb")
@@ -47,6 +49,10 @@ var battery_panel: Control
 var battery_slot_open := false
 var wrench_button: Button
 var vehicle_panel: Control
+var home_backdrop: Control
+var settings_panel: CanvasLayer
+var settings_opened_ms := 0
+var settings_was_paused := false
 
 func _ready() -> void:
 	font = SystemFont.new()
@@ -62,10 +68,11 @@ func _ready() -> void:
 	if not GameSession.active_save_path.is_empty():
 		save_path = GameSession.active_save_path
 	var menu_button := Button.new()
-	menu_button.text = "返回主菜单"
+	menu_button.name = "SettingsButton"
+	menu_button.text = "设置"
 	menu_button.position = Vector2(1100, 8)
 	menu_button.z_index = 100
-	menu_button.pressed.connect(return_to_menu)
+	menu_button.pressed.connect(show_settings)
 	add_child(menu_button)
 	var has_save := FileAccess.file_exists(save_path)
 	var loaded := state.load_cabin(save_path, Rail.STATIONS.keys())
@@ -192,14 +199,12 @@ func invisible_action(parent: Control, area: Rect2, callback: Callable) -> Butto
 	return hit
 
 func cabin_art() -> void:
-	var art := TextureRect.new()
-	art.texture = CABIN
-	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	art.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	art.mouse_filter = MOUSE_FILTER_IGNORE
-	put(view, art, Rect2(0, 0, 1280, 720))
+	home_backdrop = BACKDROP.instantiate()
+	view.add_child(home_backdrop)
+	home_backdrop.interaction_enabled = screen == "cabin"
 
-func begin_page(kind: String) -> void:
+func begin_page(kind: String, scene: PackedScene = null) -> void:
+	home_backdrop = null
 	if is_instance_valid(view):
 		view.hide()
 		view.queue_free()
@@ -212,8 +217,9 @@ func begin_page(kind: String) -> void:
 	grids.clear()
 	status = null
 	time_label = null
-	view = Control.new()
-	view.name = kind.capitalize()
+	view = scene.instantiate() if scene != null else Control.new()
+	if scene == null:
+		view.name = kind.capitalize()
 	view.mouse_filter = MOUSE_FILTER_IGNORE
 	add_child(view)
 	view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -259,16 +265,22 @@ func show_cabin(message: String = "") -> void:
 		label(view, "今日停电", Rect2(848, 163, 92, 33), 15, AMBER)
 	if state.debt > 0.0:
 		label(view, "待还欠费  %s 度" % energy_text(state.debt), Rect2(946, 163, 174, 33), 16, AMBER, HORIZONTAL_ALIGNMENT_RIGHT)
-	label(view, "%s\n%s\n%s" % [state.station, state.date_text(), state.weather()],
-		Rect2(268, 300, 100, 73), 13, Color("322d3d"), HORIZONTAL_ALIGNMENT_CENTER)
+	label(home_backdrop.get_node("Carriage/Hotspots"), "%s\n%s\n%s" % [state.station, state.date_text(), state.weather()],
+		Rect2(266, 236, 100, 73), 13, Color("322d3d"), HORIZONTAL_ALIGNMENT_CENTER)
 	for spot in HOTSPOTS:
 		var area: Rect2 = spot[1]
-		area.position = (area.position + Vector2(32, -54)) * 4.0
+		area.position = area.position * 4.0 + Vector2(126, -280)
 		area.size *= 4.0
-		var hotspot := invisible_action(view, area.grow(4), use_hotspot.bind(spot[3]))
+		var callback := use_hotspot.bind(spot[3])
+		var world: Control = home_backdrop.get_node("Carriage/Hotspots")
+		var hotspot := invisible_action(world, area.grow(4), callback)
+		home_backdrop.bind_hotspot(hotspot, callback)
+		hotspot.name = str(spot[3]) + "Hit"
 		hotspot.tooltip_text = spot[0]
 		var tag_width := 92.0 if String(spot[0]).length() > 2 else 59.0
-		var tag := action(view, spot[0], Rect2(Vector2(spot[2]) - Vector2(tag_width / 2.0, 0), Vector2(tag_width, 32)), use_hotspot.bind(spot[3]))
+		var tag := action(world, spot[0], Rect2(Vector2(spot[2]) - Vector2(tag_width / 2.0 + 2, 64), Vector2(tag_width, 32)), callback)
+		home_backdrop.bind_hotspot(tag, callback)
+		tag.name = str(spot[3]) + "Label"
 		tag.add_theme_font_size_override("font_size", 14)
 	if not message.is_empty():
 		plate(view, Rect2(208, 647, 864, 38), Color("211f31e8"), BORDER)
@@ -628,6 +640,7 @@ func show_news() -> void:
 	screen = "news"
 	overlay(view, Color("141021bb"))
 	var card := plate(view, Rect2(318, 173, 644, 372), Color("2c253b"), Color("746582"))
+	card.name = "NewsCard"
 	label(card, "当日新闻", Rect2(28, 20, 430, 48), 30)
 	action(card, "关闭", Rect2(550, 25, 66, 36), show_map)
 	label(card, "%s    地面天气 · %s" % [state.date_text(), state.weather()], Rect2(28, 75, 522, 25), 16, MINT)
@@ -643,7 +656,9 @@ func show_map() -> void:
 	action(view, "当日新闻", Rect2(1014, 28, 102, 38), show_news)
 	action(view, "返回车厢", Rect2(1132, 28, 108, 38), show_cabin.bind(""))
 	var paper := plate(view, Rect2(40, 89, 865, 585), Rail.PAPER)
+	paper.name = "NetworkMapPanel"
 	var map := Rail.new()
+	map.name = "RailMap"
 	map.setup(font, state.station, selected_station, select_station)
 	put(paper, map, Rect2(8, 50, 849, 505))
 	var legend_x := 19.0
@@ -656,6 +671,7 @@ func show_map() -> void:
 	label(paper, "●  当前站     ▱  换乘站", Rect2(604, 15, 235, 20), 13, Rail.INK, HORIZONTAL_ALIGNMENT_RIGHT)
 	label(paper, "站点示意依据申通地铁 D202501 版线路图", Rect2(19, 554, 810, 22), 12, Color("625b65"))
 	var detail := plate(view, Rect2(923, 89, 317, 585), DARK, BORDER)
+	detail.name = "StationDetails"
 	label(detail, "当前站 · %s" % state.station, Rect2(20, 15, 280, 29), 15, MINT)
 	if selected_station.is_empty():
 		label(detail, "选择目的地", Rect2(20, 60, 280, 39), 26)
@@ -834,38 +850,8 @@ func move_cargo(target: String, cell: Vector2i) -> void:
 		show_surface(message)
 
 func show_gear(message: String = "") -> void:
-	begin_page("gear")
-	var panel := modal("出站整备 · %s" % state.station, Rect2(150, 106, 980, 510))
-	var radiation: int = Rail.station_info(state.station).radiation
-	label(panel, "区域辐射 · %s   /   外出上限 %d 秒" % [RADIATION[radiation], state.trip_limit()], Rect2(24, 83, 530, 28), 17, AMBER)
-	label(panel, "防护服租用", Rect2(24, 133, 260, 30), 20)
-	label(panel, "携带装备", Rect2(360, 133, 260, 30), 20)
-	label(panel, "背包规格", Rect2(692, 133, 260, 30), 20)
-	action(panel, "普通防护服    %d 度" % state.suit_rent(false), Rect2(24, 178, 263, 48), choose_gear.bind("heavy", false), not loadout.heavy)
-	action(panel, "加强防护服    %d 度" % state.suit_rent(true), Rect2(24, 236, 263, 48), choose_gear.bind("heavy", true), loadout.heavy)
-	wrapped(panel, "超时赔偿普通 300 度、加强 500 度。高辐射区需加强防护服。", Rect2(24, 305, 263, 62), 15, MUTED)
-	label(panel, "手电筒必带 · %s" % installed_battery_text(), Rect2(360, 176, 263, 26), 17, MINT)
-	swap_button(panel, Rect2(360, 211, 263, 39))
-	action(panel, "撬棍   %s" % ("已携带" if loadout.crowbar else "未携带"), Rect2(360, 259, 263, 40), choose_gear.bind("crowbar", not loadout.crowbar), loadout.crowbar)
-	var carry_wrench: bool = loadout.get("wrench", false)
-	var wrench := action(panel, "扳手   %s" % ("已携带" if carry_wrench else "未携带"), Rect2(360, 309, 263, 40), choose_gear.bind("wrench", not carry_wrench), carry_wrench)
-	wrench.disabled = state.auto_repair_level == 0
-	wrench.tooltip_text = "完成同济大学汽修一级培训后获得。"
-	label(panel, "按 1 照明 · 每秒耗电 5%", Rect2(360, 353, 263, 24), 14, MUTED)
-	action(panel, "小背包    5 × 4", Rect2(692, 178, 263, 48), choose_gear.bind("wide", false), not loadout.wide)
-	action(panel, "大背包    6 × 5", Rect2(692, 236, 263, 48), choose_gear.bind("wide", true), loadout.wide)
-	wrapped(panel, "出发前可在柜子里腾出空间。", Rect2(692, 308, 263, 49), 15, MUTED)
-	plate(panel, Rect2(24, 385, 932, 1), BORDER)
-	label(panel, "电力余额  %s 度" % str(snappedf(state.account, 0.1)), Rect2(24, 429, 247, 44), 19, AMBER)
-	status = label(panel, "", Rect2(280, 421, 405, 60), 15, AMBER)
-	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	report(message)
-	var rent := state.suit_rent(loadout.heavy)
-	var shortfall := state.credit_shortfall(rent)
-	var caption := "确认出发 · %d 度" % rent
-	if shortfall > 0.0:
-		caption += " · 欠 %s 度" % energy_text(shortfall)
-	action(panel, caption, Rect2(700, 427, 256, 46), confirm_departure, true)
+	begin_page("gear", preload("res://scenes/game/exploration_setup.tscn"))
+	view.configure(self, message)
 
 func installed_battery_text() -> String:
 	return "未装七号电池" if state.installed_charge == State.NO_CELL else "%d%%" % state.installed_charge
@@ -906,28 +892,8 @@ func show_surface(message: String = "") -> void:
 
 func show_exploration_block(message: String) -> void:
 	if not is_instance_valid(surface_block):
-		begin_page("surface")
-		overlay(view, Color("191827"))
-		surface_location = label(view, "", Rect2(40, 24, 770, 46), 32)
-		label(view, "%s站出发    /    车电 %s" % [state.station, car_power_text()], Rect2(43, 73, 560, 25), 16, MINT)
-		time_label = label(view, "", Rect2(1018, 32, 222, 41), 25, AMBER, HORIZONTAL_ALIGNMENT_RIGHT)
-		surface_block = SurfaceBlock.new()
-		surface_block.setup(state, font)
-		surface_block.pickup_requested.connect(pick_up_surface_item)
-		surface_block.extraction_requested.connect(extract_from_block)
-		surface_block.vehicle_requested.connect(show_vehicle)
-		var street_frame := Control.new()
-		street_frame.clip_contents = true
-		street_frame.mouse_filter = MOUSE_FILTER_IGNORE
-		put(view, street_frame, Rect2(40, 112, 777, 524))
-		put(street_frame, surface_block, Rect2(Vector2.ZERO, street_frame.size))
-		var map := SurfaceMinimap.new()
-		map.name = "Minimap"
-		map.setup(surface_block, font)
-		put(view, map, Rect2(550, 126, 250, 172))
-		surface_prompt = label(view, "", Rect2(56, 584, 745, 32), 17, AMBER)
-		status = label(view, "", Rect2(42, 647, 1190, 33), 16, AMBER)
-		surface_block.moved.connect(update_surface_position)
+		begin_page("surface", EXPLORATION)
+		view.configure(self)
 	selection = {}
 	update_trip_clock()
 	update_surface_pack(true)
@@ -1058,7 +1024,9 @@ func update_surface_pack(walking: bool) -> void:
 		surface_pack.hide()
 		surface_pack.queue_free()
 	grids.clear()
-	var sidebar := plate(view, Rect2(836, 112, 404, 524), DARK, BORDER)
+	var parent: Control = view.get_node("PackAnchor") if view.has_node("PackAnchor") else view
+	var bounds := Rect2(Vector2.ZERO, parent.size) if parent != view else Rect2(836, 112, 404, 524)
+	var sidebar := plate(parent, bounds, DARK, BORDER)
 	surface_pack = sidebar
 	label(sidebar, cargo_title("bag"), Rect2(24, 17, 354, 33), 22)
 	add_grid(sidebar, "bag", Vector2(24, 60), 48)
@@ -1177,8 +1145,34 @@ class SurfaceScenery extends Control:
 
 func return_to_menu() -> void:
 	var dialog := ConfirmationDialog.new()
+	dialog.name = "ReturnConfirmation"
+	dialog.process_mode = Node.PROCESS_MODE_ALWAYS
 	dialog.dialog_text = "返回主菜单？未在床铺保存的进度将丢失。"
-	dialog.confirmed.connect(func(): get_tree().change_scene_to_file("res://scenes/ui/main_menu.tscn"))
+	dialog.confirmed.connect(func():
+		close_settings()
+		get_tree().change_scene_to_file("res://scenes/ui/main_menu.tscn"))
 	dialog.canceled.connect(dialog.queue_free)
 	add_child(dialog)
 	dialog.popup_centered()
+
+func show_settings() -> void:
+	if is_instance_valid(settings_panel):
+		return
+	if is_instance_valid(home_backdrop):
+		home_backdrop.dragging = false
+	settings_panel = SETTINGS.instantiate()
+	settings_opened_ms = Time.get_ticks_msec()
+	settings_was_paused = get_tree().paused
+	settings_panel.closed.connect(close_settings)
+	settings_panel.return_requested.connect(return_to_menu)
+	add_child(settings_panel)
+	get_tree().paused = true
+
+func close_settings() -> void:
+	if not is_instance_valid(settings_panel):
+		return
+	if state.trip_active:
+		state.trip_deadline_ms += Time.get_ticks_msec() - settings_opened_ms
+	get_tree().paused = settings_was_paused
+	settings_panel.queue_free()
+	settings_panel = null

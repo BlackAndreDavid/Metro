@@ -90,6 +90,6 @@ func load_slot(slot: int) -> void:
 	enter_game()
 
 func enter_game() -> void:
-	var err := get_tree().change_scene_to_file("res://scenes/game/cabin.tscn")
+	var err := get_tree().change_scene_to_file("res://scenes/game/home.tscn")
 	if err != OK:
 		message.text = "场景加载失败：" + error_string(err)

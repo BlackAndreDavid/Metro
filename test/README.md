@@ -7,15 +7,17 @@ test/
 ├─ cases/
 │  ├─ test_state.gd          经济、许可证、存档：33 项断言
 │  ├─ test_menu_flow.gd      菜单与三栏位：18 项检查，包含状态回归
-│  └─ test_cabin_smoke.gd    规则页 → 车厢 UI 初始化
+│  ├─ test_cabin_smoke.gd    规则页 → Home UI 初始化
+│  └─ test_home_flow.gd      31 项检查：视角、真实电脑点击、设置与地表流程
 ├─ tools/
-│  └─ run_tests.py           统一入口：资源导入 → 菜单与状态 → 车厢冒烟
+│  └─ run_tests.py           统一入口：资源导入 → 菜单与状态 → Home 冒烟 → Home 集成
 ├─ results/
 │  ├─ <UTC时间-唯一编号>/   每次运行独立保存
 │  │  ├─ summary.json       各步骤退出码、通过状态和日志路径
 │  │  ├─ import.log
 │  │  ├─ menu_flow.log
 │  │  ├─ cabin_smoke.log
+│  │  ├─ home_flow.log
 │  │  └─ 生成的存档、配置与缓存
 │  ├─ legacy/              迁移前已有的测试存档（如存在）
 │  └─ logs/                Windows 游戏、编辑器启动日志

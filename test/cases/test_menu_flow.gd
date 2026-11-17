@@ -33,7 +33,7 @@ func run() -> void:
 	slots.queue_free()
 	await process_frame
 	check(session.select_slot(2), "select second save")
-	var cabin = load("res://scenes/game/cabin.tscn").instantiate()
+	var cabin = load("res://scenes/game/home.tscn").instantiate()
 	root.add_child(cabin)
 	check(cabin.save_path == session.slot_path(2), "cabin uses selected slot")
 	check(cabin.state.base_name == "基地2", "cabin loads correct base")
