@@ -20,8 +20,6 @@ const HOTSPOTS := [
 	["柜子", Rect2(9, 128, 25, 76), Vector2(210, 522), "locker"],
 	["出站探索", Rect2(66, 123, 63, 78), Vector2(453, 522), "gear"],
 	["交易", Rect2(144, 123, 101, 49), Vector2(874, 350), "trade"],
-	["电脑", Rect2(158, 176, 23, 18), Vector2(802, 571), "news"],
-	["休息存档", Rect2(182, 185, 62, 10), Vector2(984, 571), "rest"],
 ]
 const LOOT_SPOTS := [Vector2(114, 348), Vector2(266, 380), Vector2(400, 335), Vector2(563, 397), Vector2(681, 335), Vector2(710, 455)]
 const RADIATION := ["", "低", "中", "高"]
@@ -53,6 +51,9 @@ var home_backdrop: Control
 var settings_panel: CanvasLayer
 var settings_opened_ms := 0
 var settings_was_paused := false
+var focused_carriage := 0
+var placement_mode := false
+var selected_furniture := ""
 
 func _ready() -> void:
 	font = SystemFont.new()
@@ -70,7 +71,8 @@ func _ready() -> void:
 	var menu_button := Button.new()
 	menu_button.name = "SettingsButton"
 	menu_button.text = "设置"
-	menu_button.position = Vector2(1100, 8)
+	menu_button.position = Vector2(1160, 12)
+	menu_button.size = Vector2(88, 36)
 	menu_button.z_index = 100
 	menu_button.pressed.connect(show_settings)
 	add_child(menu_button)
@@ -186,6 +188,8 @@ func action(parent: Control, caption: String, bounds: Rect2, callback: Callable,
 	var node := Button.new()
 	node.text = caption
 	button_style(node, prominent)
+	if bounds.size.y < 32:
+		node.add_theme_font_size_override("font_size", 14)
 	node.pressed.connect(callback)
 	put(parent, node, bounds)
 	return node
@@ -202,6 +206,7 @@ func cabin_art() -> void:
 	home_backdrop = BACKDROP.instantiate()
 	view.add_child(home_backdrop)
 	home_backdrop.interaction_enabled = screen == "cabin"
+	home_backdrop.configure_home(self)
 
 func begin_page(kind: String, scene: PackedScene = null) -> void:
 	home_backdrop = null
@@ -212,6 +217,9 @@ func begin_page(kind: String, scene: PackedScene = null) -> void:
 		surface_block = null
 		battery_slot_open = false
 		vehicle_panel = null
+	if kind != "cabin":
+		placement_mode = false
+		selected_furniture = ""
 	screen = kind
 	selection = {}
 	grids.clear()
@@ -245,26 +253,34 @@ func power(parent: Control, at: Vector2, title: String, value: String, tint: Col
 func show_cabin(message: String = "") -> void:
 	begin_page("cabin")
 	cabin_art()
-	label(view, "终末地铁", Rect2(156, 59, 420, 60), 44)
-	label(view, "%s   /   %s   /   %s" % [state.station, state.date_text(), state.weather()], Rect2(159, 126, 560, 26), 20, MINT)
-	power(view, Vector2(641, 80), "车内电源", car_power_text(), MINT)
-	power(view, Vector2(889, 80), "账户余额", "%s 度" % energy_text(state.account), AMBER)
+	label(view, "终末地铁 · %s" % state.base_name, Rect2(32, 6, 560, 39), 30)
+	label(view, "%s / %s / %s" % [state.station, state.date_text(), state.weather()], Rect2(34, 46, 560, 26), 17, MINT)
+	power(view, Vector2(641, 8), "车内电源", car_power_text(), MINT)
+	power(view, Vector2(889, 8), "账户余额", "%s 度" % energy_text(state.account), AMBER)
 	var water := action(view, "已喝水" if state.drank_today else "喝水 · %d" % state.supply_count("water"),
-		Rect2(156, 163, 126, 33), use_supply.bind("water"))
+		Rect2(32, 78, 122, 32), use_supply.bind("water"))
 	water.disabled = state.drank_today
 	var ration := action(view, "已进食" if state.ate_today else "进食 · %d" % state.supply_count("ration"),
-		Rect2(294, 163, 126, 33), use_supply.bind("ration"))
+		Rect2(164, 78, 122, 32), use_supply.bind("ration"))
 	ration.disabled = state.ate_today
 	var has_charger := state.has_charger(state.station)
-	action(view, "充电站" if has_charger else "找充电站", Rect2(432, 163, 126, 33),
+	action(view, "充电站" if has_charger else "找充电站", Rect2(296, 78, 122, 32),
 		show_charger.bind("") if has_charger else find_charger)
-	action(view, "电池充电", Rect2(570, 163, 126, 33), show_battery_charger.bind(""))
-	var skill_caption := "汽修培训" if state.station == AutoRepair.STATION else "技能"
-	action(view, skill_caption, Rect2(710, 163, 126, 33), show_skills.bind(""), state.station == AutoRepair.STATION)
-	if state.is_blackout():
-		label(view, "今日停电", Rect2(848, 163, 92, 33), 15, AMBER)
-	if state.debt > 0.0:
-		label(view, "待还欠费  %s 度" % energy_text(state.debt), Rect2(946, 163, 174, 33), 16, AMBER, HORIZONTAL_ALIGNMENT_RIGHT)
+	action(view, "电池充电", Rect2(428, 78, 122, 32), show_battery_charger.bind(""))
+	action(view, "汽修培训" if state.station == AutoRepair.STATION else "技能", Rect2(560, 78, 122, 32), show_skills.bind(""))
+	action(view, "结束布置" if placement_mode else "布置家具", Rect2(692, 78, 122, 32), toggle_placement)
+	action(view, "扩建车厢", Rect2(824, 78, 122, 32), show_expansion)
+	if placement_mode:
+		action(view, "摆放床", Rect2(32, 112, 100, 27), select_home_furniture.bind("bed"), selected_furniture == "bed")
+		action(view, "摆放电脑", Rect2(144, 112, 100, 27), select_home_furniture.bind("computer"), selected_furniture == "computer")
+		label(view, "选择家具后点击空槽；点击已摆家具可收纳。床、电脑各一件。", Rect2(258, 118, 900, 23), 14, AMBER)
+	else:
+		action(view, "柜子", Rect2(32, 112, 100, 27), use_hotspot.bind("locker"))
+		action(view, "交易", Rect2(144, 112, 100, 27), use_hotspot.bind("trade"))
+		action(view, "出站探索", Rect2(256, 112, 110, 27), use_hotspot.bind("gear"))
+		label(view, "%d 节车厢 · 行车 %d 度/站 · 每日 %s 度" % [state.carriage_count, state.travel_cost_per_stop(), energy_text(state.daily_power_cost())], Rect2(384, 118, 560, 23), 15, MINT)
+	if state.debt > 0:
+		label(view, "欠费 %s 度" % energy_text(state.debt), Rect2(964, 82, 268, 32), 16, AMBER)
 	label(home_backdrop.get_node("Carriage/Hotspots"), "%s\n%s\n%s" % [state.station, state.date_text(), state.weather()],
 		Rect2(266, 236, 100, 73), 13, Color("322d3d"), HORIZONTAL_ALIGNMENT_CENTER)
 	for spot in HOTSPOTS:
@@ -277,11 +293,6 @@ func show_cabin(message: String = "") -> void:
 		home_backdrop.bind_hotspot(hotspot, callback)
 		hotspot.name = str(spot[3]) + "Hit"
 		hotspot.tooltip_text = spot[0]
-		var tag_width := 92.0 if String(spot[0]).length() > 2 else 59.0
-		var tag := action(world, spot[0], Rect2(Vector2(spot[2]) - Vector2(tag_width / 2.0 + 2, 64), Vector2(tag_width, 32)), callback)
-		home_backdrop.bind_hotspot(tag, callback)
-		tag.name = str(spot[3]) + "Label"
-		tag.add_theme_font_size_override("font_size", 14)
 	if not message.is_empty():
 		plate(view, Rect2(208, 647, 864, 38), Color("211f31e8"), BORDER)
 		label(view, message, Rect2(222, 647, 836, 38), 16, MINT, HORIZONTAL_ALIGNMENT_CENTER)
@@ -367,7 +378,7 @@ func show_rules(message: String) -> void:
 	begin_page("rules")
 	var panel := modal("简要规则", Rect2(302, 99, 676, 522), dismiss_rules)
 	var rules := [
-		["用电与欠费", "行车每站耗 %d 度，电脑每天耗 %d 度。充电、购物和租防护服时，余额不足可挂账。七号电池在车内充。" % [State.TRAVEL_COST_PER_STOP, State.COMPUTER_DAILY_COST]],
+		["用电与欠费", "行车每站耗 %d 度，车厢每日结算耗 %d 度。充电、购物和租防护服时，余额不足可挂账。七号电池在车内充。" % [state.travel_cost_per_stop(), state.daily_power_cost()]],
 		["限时探索", "每次出站限时 %d 秒。出站必带装有七号电池的手电筒，按 1 开关照明。" % state.trip_limit()],
 		["超时赔偿", "超时丢失随身物品。普通防护服赔偿 300 度，加强型 500 度，余额不足记作欠费。"],
 		["每日生存", "每天喝水、进食，睡觉时结算。连续两天未喝水或欠费、连续三天未进食都会结束本轮。"],
@@ -475,7 +486,7 @@ func find_charger() -> void:
 			continue
 		if nearest.is_empty():
 			nearest = location
-		var travel_cost: int = (routes[location].size() - 1) * State.TRAVEL_COST_PER_STOP
+		var travel_cost: int = (routes[location].size() - 1) * state.travel_cost_per_stop()
 		if state.charger_stock(location) > 0.0 and state.car_power >= travel_cost:
 			open_market_map(location)
 			return
@@ -493,7 +504,7 @@ func show_rest() -> void:
 		Rect2(24, 163, 552, 26), 16, MUTED)
 	label(panel, "待还欠费 %s 度     结算后连续欠费 %d / 2 天" % [energy_text(state.debt), after.days_in_debt],
 		Rect2(24, 197, 552, 26), 16, MUTED)
-	label(panel, "电脑每日耗电 %d 度     结算后车内剩余 %s 度" % [State.COMPUTER_DAILY_COST, energy_text(state.overnight_power())],
+	label(panel, "车厢每日耗电 %d 度     结算后车内剩余 %s 度" % [state.daily_power_cost(), energy_text(state.overnight_power())],
 		Rect2(24, 231, 552, 26), 16, MUTED)
 	status = label(panel, "", Rect2(24, 259, 552, 26), 15, AMBER)
 	report("今晚结算会结束本轮。" if not after.game_over_reason.is_empty() else "")
@@ -527,6 +538,7 @@ func restart_game() -> void:
 		report("新存档写入失败（%s）。" % error_string(err))
 		return
 	state = fresh
+	focused_carriage = 0
 	show_cabin()
 
 func show_trade(message: String = "") -> void:
@@ -695,7 +707,7 @@ func show_map() -> void:
 	plate(detail, Rect2(20, 333, 277, 1), BORDER)
 	var path := Rail.route(state.station, selected_station)
 	var steps := maxi(0, path.size() - 1)
-	var fare := steps * State.TRAVEL_COST_PER_STOP
+	var fare := steps * state.travel_cost_per_stop()
 	label(detail, "行车路线 · %d 站" % steps, Rect2(20, 345, 275, 27), 16, MINT)
 	var itinerary := "  →  ".join(PackedStringArray(path))
 	wrapped(detail, itinerary, Rect2(20, 382, 276, 103), 14, MUTED)
@@ -752,7 +764,7 @@ func set_map_tab(outside: bool) -> void:
 func travel() -> void:
 	var steps := Rail.route(state.station, selected_station).size() - 1
 	if state.travel_to(selected_station, steps):
-		show_cabin("已抵达 %s · 消耗车内电源 %d 度" % [state.station, steps * State.TRAVEL_COST_PER_STOP])
+		show_cabin("已抵达 %s · 消耗车内电源 %d 度" % [state.station, steps * state.travel_cost_per_stop()])
 
 func add_grid(parent: Control, target: String, at: Vector2, pixels: int) -> void:
 	var grid := CargoGrid.new()
@@ -1176,3 +1188,49 @@ func close_settings() -> void:
 	get_tree().paused = settings_was_paused
 	settings_panel.queue_free()
 	settings_panel = null
+
+func toggle_placement() -> void:
+	placement_mode = not placement_mode
+	selected_furniture = ""
+	show_cabin("家具摆放和扩建进度会随床铺存档保存。")
+
+func select_home_furniture(kind: String) -> void:
+	placement_mode = true
+	selected_furniture = kind
+	show_cabin("请选择空槽；原家具将移动到新槽位，不会复制。")
+
+func place_home_furniture(slot: int) -> void:
+	if not placement_mode or selected_furniture.is_empty():
+		placement_mode = true
+		show_cabin("请先在上方选择要摆放的家具。")
+		return
+	var problem := state.place_furniture(selected_furniture, slot)
+	if problem.is_empty():
+		focused_carriage = floori(slot / 2.0)
+	show_cabin("家具已摆放。" if problem.is_empty() else problem)
+
+func store_home_furniture(kind: String) -> void:
+	var problem := state.store_furniture(kind)
+	show_cabin("家具已收纳，可重新选择空槽摆放。" if problem.is_empty() else problem)
+
+func show_expansion() -> void:
+	begin_page("expansion")
+	var panel := modal("车厢扩建 · %d / %d 节" % [state.carriage_count, State.MAX_CARRIAGES], Rect2(300, 145, 680, 430))
+	label(panel, "材料从柜子和背包扣除，家具槽位增加 2 个。", Rect2(24, 84, 632, 28), 18, MINT)
+	var row := 0
+	for kind in State.EXPANSION_COST:
+		label(panel, "%s  × %d     当前拥有 %d" % [state.item_name(kind), State.EXPANSION_COST[kind], state.material_count(kind)], Rect2(24, 125 + row * 35, 632, 30), 18)
+		row += 1
+	label(panel, "行车：%d → %d 度/站   每日：%s → %s 度" % [state.travel_cost_per_stop(), state.travel_cost_per_stop() + State.EXTRA_TRAVEL_COST, energy_text(state.daily_power_cost()), energy_text(state.daily_power_cost() + State.EXTRA_DAILY_COST)], Rect2(24, 249, 632, 32), 18, AMBER)
+	wrapped(panel, "跨站接应也使用新的行车耗电。扩建后需在床铺保存。", Rect2(24, 291, 632, 43), 16, MUTED)
+	status = label(panel, state.expansion_problem(), Rect2(24, 335, 632, 24), 15, AMBER)
+	var confirm := action(panel, "消耗材料并扩建一节", Rect2(24, 372, 632, 38), confirm_expansion, true)
+	confirm.disabled = not state.expansion_problem().is_empty()
+
+func confirm_expansion() -> void:
+	var problem := state.expand_carriage()
+	if problem.is_empty():
+		focused_carriage = state.carriage_count - 1
+		show_cabin("扩建完成，车厢已增加两个家具槽位。请在床铺保存进度。")
+	else:
+		report(problem)

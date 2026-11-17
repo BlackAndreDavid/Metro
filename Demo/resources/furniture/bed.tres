@@ -1,0 +1,11 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://scripts/items/furniture_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/textures/Bed.png" id="2"]
+[resource]
+script = ExtResource("1")
+id = "bed"
+display_name = "床"
+function_text = "睡觉"
+action = "rest"
+texture = ExtResource("2")
+source_origin = Vector2(175, 79)

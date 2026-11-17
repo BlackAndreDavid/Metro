@@ -26,6 +26,8 @@ func run() -> void:
 	var home = load("res://scenes/game/home.tscn").instantiate()
 	root.add_child(home)
 	await process_frame
+	home.state.place_furniture("computer", 0)
+	home.state.place_furniture("bed", 1)
 	home.show_cabin()
 	await process_frame
 	check(home.name == "Home", "renamed home scene")
@@ -53,8 +55,13 @@ func run() -> void:
 	check(backdrop.offset.is_equal_approx(Vector2(35, 14)), "gentle drag sensitivity")
 	backdrop.pan_by(-backdrop.offset)
 	# Exercise real GUI routing on the computer tag, including click-vs-drag.
-	var tag = backdrop.get_node("Carriage/Hotspots/newsLabel")
-	var point: Vector2 = tag.global_position + tag.size / 2
+	var tag = backdrop.get_node("Carriage/FurnitureSlots/Computer")
+	var hit := Vector2.ZERO
+	for y in range(tag.padded_image.get_height()):
+		for x in range(tag.padded_image.get_width()):
+			if tag.padded_image.get_pixel(x, y).a > 0.9:
+				hit = (Vector2(x, y) + Vector2(0.5, 0.5)) / Vector2(tag.padded_image.get_size()) * tag.size
+	var point: Vector2 = tag.global_position + hit
 	root.push_input(mouse_button(point, true))
 	var gui_motion := InputEventMouseMotion.new()
 	gui_motion.position = point + Vector2(80, 20)

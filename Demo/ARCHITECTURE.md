@@ -8,12 +8,15 @@ Metro/
 │  ├─ project.godot
 │  ├─ scenes/
 │  │  ├─ ui/     main_menu.tscn、save_select.tscn、settings_panel.tscn
+│  │  ├─ items/ highlightable_item.tscn、furniture.tscn
 │  │  └─ game/   home.tscn、home_backdrop.tscn、exploration_setup.tscn、exploration.tscn、main.tscn
+│  ├─ resources/furniture/         床、电脑的数据定义与裁剪偏移
 │  ├─ scripts/
 │  │  ├─ home.gd                    游戏状态与页面调度
 │  │  ├─ exploration.gd             地表场景和主控制器的连接
 │  │  ├─ core/game_session.gd        三栏位存档选择
 │  │  ├─ ui/                        菜单、设置、车厢视角、探索整备
+│  │  ├─ items/                     可高亮物品、家具与功能定义
 │  │  ├─ cabin_state.gd             车厢经济、生存、物品与存档
 │  │  ├─ cabin_map.gd               地铁线路与地图绘制
 │  │  ├─ cabin_markets.gd           各站供需与报价
@@ -24,14 +27,14 @@ Metro/
 │  │  └─ main.gd / world.gd / player.gd / state.gd
 │  │                                早期横版原型（state 也是车厢状态基类）
 │  ├─ assets/
-│  │  ├─ textures/                  Carriage.png、BG_Afternoon.png；旧 cabin.png 保留
+│  │  ├─ textures/                  Carriage.png、BG_Afternoon.png、Bed.png、LapTop.png
 │  │  ├─ source/                    Carriage.aseprite、BG_Afternoon.aseprite 等编辑源文件
 │  │  ├─ shaders/                   地表照明着色器
 │  │  └─ icons/
 │  └─ addons/godot_ai/               第三方插件，保持内部布局
 ├─ tools/                           美术导出、原生 Aseprite 透明画布裁剪工具
 └─ test/
-   ├─ cases/                        状态、菜单、车厢冒烟和 Home 集成测试
+   ├─ cases/                        状态、菜单、车厢冒烟、Home 与建造集成测试
    ├─ tools/run_tests.py             统一入口
    └─ results/                      每次运行的独立结果、日志和测试数据
 ```
@@ -138,39 +141,85 @@ Exploration (Control，exploration.gd)
 
 邮电新村、四平路、同济大学使用此街区场景；其余站点继续使用原有简化搜刮页面，未将其伪装为完整街区。
 
-## 分层车厢与视角拖拽
+## 分层车厢、家具和视角拖拽
 
 ```text
 Home 动态页面
+├─ 固定顶部工具栏（按钮底边 ≤ 144，不遮挡居中车厢）
 └─ HomeBackdrop (home_backdrop.tscn / home_backdrop.gd)
-   ├─ Background                BG_Afternoon.png，位于后层
-   └─ Carriage                  前层，整体跟随拖拽
-      ├─ Texture                Carriage.png
-      └─ Hotspots               柜子、车门、交易、电脑、床的点击区与标签
+   ├─ Background                BG_Afternoon.png，后层视差
+   └─ Carriage                  整列车的变换父节点
+      ├─ Texture                第一节空车厢
+      ├─ Hotspots               原有柜子、交易、车门交互区
+      ├─ Carriage2 / Carriage3   扩建时复用同一空车厢贴图
+      └─ FurnitureSlots
+         ├─ SlotN               未占用槽位
+         ├─ Bed                 独立床素材 + 睡觉行为
+         └─ Computer            独立电脑素材 + 使用电脑行为
 ```
 
-新的 `Carriage.aseprite` 已将完全透明边缘裁掉，从 256×256 变为 **243×108**，保留所有图层与像素。裁剪移除了左 7、上 106、右 6、下 42 像素。游戏中车厢按 4 倍显示（972×432），默认位于 `(154,144)`，可见内容中心为 `(640,360)`。背景保持原始 256×256。
+每节车厢包含两个家具槽位。新档自带一张床和一台电脑，初始在收纳区；点击顶部“布置家具”，选择“摆放床”或“摆放电脑”，再点空槽即可。移动同一家具不会复制；已占用槽位不能覆盖，布置模式下点已有家具将其收纳。结束布置后，点击家具本体执行其功能。新档首次放好床后即可像以前一样休息存档。
 
-按住鼠标左键拖拽空白场景或车厢热点，移动超过 6 个逻辑像素后进入拖拽；轻点仍执行原交互，拖拽结束不会误开柜子或电脑。HUD 的按钮与设置不跟随场景移动。
+**可复用高亮与家具封装：**
 
-`home_backdrop.tscn` 根节点可调：
+- `scenes/items/highlightable_item.tscn` + `scripts/items/highlightable_item.gd` 提供统一纹理透明度命中检测、悬停功能文字与描边材质。透明画布不会成为点击区。
+- `assets/shaders/item_outline.gdshader` 使用周围 8 个方向的 alpha 膨胀生成白色轮廓，纹理自动加两像素透明边距，防止外轮廓被截掉。每个物品独享材质，悬停不会同时点亮其他物品。
+- 后续物品可直接实例化通用场景，调用 `set_item(texture, 功能文案, home_backdrop)`，连接 `activated` 信号；无须复制描边算法。非车厢物品可省略第三个参数，不会绑定视角拖拽。
+- `furniture.tscn` 继承该通用场景，`furniture.gd` 根据布置模式决定收纳还是调用家具定义的功能。
+- `resources/furniture/bed.tres`、`computer.tres` 定义名称、素材、功能文案、动作和裁剪前偏移；`furniture_definition.gd.perform(home)` 将动作关联至原来的休息、电脑流程。
 
-- `drag_sensitivity`：默认 0.35，控制拖拽幅度。
-- `max_offset_ratio`：默认 0.2，硬上限 0.2；车厢中心在横、纵方向均不超过视口对应尺寸的 20%。1280×720 下为左右 256、上下 144 像素。
-- `background_parallax`：默认 0.25，背景只移动车厢偏移的四分之一。
+**裁剪与对齐：**
 
-车厢、家具点击区和标签共享同一父节点。`home.gd` 的 `HOTSPOTS` 仍使用原 256×256 源图的家具坐标，构建时用 `原坐标×4 + (126,-280)` 对齐裁剪后的图；源图裁剪偏移已计入纹理位置，因此不需要手工重画热点。不同页面重建时视角回中。
+- `Carriage.aseprite` 仍为 243×108，新版已移除床、电脑，不会与独立家具重复绘制。
+- `Bed.aseprite` 从 243×108 裁为 **62×10**，移除的原点为 `(175,79)`。
+- `LapTop.aseprite` 从 243×108 裁为 **23×18**，移除的原点为 `(151,70)`。
+- 两个偏移保存在家具 `.tres` 的 `source_origin`，槽位位置由 `slot_rect()` 使用该偏移建立。描边的透明边距也计入位置补偿。初始槽位内的素材仍对齐原来的车厢位置；裁剪不改变有效像素与图层。
+
+**拖拽与多车厢回正：**
+
+按住左键拖拽场景或家具，超过 6 个逻辑像素才进入拖拽；短按仍执行交互，拖拽不会误开家具功能。松开后以 `return_speed`（默认 160 逻辑像素/秒）匀速回正，而不是逐渐减速的插值。
+
+只有一节时回到该节中心；多节时在松开的一刻，比较每节车厢中心到视口中心的距离，选择最近的一节为目标。距离相等时保持原车厢，避免来回跳动。回正过程中重新按住可立即接管视角；刷新家具或打开页面返回时保留当前节数，重新载入游戏则从第一节开始。刚扩建或将家具移入其他车厢时会聚焦目标车厢。
+
+`home_backdrop.tscn` 根节点可调参数：
+
+- `drag_sensitivity`：默认 0.35。
+- `return_speed`：默认 160，控制匀速回正速度。
+- `max_offset_ratio`：默认 0.2，硬上限 0.2，限制相对当前车厢焦点的手动拖拽范围。
+- `background_parallax`：默认 0.25。
+
+多车厢会缩小显示比例，让相邻车厢中心间的中点位于允许拖拽范围内，从而能通过轻拖切换焦点；车厢、家具、空槽和热点共享缩放与位置变换。
+
+## 扩建、耗电与存档
+
+顶部“扩建车厢”显示完整材料需求、当前持有量和扩建前后耗电，确认后才扣料。
+
+| 项目 | 默认规则 |
+| --- | --- |
+| 每次扩建材料 | 钢板×2、螺丝×4、工具×1，柜子与背包合并计算 |
+| 车厢数量 | 初始 1 节，最多 3 节 |
+| 槽位 | 每新增一节增加 2 个 |
+| 行车与跨站接应 | 初始 30 度/站，每新增一节 +10 度/站 |
+| 每日结算 | 基础 2 度，每新增一节 +2 度 |
+
+这些默认值集中在 `cabin_state.gd` 的 `MAX_CARRIAGES / EXPANSION_COST / EXTRA_TRAVEL_COST / EXTRA_DAILY_COST`，方便调整。每日基础耗电保留原规则，不随电脑是否收纳而免除。所有路线报价、实际行车、找充电站、跨站接应及休息结算统一调用状态方法，避免显示和实际扣电不一致。
+
+材料不足、超过数量上限、外出中或游戏结束时均不能扩建；先验证整份配方再扣料，失败不会部分扣除。
+
+存档升级为版本 4，保存 `carriage_count`、`furniture_layout`。仍兼容版本 1–3；旧档迁移为一节车厢并保留床、电脑的原始摆放位置。读取时校验车厢数量、家具种类、槽位范围及重叠，非法布局不会部分污染当前状态。布置与扩建仍通过床铺睡觉保存，返回菜单不会自动保存。
 
 ## 美术修改与导出
 
 源文件在 `assets/source/`，使用 `.gdignore` 避免自动导入 Blender、Aseprite 等编辑文件。运行时使用 `assets/textures/` 的 PNG。
 
 ```sh
-# 需要 Python 3 + Pillow；导出这两张素材的第一个帧，保留透明度。
+# 需要 Python 3 + Pillow；导出四张素材的第一个帧，保留透明度。
 python3 tools/export_home_art.py
 # 如将来又添加了透明边缘，可对单帧 RGBA 文件原生裁剪；像素验证通过才覆盖。
 python3 tools/trim_aseprite.py Demo/assets/source/Carriage.aseprite
 ```
+
+可同样用裁剪工具处理 Bed.aseprite、LapTop.aseprite。源图裁剪偏移变化时，需要同步 `.tres` 的 source_origin。
 
 工具保留当前素材的普通图层叠加。遇到动画、分组、非普通混合、切片等不支持的结构会明确失败；复杂素材请使用 Aseprite 的官方导出／裁剪功能。
 

@@ -44,9 +44,9 @@ mouse_filter = 2
 theme_override_font_sizes/font_size = 16
 
 [node name="Timer" type="Label" parent="."]
-offset_left = 1018.0
+offset_left = 910.0
 offset_top = 32.0
-offset_right = 1240.0
+offset_right = 1138.0
 offset_bottom = 73.0
 mouse_filter = 2
 theme_override_font_sizes/font_size = 25

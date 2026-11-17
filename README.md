@@ -19,3 +19,5 @@
 测试独立位于根目录 [test/](test/README.md)，统一运行命令：`python3 test/tools/run_tests.py --godot <Godot可执行文件>`。
 
 车厢主场景为 `Demo/scenes/game/home.tscn`；背景与车厢独立分层。电脑与探索界面的调整位置见 [结构与调整指南](Demo/ARCHITECTURE.md)。
+
+床与电脑已拆为独立家具，可在空槽摆放和收纳，悬停显示白色轮廓与功能。扩建车厢会增加行车及每日耗电；松开拖拽后，视角匀速回到最近的车厢中心。规则与可调整参数见 [家具与车厢指南](Demo/ARCHITECTURE.md)。

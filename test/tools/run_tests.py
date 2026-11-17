@@ -35,15 +35,17 @@ def main():
 
     def run(name, arguments, expected=()):
         command = base + arguments
+        log_path = output / (name + '.log')
         try:
-            process = subprocess.run(command, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                     text=True, timeout=120)
-            log, code = process.stdout, process.returncode
-        except subprocess.TimeoutExpired as error:
-            log = (error.stdout or b'').decode(errors='replace') if isinstance(error.stdout, bytes) else (error.stdout or '')
-            log += '\nTest timed out after 120 seconds\n'
+            with log_path.open('w', encoding='utf-8') as log_file:
+                process = subprocess.run(command, env=env, stdout=log_file, stderr=subprocess.STDOUT,
+                                         text=True, timeout=120)
+            code = process.returncode
+        except subprocess.TimeoutExpired:
+            with log_path.open('a', encoding='utf-8') as log_file:
+                log_file.write('\nTest timed out after 120 seconds\n')
             code = 124
-        (output / (name + '.log')).write_text(log, encoding='utf-8')
+        log = log_path.read_text(encoding='utf-8', errors='replace')
         passed = code == 0 and all(marker in log for marker in expected) and 'SCRIPT ERROR:' not in log and 'ERROR:' not in log
         results.append(dict(name=name, exit_code=code, passed=passed, log=name + '.log'))
         print(f'{name}: {"PASS" if passed else "FAIL"}', flush=True)
@@ -60,7 +62,10 @@ def main():
         run('home_flow', ['--script', str(root / 'cases/test_home_flow.gd'), '--',
                           '--save-file=' + str(output / 'home_flow_save.json')],
             ['HOME_FLOW: 31 checks, 0 failures'])
-    passed = len(results) == 4 and all(item['passed'] for item in results)
+        run('build_flow', ['--script', str(root / 'cases/test_build_flow.gd'), '--',
+                           '--save-file=' + str(output / 'build_flow_save.json')],
+            ['BUILD_FLOW_OK'])
+    passed = len(results) == 5 and all(item['passed'] for item in results)
     summary = dict(run_id=run_id, passed=passed, results=results)
     (output / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print(f'Results: {output}')

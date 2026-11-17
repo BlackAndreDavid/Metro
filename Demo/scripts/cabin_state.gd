@@ -28,7 +28,13 @@ const RARITY := {
 const RARITY_NAMES := ["普通", "少见", "稀有", "珍稀"]
 const RARITY_COLORS := [Color("bfc3ce"), Color("e4be76"), Color("ffa271"), Color("ff7873")]
 const EPOCH := "2026-07-11T00:00:00"
-const CABIN_SAVE_VERSION := 3
+const CABIN_SAVE_VERSION := 4
+const MAX_CARRIAGES := 3
+const EXPANSION_COST := {"steel_plate": 2, "bolts": 4, "tools": 1}
+const EXTRA_TRAVEL_COST := 10
+const EXTRA_DAILY_COST := 2.0
+const FURNITURE_IDS := ["bed", "computer"]
+
 const CAR_CAPACITY := 500.0
 const CAR_START_POWER := 100.0
 const ACCOUNT_START_POWER := 100.0
@@ -42,6 +48,8 @@ const NO_CELL := -1
 const TRIP_LIMIT_SECONDS := 90
 const BLACKOUT_INTERVAL := 5
 
+var carriage_count := 1
+var furniture_layout := {"bed": -1, "computer": -1}
 var station := START_STATION
 var locker: Array[Dictionary] = []
 var wide_bag := false
@@ -121,7 +129,7 @@ func charge_car(requested: float) -> float:
 	return amount
 
 func travel_to(destination: String, steps: int) -> bool:
-	var cost := steps * TRAVEL_COST_PER_STOP
+	var cost := steps * travel_cost_per_stop()
 	if trip_active or not game_over_reason.is_empty() or destination == station or cost <= 0 or car_power < cost:
 		return false
 	car_power -= cost
@@ -130,7 +138,7 @@ func travel_to(destination: String, steps: int) -> bool:
 
 func extraction_cost(destination: String) -> int:
 	var route := Rail.route(station, destination)
-	return -1 if route.is_empty() else (route.size() - 1) * TRAVEL_COST_PER_STOP
+	return -1 if route.is_empty() else (route.size() - 1) * travel_cost_per_stop()
 
 func extract_at(destination: String) -> String:
 	if not trip_active or remaining_ms() == 0:
@@ -521,7 +529,7 @@ func next_day() -> void:
 	car_power = overnight_power()
 
 func overnight_power() -> float:
-	return maxf(0.0, car_power - COMPUTER_DAILY_COST)
+	return maxf(0.0, car_power - daily_power_cost())
 
 func trip_limit() -> int:
 	return TRIP_LIMIT_SECONDS
@@ -628,6 +636,7 @@ func save_data() -> Dictionary:
 		"ate_today": ate_today, "game_over_reason": game_over_reason,
 		"car_power": car_power, "world_seed": world_seed, "charger_used": charger_used,
 		"auto_repair_level": auto_repair_level,
+		"carriage_count": carriage_count, "furniture_layout": furniture_layout.duplicate(),
 	}
 
 func write_save(path: String, data: Dictionary) -> Error:
@@ -695,11 +704,13 @@ func load_cabin(path: String, known_stations: Array) -> bool:
 	if not data is Dictionary:
 		return false
 	var version: Variant = data.get("version")
-	if version != 1 and version != 2 and version != CABIN_SAVE_VERSION:
+	if version != 1 and version != 2 and version != 3 and version != CABIN_SAVE_VERSION:
 		return false
-	if version == CABIN_SAVE_VERSION and not valid_car_state(data):
+	if version >= 3 and not valid_car_state(data):
 		return false
 	if not valid_index(data.get("auto_repair_level", 0), 0, AutoRepair.COURSES.size()):
+		return false
+	if version == CABIN_SAVE_VERSION and not valid_home_layout(data):
 		return false
 	var needs_upgrade: bool = version == 1
 	if not needs_upgrade and not valid_vitals(data):
@@ -722,13 +733,15 @@ func load_cabin(path: String, known_stations: Array) -> bool:
 	for entry in inventory + locker:
 		entry.id = next_id
 		next_id += 1
+	carriage_count = int(data.carriage_count) if version == CABIN_SAVE_VERSION else 1
+	furniture_layout = data.furniture_layout.duplicate() if version == CABIN_SAVE_VERSION else {"bed": 1, "computer": 0}
 	base_name = str(data.get("base_name", "未命名基地"))
 	station = data.station
 	wide_bag = data.wide
 	account = balance
 	day = int(data.day)
 	auto_repair_level = int(data.get("auto_repair_level", 0))
-	if version == CABIN_SAVE_VERSION:
+	if version >= 3:
 		car_power = float(data.car_power)
 		world_seed = int(data.world_seed)
 		charger_used = data.charger_used.duplicate()
@@ -767,3 +780,79 @@ func read_cargo(raw: Variant, bounds: Vector2i) -> Dictionary:
 			restored.charge = int(entry.charge)
 		cargo.append(restored)
 	return {"entries": cargo}
+
+# Home layout and costs live in the saved game state, not in scene instances.
+func travel_cost_per_stop() -> int:
+	return TRAVEL_COST_PER_STOP + (carriage_count - 1) * EXTRA_TRAVEL_COST
+
+func daily_power_cost() -> float:
+	return COMPUTER_DAILY_COST + (carriage_count - 1) * EXTRA_DAILY_COST
+
+func can_edit_home() -> bool:
+	return not trip_active and game_over_reason.is_empty()
+
+func place_furniture(kind: String, slot: int) -> String:
+	if not can_edit_home():
+		return "当前不能布置家具。"
+	if kind not in FURNITURE_IDS or slot < 0 or slot >= carriage_count * 2:
+		return "家具或槽位无效。"
+	for other in FURNITURE_IDS:
+		if other != kind and int(furniture_layout[other]) == slot:
+			return "槽位已被占用，请先收纳原家具。"
+	furniture_layout[kind] = slot
+	return ""
+
+func store_furniture(kind: String) -> String:
+	if not can_edit_home() or kind not in FURNITURE_IDS:
+		return "当前不能收纳这件家具。"
+	furniture_layout[kind] = -1
+	return ""
+
+func material_count(kind: String) -> int:
+	var count := 0
+	for entry in inventory + locker:
+		if entry.kind == kind:
+			count += 1
+	return count
+
+func expansion_problem() -> String:
+	if not can_edit_home():
+		return "当前不能扩建车厢。"
+	if carriage_count >= MAX_CARRIAGES:
+		return "已达到 %d 节车厢上限。" % MAX_CARRIAGES
+	for kind in EXPANSION_COST:
+		if material_count(kind) < EXPANSION_COST[kind]:
+			return "扩建材料不足：%s。" % item_name(kind)
+	return ""
+
+func expand_carriage() -> String:
+	var problem := expansion_problem()
+	if not problem.is_empty():
+		return problem
+	# Check the whole recipe first, then consume each unique entry once.
+	for kind in EXPANSION_COST:
+		var remaining: int = EXPANSION_COST[kind]
+		for cargo in [locker, inventory]:
+			for index in range(cargo.size() - 1, -1, -1):
+				if remaining > 0 and cargo[index].kind == kind:
+					cargo.remove_at(index)
+					remaining -= 1
+	carriage_count += 1
+	return ""
+
+func valid_home_layout(data: Dictionary) -> bool:
+	if not valid_index(data.get("carriage_count"), 1, MAX_CARRIAGES):
+		return false
+	var layout: Variant = data.get("furniture_layout")
+	if not layout is Dictionary or layout.size() != FURNITURE_IDS.size():
+		return false
+	var occupied: Array[int] = []
+	for kind in FURNITURE_IDS:
+		var slot: Variant = layout.get(kind)
+		if not valid_index(slot, -1, int(data.carriage_count) * 2 - 1):
+			return false
+		if int(slot) >= 0:
+			if int(slot) in occupied:
+				return false
+			occupied.append(int(slot))
+	return true
