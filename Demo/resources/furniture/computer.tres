@@ -1,11 +1,10 @@
-[gd_resource type="Resource" load_steps=3 format=3]
+[gd_resource type="Resource" load_steps=2 format=3]
 [ext_resource type="Script" path="res://scripts/items/furniture_definition.gd" id="1"]
-[ext_resource type="Texture2D" path="res://assets/textures/LapTop.png" id="2"]
 [resource]
 script = ExtResource("1")
 id = "computer"
 display_name = "电脑"
 function_text = "使用电脑"
 action = "news"
-texture = ExtResource("2")
+texture_path = "res://assets/textures/LapTop.png"
 source_origin = Vector2(151, 70)

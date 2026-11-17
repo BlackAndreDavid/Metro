@@ -21,10 +21,10 @@ func add_recipe(state) -> void:
 
 func run() -> void:
 	var state := State.new()
-	check(state.carriage_count == 1 and state.furniture_layout == {"bed": -1, "computer": -1}, "new game has two owned unplaced furniture")
+	check(state.carriage_count == 1 and state.furniture_layout == State.Furniture.DEFAULT_LAYOUT, "new game has stored bed/computer and installed service furniture")
 	check(state.travel_cost_per_stop() == 30 and state.daily_power_cost() == 2, "base costs preserved")
 	check(not state.place_furniture("unknown", 0).is_empty(), "reject unknown furniture")
-	check(not state.place_furniture("bed", 2).is_empty(), "reject slot outside existing carriage")
+	check(not state.place_furniture("bed", State.SLOTS_PER_CARRIAGE).is_empty(), "reject slot outside existing carriage")
 	check(state.place_furniture("bed", 1).is_empty(), "place bed")
 	check(not state.place_furniture("computer", 1).is_empty() and state.furniture_layout.bed == 1, "occupied slot cannot be overwritten")
 	check(state.place_furniture("computer", 0).is_empty(), "place computer")
@@ -54,12 +54,12 @@ func run() -> void:
 	state.trip_deadline_ms = Time.get_ticks_msec() + 10000
 	check(state.extract_at("邮电新村").is_empty() and state.car_power == 20, "actual extraction consumes expanded cost")
 	state.car_power = 100
-	check(state.place_furniture("bed", 3).is_empty(), "place in added carriage")
+	check(state.place_furniture("bed", State.SLOTS_PER_CARRIAGE + 1).is_empty(), "place in added carriage")
 	var path := OS.get_environment("METRO_TEST_RESULTS").path_join("expanded_save.json")
 	check(state.save_next_day(path) == OK and state.car_power == 96, "daily save debits expanded drain")
 	var restored := State.new()
 	check(restored.load_cabin(path, Rail.STATIONS.keys()), "expanded layout loads")
-	check(restored.carriage_count == 2 and restored.furniture_layout.bed == 3 and restored.furniture_layout.computer == 1 and restored.car_power == 96, "layout train and power round-trip")
+	check(restored.carriage_count == 2 and restored.furniture_layout.bed == State.SLOTS_PER_CARRIAGE + 1 and restored.furniture_layout.computer == 1 and restored.car_power == 96, "layout train and power round-trip")
 	var snapshot := restored.save_data()
 	var invalid := snapshot.duplicate(true)
 	invalid.furniture_layout.bed = invalid.furniture_layout.computer
@@ -74,7 +74,7 @@ func run() -> void:
 	legacy.erase("carriage_count")
 	legacy.erase("furniture_layout")
 	restored.write_save(path, legacy)
-	check(restored.load_cabin(path, Rail.STATIONS.keys()) and restored.carriage_count == 1 and restored.furniture_layout == {"bed": 1, "computer": 0}, "version 3 migrates old furniture positions")
+	check(restored.load_cabin(path, Rail.STATIONS.keys()) and restored.carriage_count == 1 and restored.furniture_layout.bed == 1 and restored.furniture_layout.computer == 0 and restored.furniture_layout.door == 3, "version 3 migrates old furniture positions")
 	add_recipe(state)
 	check(state.expand_carriage().is_empty() and state.carriage_count == 3, "second expansion")
 	add_recipe(state)
@@ -87,12 +87,12 @@ func run() -> void:
 	home.show_cabin()
 	await process_frame
 	var backdrop = home.home_backdrop
-	check(backdrop.get_node("Carriage/FurnitureSlots").get_child_count() == 2, "new home exposes two empty slots")
+	check(backdrop.get_node("Carriage/FurnitureSlots").get_child_count() == 3, "normal home hides build cells and displays installed service furniture")
 	home.select_home_furniture("bed")
 	home.place_home_furniture(1)
 	home.select_home_furniture("computer")
 	home.place_home_furniture(0)
-	check(home.state.furniture_layout == {"bed": 1, "computer": 0}, "placement toolbar updates state")
+	check(home.state.furniture_layout.bed == 1 and home.state.furniture_layout.computer == 0, "placement toolbar updates state")
 	home.toggle_placement()
 	await process_frame
 	backdrop = home.home_backdrop
@@ -131,12 +131,13 @@ func run() -> void:
 		if child is Button:
 			check(child.get_rect().end.y <= 144, "option buttons above carriage: %s %s" % [child.text, child.get_rect()])
 	add_recipe(home.state)
+	home.toggle_build_mode()
 	home.show_expansion()
 	home.confirm_expansion()
 	await process_frame
 	backdrop = home.home_backdrop
 	check(backdrop.train_count == 2 and backdrop.carriage.has_node("Carriage2"), "new car uses carriage texture")
-	check(backdrop.get_node("Carriage/FurnitureSlots").get_child_count() == 4, "expansion adds two usable slots")
+	check(backdrop.get_node("Carriage/FurnitureSlots").has_node("Slot10") and backdrop.get_node("Carriage/FurnitureSlots").has_node("Slot15"), "expansion adds six floor cells")
 	var center: Vector2 = backdrop.carriage.position + Vector2(640 + 972 * backdrop.focused_carriage, 360) * backdrop.train_zoom
 	check(center.is_equal_approx(Vector2(640, 360)), "expanded train focuses current carriage")
 	backdrop.set_process(false)
@@ -163,8 +164,8 @@ func run() -> void:
 	home.show_cabin()
 	check(home.home_backdrop.focused_carriage == 1, "page refresh preserves focused carriage")
 	home.select_home_furniture("bed")
-	home.place_home_furniture(3)
-	check(home.state.furniture_layout.bed == 3, "UI moves bed into added car")
+	home.place_home_furniture(State.SLOTS_PER_CARRIAGE + 1)
+	check(home.state.furniture_layout.bed == State.SLOTS_PER_CARRIAGE + 1, "UI moves bed into added car")
 	var moved_bed = home.home_backdrop.get_node("Carriage/FurnitureSlots/Bed")
 	moved_bed.use()
 	check(home.state.furniture_layout.bed == -1, "arrangement click stores furniture")

@@ -29,7 +29,7 @@ func set_item(texture: Texture2D, function_text: String, surface: Control = null
 	visual.material = outline
 	caption.text = function_text
 	caption.hide()
-	tooltip_text = function_text
+	tooltip_text = ""
 
 func set_highlighted(value: bool) -> void:
 	hovered = value

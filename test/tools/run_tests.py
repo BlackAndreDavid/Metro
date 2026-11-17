@@ -65,7 +65,10 @@ def main():
         run('build_flow', ['--script', str(root / 'cases/test_build_flow.gd'), '--',
                            '--save-file=' + str(output / 'build_flow_save.json')],
             ['BUILD_FLOW_OK'])
-    passed = len(results) == 5 and all(item['passed'] for item in results)
+        run('fixture_flow', ['--script', str(root / 'cases/test_fixture_flow.gd'), '--',
+                             '--save-file=' + str(output / 'fixture_flow_save.json')],
+            ['FIXTURE_FLOW_OK'])
+    passed = len(results) == 6 and all(item['passed'] for item in results)
     summary = dict(run_id=run_id, passed=passed, results=results)
     (output / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print(f'Results: {output}')

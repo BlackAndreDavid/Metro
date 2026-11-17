@@ -16,11 +16,6 @@ const AMBER := Color("f0cc91")
 const MINT := Color("a6dccc")
 const DARK := Color("211f31")
 const BORDER := Color("514b67")
-const HOTSPOTS := [
-	["柜子", Rect2(9, 128, 25, 76), Vector2(210, 522), "locker"],
-	["出站探索", Rect2(66, 123, 63, 78), Vector2(453, 522), "gear"],
-	["交易", Rect2(144, 123, 101, 49), Vector2(874, 350), "trade"],
-]
 const LOOT_SPOTS := [Vector2(114, 348), Vector2(266, 380), Vector2(400, 335), Vector2(563, 397), Vector2(681, 335), Vector2(710, 455)]
 const RADIATION := ["", "低", "中", "高"]
 
@@ -52,6 +47,7 @@ var settings_panel: CanvasLayer
 var settings_opened_ms := 0
 var settings_was_paused := false
 var focused_carriage := 0
+var build_mode := false
 var placement_mode := false
 var selected_furniture := ""
 
@@ -220,6 +216,8 @@ func begin_page(kind: String, scene: PackedScene = null) -> void:
 	if kind != "cabin":
 		placement_mode = false
 		selected_furniture = ""
+	if kind not in ["cabin", "expansion"]:
+		build_mode = false
 	screen = kind
 	selection = {}
 	grids.clear()
@@ -268,31 +266,26 @@ func show_cabin(message: String = "") -> void:
 		show_charger.bind("") if has_charger else find_charger)
 	action(view, "电池充电", Rect2(428, 78, 122, 32), show_battery_charger.bind(""))
 	action(view, "汽修培训" if state.station == AutoRepair.STATION else "技能", Rect2(560, 78, 122, 32), show_skills.bind(""))
-	action(view, "结束布置" if placement_mode else "布置家具", Rect2(692, 78, 122, 32), toggle_placement)
-	action(view, "扩建车厢", Rect2(824, 78, 122, 32), show_expansion)
-	if placement_mode:
-		action(view, "摆放床", Rect2(32, 112, 100, 27), select_home_furniture.bind("bed"), selected_furniture == "bed")
-		action(view, "摆放电脑", Rect2(144, 112, 100, 27), select_home_furniture.bind("computer"), selected_furniture == "computer")
-		label(view, "选择家具后点击空槽；点击已摆家具可收纳。床、电脑各一件。", Rect2(258, 118, 900, 23), 14, AMBER)
+	var build_button := action(view, "退出建造" if build_mode else "建造模式", Rect2(692, 78, 122, 32), toggle_build_mode)
+	build_button.name = "BuildModeButton"
+	if build_mode:
+		var toolbar := Control.new()
+		toolbar.name = "BuildModePanel"
+		toolbar.mouse_filter = MOUSE_FILTER_IGNORE
+		put(view, toolbar, Rect2(32, 112, 1150, 32))
+		action(toolbar, "结束布置" if placement_mode else "家具布置", Rect2(0, 0, 112, 27), toggle_placement)
+		action(toolbar, "扩建车厢", Rect2(124, 0, 112, 27), show_expansion)
+		if placement_mode:
+			for index in range(State.FURNITURE_IDS.size()):
+				var kind: String = State.FURNITURE_IDS[index]
+				var definition: Resource = State.Furniture.DEFINITIONS[kind]
+				action(toolbar, "摆放" + definition.display_name, Rect2(248 + index * 106, 0, 100, 27), select_home_furniture.bind(kind), selected_furniture == kind)
+		else:
+			label(toolbar, "家具布置：屏幕使用四个栏杆挂点；门占两个地面槽位。", Rect2(248, 0, 700, 28), 14, AMBER)
 	else:
-		action(view, "柜子", Rect2(32, 112, 100, 27), use_hotspot.bind("locker"))
-		action(view, "交易", Rect2(144, 112, 100, 27), use_hotspot.bind("trade"))
-		action(view, "出站探索", Rect2(256, 112, 110, 27), use_hotspot.bind("gear"))
-		label(view, "%d 节车厢 · 行车 %d 度/站 · 每日 %s 度" % [state.carriage_count, state.travel_cost_per_stop(), energy_text(state.daily_power_cost())], Rect2(384, 118, 560, 23), 15, MINT)
+		label(view, "%d 节车厢 · 行车 %d 度/站 · 每日 %s 度" % [state.carriage_count, state.travel_cost_per_stop(), energy_text(state.daily_power_cost())], Rect2(32, 116, 1100, 25), 15, MINT)
 	if state.debt > 0:
 		label(view, "欠费 %s 度" % energy_text(state.debt), Rect2(964, 82, 268, 32), 16, AMBER)
-	label(home_backdrop.get_node("Carriage/Hotspots"), "%s\n%s\n%s" % [state.station, state.date_text(), state.weather()],
-		Rect2(266, 236, 100, 73), 13, Color("322d3d"), HORIZONTAL_ALIGNMENT_CENTER)
-	for spot in HOTSPOTS:
-		var area: Rect2 = spot[1]
-		area.position = area.position * 4.0 + Vector2(126, -280)
-		area.size *= 4.0
-		var callback := use_hotspot.bind(spot[3])
-		var world: Control = home_backdrop.get_node("Carriage/Hotspots")
-		var hotspot := invisible_action(world, area.grow(4), callback)
-		home_backdrop.bind_hotspot(hotspot, callback)
-		hotspot.name = str(spot[3]) + "Hit"
-		hotspot.tooltip_text = spot[0]
 	if not message.is_empty():
 		plate(view, Rect2(208, 647, 864, 38), Color("211f31e8"), BORDER)
 		label(view, message, Rect2(222, 647, 836, 38), 16, MINT, HORIZONTAL_ALIGNMENT_CENTER)
@@ -1190,23 +1183,26 @@ func close_settings() -> void:
 	settings_panel = null
 
 func toggle_placement() -> void:
+	build_mode = true
 	placement_mode = not placement_mode
 	selected_furniture = ""
 	show_cabin("家具摆放和扩建进度会随床铺存档保存。")
 
 func select_home_furniture(kind: String) -> void:
+	build_mode = true
 	placement_mode = true
 	selected_furniture = kind
 	show_cabin("请选择空槽；原家具将移动到新槽位，不会复制。")
 
 func place_home_furniture(slot: int) -> void:
 	if not placement_mode or selected_furniture.is_empty():
+		build_mode = true
 		placement_mode = true
 		show_cabin("请先在上方选择要摆放的家具。")
 		return
 	var problem := state.place_furniture(selected_furniture, slot)
 	if problem.is_empty():
-		focused_carriage = floori(slot / 2.0)
+		focused_carriage = floori(slot / float(State.SLOTS_PER_CARRIAGE))
 	show_cabin("家具已摆放。" if problem.is_empty() else problem)
 
 func store_home_furniture(kind: String) -> void:
@@ -1216,7 +1212,7 @@ func store_home_furniture(kind: String) -> void:
 func show_expansion() -> void:
 	begin_page("expansion")
 	var panel := modal("车厢扩建 · %d / %d 节" % [state.carriage_count, State.MAX_CARRIAGES], Rect2(300, 145, 680, 430))
-	label(panel, "材料从柜子和背包扣除，家具槽位增加 2 个。", Rect2(24, 84, 632, 28), 18, MINT)
+	label(panel, "材料从柜子和背包扣除，增加 6 个地面槽位、4 个挂点。", Rect2(24, 84, 632, 28), 18, MINT)
 	var row := 0
 	for kind in State.EXPANSION_COST:
 		label(panel, "%s  × %d     当前拥有 %d" % [state.item_name(kind), State.EXPANSION_COST[kind], state.material_count(kind)], Rect2(24, 125 + row * 35, 632, 30), 18)
@@ -1231,6 +1227,12 @@ func confirm_expansion() -> void:
 	var problem := state.expand_carriage()
 	if problem.is_empty():
 		focused_carriage = state.carriage_count - 1
-		show_cabin("扩建完成，车厢已增加两个家具槽位。请在床铺保存进度。")
+		show_cabin("扩建完成，增加 6 个地面槽位和 4 个挂点。请在床铺保存进度。")
 	else:
 		report(problem)
+
+func toggle_build_mode() -> void:
+	build_mode = not build_mode
+	placement_mode = false
+	selected_furniture = ""
+	show_cabin("建造模式中可选择家具布置或扩建车厢。" if build_mode else "")

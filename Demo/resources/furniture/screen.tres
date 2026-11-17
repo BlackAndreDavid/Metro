@@ -1,0 +1,12 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+[ext_resource type="Script" path="res://scripts/items/furniture_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+id = "screen"
+display_name = "屏幕"
+function_text = "查看站点信息"
+action = "map"
+slot_span = 1
+placement_type = "hanging"
+texture_path = "res://assets/textures/Screen.png"
+source_origin = Vector2(28, 22)

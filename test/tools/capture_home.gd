@@ -31,6 +31,15 @@ func run() -> void:
 	await capture("home_furnished")
 	home.home_backdrop.get_node("Carriage/FurnitureSlots/Bed").set_highlighted(true)
 	await capture("home_bed_outline")
+	home.home_backdrop.get_node("Carriage/FurnitureSlots/Bed").set_highlighted(false)
+	for fixture in ["Door", "Locker", "Screen"]:
+		var item = home.home_backdrop.get_node("Carriage/FurnitureSlots/" + fixture)
+		item.set_highlighted(true)
+		await capture("home_" + fixture.to_lower() + "_outline")
+		item.set_highlighted(false)
+	home.select_home_furniture("screen")
+	await capture("home_hanging_points")
+	home.toggle_build_mode()
 	for kind in home.state.EXPANSION_COST:
 		for i in range(home.state.EXPANSION_COST[kind]):
 			home.state.add_supply(kind, "locker")

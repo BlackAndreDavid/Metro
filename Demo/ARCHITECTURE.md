@@ -10,10 +10,11 @@ Metro/
 │  │  ├─ ui/     main_menu.tscn、save_select.tscn、settings_panel.tscn
 │  │  ├─ items/ highlightable_item.tscn、furniture.tscn
 │  │  └─ game/   home.tscn、home_backdrop.tscn、exploration_setup.tscn、exploration.tscn、main.tscn
-│  ├─ resources/furniture/         床、电脑的数据定义与裁剪偏移
+│  ├─ resources/furniture/         床、电脑、门、柜子、屏幕的数据与裁剪偏移
 │  ├─ scripts/
 │  │  ├─ home.gd                    游戏状态与页面调度
 │  │  ├─ exploration.gd             地表场景和主控制器的连接
+│  │  ├─ items/furniture_catalog.gd  家具目录、占用空间、四个栏杆挂点
 │  │  ├─ core/game_session.gd        三栏位存档选择
 │  │  ├─ ui/                        菜单、设置、车厢视角、探索整备
 │  │  ├─ items/                     可高亮物品、家具与功能定义
@@ -27,7 +28,7 @@ Metro/
 │  │  └─ main.gd / world.gd / player.gd / state.gd
 │  │                                早期横版原型（state 也是车厢状态基类）
 │  ├─ assets/
-│  │  ├─ textures/                  Carriage.png、BG_Afternoon.png、Bed.png、LapTop.png
+│  │  ├─ textures/                  Carriage.png、BG_Afternoon.png、Bed.png、LapTop.png、Door.png、Locker.png、Screen.png
 │  │  ├─ source/                    Carriage.aseprite、BG_Afternoon.aseprite 等编辑源文件
 │  │  ├─ shaders/                   地表照明着色器
 │  │  └─ icons/
@@ -150,15 +151,24 @@ Home 动态页面
    ├─ Background                BG_Afternoon.png，后层视差
    └─ Carriage                  整列车的变换父节点
       ├─ Texture                第一节空车厢
-      ├─ Hotspots               原有柜子、交易、车门交互区
+      ├─ Fixtures               固定交易窗，也使用共用高亮组件
       ├─ Carriage2 / Carriage3   扩建时复用同一空车厢贴图
       └─ FurnitureSlots
-         ├─ SlotN               未占用槽位
+         ├─ SlotN               建造模式中的地面槽位／挂点
          ├─ Bed                 独立床素材 + 睡觉行为
-         └─ Computer            独立电脑素材 + 使用电脑行为
+         ├─ Computer            独立电脑素材 + 使用电脑行为
+         ├─ Door                独立门素材 + 出站探索行为
+         ├─ Locker              独立柜子素材 + 整理物品行为
+         └─ Screen              独立屏幕素材 + 站点信息／线路图
 ```
 
-每节车厢包含两个家具槽位。新档自带一张床和一台电脑，初始在收纳区；点击顶部“布置家具”，选择“摆放床”或“摆放电脑”，再点空槽即可。移动同一家具不会复制；已占用槽位不能覆盖，布置模式下点已有家具将其收纳。结束布置后，点击家具本体执行其功能。新档首次放好床后即可像以前一样休息存档。
+每节车厢包含 **6 个地面槽位、4 个专用栏杆挂点**。新档自带收纳中的床与电脑，门、柜子、屏幕则已按原位置安装。
+
+顶部原有“柜子／交易／出站探索”重复按钮已删除，直接点击对应素材执行功能。顶部现在只保留“建造模式”入口：进入后选择“家具布置”或“扩建车厢”，正常模式不显示空槽和挂点。
+
+在家具布置中选择要摆放的物品，再点兼容空位。点击已有家具可收纳，移动不会复制，已占用位置不能覆盖。门占 **两个连续地面槽位**，不能跨车厢或延伸进挂点；柜子占一个地面槽位。屏幕只能选择栏杆挂点，不能放地上，床、电脑、门、柜子也不能占挂点。选屏幕时隐藏不兼容的地面槽位，挂点会置于家具前面以确保能点击。
+
+屏幕的第一个挂点保持原位置。另三个挂点依据原栏杆像素校准：四个挂钩横坐标分别是源图的 `42 / 101 / 144 / 218`，末端纵坐标是 `22 / 22 / 20 / 21`；屏幕在挂钩下居中。可在 `items/furniture_catalog.gd → HANGING_ORIGINS` 修改位置。每增加一节车厢，获得独立的四个挂点。
 
 **可复用高亮与家具封装：**
 
@@ -166,14 +176,17 @@ Home 动态页面
 - `assets/shaders/item_outline.gdshader` 使用周围 8 个方向的 alpha 膨胀生成白色轮廓，纹理自动加两像素透明边距，防止外轮廓被截掉。每个物品独享材质，悬停不会同时点亮其他物品。
 - 后续物品可直接实例化通用场景，调用 `set_item(texture, 功能文案, home_backdrop)`，连接 `activated` 信号；无须复制描边算法。非车厢物品可省略第三个参数，不会绑定视角拖拽。
 - `furniture.tscn` 继承该通用场景，`furniture.gd` 根据布置模式决定收纳还是调用家具定义的功能。
-- `resources/furniture/bed.tres`、`computer.tres` 定义名称、素材、功能文案、动作和裁剪前偏移；`furniture_definition.gd.perform(home)` 将动作关联至原来的休息、电脑流程。
+- `resources/furniture/*.tres` 定义名称、素材路径、功能文案、动作、占用格数、摆放类型和裁剪偏移；`furniture_definition.gd.perform(home)` 分别连接休息、电脑、出站整备、柜子、站点地图流程。屏幕上常驻的站点／日期／天气属于内容展示，不是悬停提示。
+- 素材使用延迟加载，保存与布局校验无需提前读取 PNG，首次导入项目也不依赖纹理缓存。
+- `highlightable_item.gd` 的 `Function` 是唯一悬停功能说明。旧版同一节点另设了 `tooltip_text`，造成 Godot 默认提示框和功能文字同时出现；该字段已清空。原来叠在车厢上的隐形柜子、门、交易 Tooltip 热点已移除，交易窗也复用同一组件。背包、价格按钮等没有高亮说明的 UI 仍可保留各自的明细提示。
 
 **裁剪与对齐：**
 
-- `Carriage.aseprite` 仍为 243×108，新版已移除床、电脑，不会与独立家具重复绘制。
+- `Carriage.aseprite` 仍为 243×108，新版已移除床、电脑、门、柜子和屏幕，不会与独立家具重复绘制。
 - `Bed.aseprite` 从 243×108 裁为 **62×10**，移除的原点为 `(175,79)`。
 - `LapTop.aseprite` 从 243×108 裁为 **23×18**，移除的原点为 `(151,70)`。
-- 两个偏移保存在家具 `.tres` 的 `source_origin`，槽位位置由 `slot_rect()` 使用该偏移建立。描边的透明边距也计入位置补偿。初始槽位内的素材仍对齐原来的车厢位置；裁剪不改变有效像素与图层。
+- `Door.aseprite` 从 243×108 裁为 **63×78**，原点 `(59,17)`；柜子 `Locker.aseprite` 为 **25×76**，原点 `(2,22)`；屏幕 `Screen.aseprite` 为 **28×20**，原点 `(28,22)`。
+- 裁剪偏移保存在家具 `.tres` 的 `source_origin`，槽位位置由 `slot_rect()` 使用该偏移建立。描边的透明边距也计入位置补偿。初始槽位内的素材仍对齐原来的车厢位置；裁剪不改变有效像素与图层。
 
 **拖拽与多车厢回正：**
 
@@ -192,13 +205,13 @@ Home 动态页面
 
 ## 扩建、耗电与存档
 
-顶部“扩建车厢”显示完整材料需求、当前持有量和扩建前后耗电，确认后才扣料。
+“建造模式 → 扩建车厢”显示完整材料需求、当前持有量和扩建前后耗电，确认后才扣料。
 
 | 项目 | 默认规则 |
 | --- | --- |
 | 每次扩建材料 | 钢板×2、螺丝×4、工具×1，柜子与背包合并计算 |
 | 车厢数量 | 初始 1 节，最多 3 节 |
-| 槽位 | 每新增一节增加 2 个 |
+| 空间 | 每新增一节增加 6 个地面槽位、4 个栏杆挂点 |
 | 行车与跨站接应 | 初始 30 度/站，每新增一节 +10 度/站 |
 | 每日结算 | 基础 2 度，每新增一节 +2 度 |
 
@@ -206,20 +219,20 @@ Home 动态页面
 
 材料不足、超过数量上限、外出中或游戏结束时均不能扩建；先验证整份配方再扣料，失败不会部分扣除。
 
-存档升级为版本 4，保存 `carriage_count`、`furniture_layout`。仍兼容版本 1–3；旧档迁移为一节车厢并保留床、电脑的原始摆放位置。读取时校验车厢数量、家具种类、槽位范围及重叠，非法布局不会部分污染当前状态。布置与扩建仍通过床铺睡觉保存，返回菜单不会自动保存。
+存档升级为版本 5，保存 `carriage_count`、五类家具的 `furniture_layout`，仍兼容版本 1–4。版本 4 的床、电脑按旧的每节两槽编号迁移到新的每节十位编号，保留原车厢和原摆放位置；新增门、柜子和屏幕恢复在第一节原位置，屏幕挂在第一个挂点。更早存档恢复原始床和电脑布局。读取时校验家具种类、车厢数量、格位类型、门的两格占用、边界与重叠，非法布局不会部分污染当前状态。布置与扩建仍通过床铺睡觉保存，返回菜单不会自动保存。
 
 ## 美术修改与导出
 
 源文件在 `assets/source/`，使用 `.gdignore` 避免自动导入 Blender、Aseprite 等编辑文件。运行时使用 `assets/textures/` 的 PNG。
 
 ```sh
-# 需要 Python 3 + Pillow；导出四张素材的第一个帧，保留透明度。
+# 需要 Python 3 + Pillow；导出七张素材的第一个帧，保留透明度。
 python3 tools/export_home_art.py
 # 如将来又添加了透明边缘，可对单帧 RGBA 文件原生裁剪；像素验证通过才覆盖。
 python3 tools/trim_aseprite.py Demo/assets/source/Carriage.aseprite
 ```
 
-可同样用裁剪工具处理 Bed.aseprite、LapTop.aseprite。源图裁剪偏移变化时，需要同步 `.tres` 的 source_origin。
+可同样用裁剪工具处理 Bed、LapTop、Door、Locker、Screen 等 Aseprite 文件。源图裁剪偏移变化时，需要同步 `.tres` 的 source_origin。
 
 工具保留当前素材的普通图层叠加。遇到动画、分组、非普通混合、切片等不支持的结构会明确失败；复杂素材请使用 Aseprite 的官方导出／裁剪功能。
 

@@ -28,12 +28,14 @@ const RARITY := {
 const RARITY_NAMES := ["普通", "少见", "稀有", "珍稀"]
 const RARITY_COLORS := [Color("bfc3ce"), Color("e4be76"), Color("ffa271"), Color("ff7873")]
 const EPOCH := "2026-07-11T00:00:00"
-const CABIN_SAVE_VERSION := 4
+const CABIN_SAVE_VERSION := 5
+const Furniture = preload("res://scripts/items/furniture_catalog.gd")
+const SLOTS_PER_CARRIAGE := Furniture.SLOTS_PER_CARRIAGE
 const MAX_CARRIAGES := 3
 const EXPANSION_COST := {"steel_plate": 2, "bolts": 4, "tools": 1}
 const EXTRA_TRAVEL_COST := 10
 const EXTRA_DAILY_COST := 2.0
-const FURNITURE_IDS := ["bed", "computer"]
+const FURNITURE_IDS := Furniture.IDS
 
 const CAR_CAPACITY := 500.0
 const CAR_START_POWER := 100.0
@@ -49,7 +51,7 @@ const TRIP_LIMIT_SECONDS := 90
 const BLACKOUT_INTERVAL := 5
 
 var carriage_count := 1
-var furniture_layout := {"bed": -1, "computer": -1}
+var furniture_layout := Furniture.DEFAULT_LAYOUT.duplicate()
 var station := START_STATION
 var locker: Array[Dictionary] = []
 var wide_bag := false
@@ -704,13 +706,13 @@ func load_cabin(path: String, known_stations: Array) -> bool:
 	if not data is Dictionary:
 		return false
 	var version: Variant = data.get("version")
-	if version != 1 and version != 2 and version != 3 and version != CABIN_SAVE_VERSION:
+	if version != 1 and version != 2 and version != 3 and version != 4 and version != CABIN_SAVE_VERSION:
 		return false
 	if version >= 3 and not valid_car_state(data):
 		return false
 	if not valid_index(data.get("auto_repair_level", 0), 0, AutoRepair.COURSES.size()):
 		return false
-	if version == CABIN_SAVE_VERSION and not valid_home_layout(data):
+	if version >= 4 and not valid_home_layout(data, int(version)):
 		return false
 	var needs_upgrade: bool = version == 1
 	if not needs_upgrade and not valid_vitals(data):
@@ -733,8 +735,17 @@ func load_cabin(path: String, known_stations: Array) -> bool:
 	for entry in inventory + locker:
 		entry.id = next_id
 		next_id += 1
-	carriage_count = int(data.carriage_count) if version == CABIN_SAVE_VERSION else 1
-	furniture_layout = data.furniture_layout.duplicate() if version == CABIN_SAVE_VERSION else {"bed": 1, "computer": 0}
+	carriage_count = int(data.carriage_count) if version >= 4 else 1
+	furniture_layout = Furniture.DEFAULT_LAYOUT.duplicate()
+	if version == CABIN_SAVE_VERSION:
+		furniture_layout = data.furniture_layout.duplicate()
+	elif version == 4:
+		for kind in ["bed", "computer"]:
+			var old_slot := int(data.furniture_layout[kind])
+			furniture_layout[kind] = -1 if old_slot < 0 else floori(old_slot / 2.0) * SLOTS_PER_CARRIAGE + old_slot % 2
+	else:
+		furniture_layout.bed = 1
+		furniture_layout.computer = 0
 	base_name = str(data.get("base_name", "未命名基地"))
 	station = data.station
 	wide_bag = data.wide
@@ -794,11 +805,15 @@ func can_edit_home() -> bool:
 func place_furniture(kind: String, slot: int) -> String:
 	if not can_edit_home():
 		return "当前不能布置家具。"
-	if kind not in FURNITURE_IDS or slot < 0 or slot >= carriage_count * 2:
-		return "家具或槽位无效。"
+	var cells := Furniture.footprint(kind, slot, carriage_count)
+	if cells.is_empty():
+		return "槽位类型不匹配；屏幕只能挂栏杆，门需同一车厢内两个连续地面槽位。"
 	for other in FURNITURE_IDS:
-		if other != kind and int(furniture_layout[other]) == slot:
-			return "槽位已被占用，请先收纳原家具。"
+		if other == kind:
+			continue
+		for used in Furniture.footprint(other, int(furniture_layout[other]), carriage_count):
+			if used in cells:
+				return "槽位已被占用，请先收纳原家具。"
 	furniture_layout[kind] = slot
 	return ""
 
@@ -840,19 +855,30 @@ func expand_carriage() -> String:
 	carriage_count += 1
 	return ""
 
-func valid_home_layout(data: Dictionary) -> bool:
+func valid_home_layout(data: Dictionary, version: int = CABIN_SAVE_VERSION) -> bool:
 	if not valid_index(data.get("carriage_count"), 1, MAX_CARRIAGES):
 		return false
 	var layout: Variant = data.get("furniture_layout")
-	if not layout is Dictionary or layout.size() != FURNITURE_IDS.size():
+	var ids: Array = ["bed", "computer"] if version == 4 else FURNITURE_IDS
+	var per_car := 2 if version == 4 else SLOTS_PER_CARRIAGE
+	if not layout is Dictionary or layout.size() != ids.size():
 		return false
 	var occupied: Array[int] = []
-	for kind in FURNITURE_IDS:
+	for kind in ids:
 		var slot: Variant = layout.get(kind)
-		if not valid_index(slot, -1, int(data.carriage_count) * 2 - 1):
+		if not valid_index(slot, -1, int(data.carriage_count) * per_car - 1):
 			return false
-		if int(slot) >= 0:
-			if int(slot) in occupied:
+		if int(slot) < 0:
+			continue
+		var cells: Array[int] = []
+		if version == 4:
+			cells.append(int(slot))
+		else:
+			cells = Furniture.footprint(kind, int(slot), int(data.carriage_count))
+		if cells.is_empty():
+			return false
+		for cell in cells:
+			if cell in occupied:
 				return false
-			occupied.append(int(slot))
+			occupied.append(cell)
 	return true
