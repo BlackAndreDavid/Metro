@@ -65,7 +65,7 @@ func run() -> void:
 	var bed = home.construction.backdrop.get_node("Carriage/FurnitureSlots/Bed")
 	home.construction.press_furniture("bed",bed.global_position + bed.size / 2)
 	home.construction.set_process(false)
-	home.construction._process(1.0)
+	home.construction._process(0.5)
 	await capture("hold_progress")
 	home.construction.exit()
 	home.state.store_furniture("computer")

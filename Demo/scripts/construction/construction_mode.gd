@@ -18,7 +18,7 @@ var _previous_current_scene: Node
 var active := false
 var selected_id := ""
 var moving := false
-const HOLD_SECONDS := 2.0
+const HOLD_SECONDS := 1.0
 var hold_kind := ""
 var hold_elapsed := 0.0
 var hold_cancelled := false
@@ -117,7 +117,7 @@ func select_furniture(kind: String) -> void:
 		return
 	selected_id = kind
 	moving = false
-	_refresh("已选中%s，长按2秒可拖动，也可拆除。" % Catalog.DEFINITIONS[kind].display_name)
+	_refresh("已选中%s，长按1秒可拖动，也可拆除。" % Catalog.DEFINITIONS[kind].display_name)
 
 func can_place_at(placement: Dictionary) -> bool:
 	return active and moving and not selected_id.is_empty() and state.furniture_placement_problem(selected_id, placement).is_empty()
@@ -196,7 +196,7 @@ func refresh_ui() -> void:
 	if not visible:
 		return
 	var has_selection := not selected_id.is_empty()
-	actions.get_node("Selection").text = "建造模式 · " + (("移动中：" if moving else "已选中：") + Catalog.DEFINITIONS[selected_id].display_name if has_selection else "长按家具2秒后拖动，或点击选中拆除")
+	actions.get_node("Selection").text = "建造模式 · " + (("移动中：" if moving else "已选中：") + Catalog.DEFINITIONS[selected_id].display_name if has_selection else "长按家具1秒后拖动，或点击选中拆除")
 	actions.get_node("Dismantle").disabled = not has_selection or state.furniture_layout[selected_id] == null
 
 func _refresh(message: String) -> void:

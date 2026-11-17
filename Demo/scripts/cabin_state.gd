@@ -29,7 +29,7 @@ const RARITY := {
 const RARITY_NAMES := ["普通", "少见", "稀有", "珍稀"]
 const RARITY_COLORS := [Color("bfc3ce"), Color("e4be76"), Color("ffa271"), Color("ff7873")]
 const EPOCH := "2026-07-11T00:00:00"
-const CABIN_SAVE_VERSION := 8
+const CABIN_SAVE_VERSION := 9
 const ITEM_DEFINITIONS := {"computer": preload("res://resources/items/computer.tres")}
 const Furniture = preload("res://scripts/items/furniture_catalog.gd")
 const MAX_CARRIAGES := 3
@@ -712,7 +712,7 @@ func load_cabin(path: String, known_stations: Array) -> bool:
 	if not data is Dictionary:
 		return false
 	var version: Variant = data.get("version")
-	if version != 1 and version != 2 and version != 3 and version != 4 and version != 5 and version != 6 and version != 7 and version != CABIN_SAVE_VERSION:
+	if version != 1 and version != 2 and version != 3 and version != 4 and version != 5 and version != 6 and version != 7 and version != 8 and version != CABIN_SAVE_VERSION:
 		return false
 	if version >= 3 and not valid_car_state(data):
 		return false
@@ -918,7 +918,7 @@ func valid_home_layout(data: Dictionary, version: int = CABIN_SAVE_VERSION) -> b
 	return true
 
 func migrate_furniture(data: Dictionary, version: int) -> Dictionary:
-	if version in [6, 7]:
+	if version in [6, 7, 8]:
 		return Furniture.migrate_grid_layout(data.furniture_layout, version)
 	var layout := Furniture.initial_layout()
 	if version <= 3:

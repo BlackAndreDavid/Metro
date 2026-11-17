@@ -12,7 +12,7 @@ test/
 │  ├─ test_build_flow.gd     家具、材料、扩建、耗电、存档迁移和多车厢回正
 │  ├─ test_fixture_flow.gd   五类占格、边界、四挂点、前景层和统一高亮
 │  ├─ test_item_map_flow.gd  电脑旋转与收纳、满格保护、地图往返 Home／建造
-│  └─ test_construction_flow.gd  独立场景、状态共享、真实鼠标选择／按钮、2秒蓄力与真实拖放、无效落点、拆除、仓库及退出
+│  └─ test_construction_flow.gd  独立场景、状态共享、真实鼠标选择／按钮、1秒蓄力与真实拖放、无效落点、拆除、仓库及退出
 ├─ tools/
 │  ├─ capture_home.gd       可选 OpenGL 图形截图验证
 │  └─ run_tests.py           统一入口：资源导入 → 菜单与状态 → Home 冒烟 → Home 集成 → 家具与建造 → 独立设施 → 建造模块
