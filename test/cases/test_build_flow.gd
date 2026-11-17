@@ -19,6 +19,12 @@ func add_recipe(state) -> void:
 		for i in range(State.EXPANSION_COST[kind]):
 			check(state.add_supply(kind, "locker"), "test recipe fits locker")
 
+func select_for_move(home, kind: String) -> void:
+	if not home.construction.active:
+		home.construction.enter()
+	home.construction.select_furniture(kind)
+	home.construction.begin_move()
+
 func run() -> void:
 	var state := State.new()
 	check(state.carriage_count == 1 and state.furniture_layout == State.Furniture.DEFAULT_LAYOUT, "new game has stored bed/computer and installed service furniture")
@@ -88,12 +94,12 @@ func run() -> void:
 	await process_frame
 	var backdrop = home.home_backdrop
 	check(backdrop.get_node("Carriage/FurnitureSlots").get_child_count() == 3, "normal home hides build cells and displays installed service furniture")
-	home.select_home_furniture("bed")
-	home.place_home_furniture(1)
-	home.select_home_furniture("computer")
-	home.place_home_furniture(0)
+	select_for_move(home, "bed")
+	home.construction.place_at(1)
+	select_for_move(home, "computer")
+	home.construction.place_at(0)
 	check(home.state.furniture_layout.bed == 1 and home.state.furniture_layout.computer == 0, "placement toolbar updates state")
-	home.toggle_placement()
+	home.construction.exit()
 	await process_frame
 	backdrop = home.home_backdrop
 	var bed = backdrop.get_node("Carriage/FurnitureSlots/Bed")
@@ -131,13 +137,13 @@ func run() -> void:
 		if child is Button:
 			check(child.get_rect().end.y <= 144, "option buttons above carriage: %s %s" % [child.text, child.get_rect()])
 	add_recipe(home.state)
-	home.toggle_build_mode()
+	home.construction.enter()
 	home.show_expansion()
 	home.confirm_expansion()
 	await process_frame
 	backdrop = home.home_backdrop
 	check(backdrop.train_count == 2 and backdrop.carriage.has_node("Carriage2"), "new car uses carriage texture")
-	check(backdrop.get_node("Carriage/FurnitureSlots").has_node("Slot10") and backdrop.get_node("Carriage/FurnitureSlots").has_node("Slot15"), "expansion adds six floor cells")
+	check(home.state.carriage_count == 2 and home.state.SLOTS_PER_CARRIAGE == 10, "expansion adds floor cells and hanging points")
 	var center: Vector2 = backdrop.carriage.position + Vector2(640 + 972 * backdrop.focused_carriage, 360) * backdrop.train_zoom
 	check(center.is_equal_approx(Vector2(640, 360)), "expanded train focuses current carriage")
 	backdrop.set_process(false)
@@ -163,12 +169,13 @@ func run() -> void:
 	backdrop._process(10.0)
 	home.show_cabin()
 	check(home.home_backdrop.focused_carriage == 1, "page refresh preserves focused carriage")
-	home.select_home_furniture("bed")
-	home.place_home_furniture(State.SLOTS_PER_CARRIAGE + 1)
+	select_for_move(home, "bed")
+	home.construction.place_at(State.SLOTS_PER_CARRIAGE + 1)
 	check(home.state.furniture_layout.bed == State.SLOTS_PER_CARRIAGE + 1, "UI moves bed into added car")
 	var moved_bed = home.home_backdrop.get_node("Carriage/FurnitureSlots/Bed")
 	moved_bed.use()
-	check(home.state.furniture_layout.bed == -1, "arrangement click stores furniture")
+	home.construction.dismantle()
+	check(home.state.furniture_layout.bed == -1, "shared dismantle action stores selected furniture")
 	# A third carriage must participate in nearest-center selection as well.
 	home.state.carriage_count = 3
 	home.focused_carriage = 1

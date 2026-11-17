@@ -47,9 +47,9 @@ var settings_panel: CanvasLayer
 var settings_opened_ms := 0
 var settings_was_paused := false
 var focused_carriage := 0
-var build_mode := false
-var placement_mode := false
-var selected_furniture := ""
+const Construction = preload("res://scripts/construction/construction_mode.gd")
+const CONSTRUCTION_SCENE = preload("res://scenes/construction/construction_mode.tscn")
+var construction: Construction
 
 func _ready() -> void:
 	font = SystemFont.new()
@@ -57,6 +57,10 @@ func _ready() -> void:
 	var ui_theme := Theme.new()
 	ui_theme.default_font = font
 	theme = ui_theme
+	construction = CONSTRUCTION_SCENE.instantiate()
+	add_child(construction)
+	construction.configure(self)
+	construction.expansion_requested.connect(show_expansion)
 	var directory := OS.get_executable_path().get_base_dir() if OS.has_feature("template") else ProjectSettings.globalize_path("res://")
 	save_path = directory.path_join("saves/cabin_slot.json")
 	for argument in OS.get_cmdline_user_args():
@@ -213,11 +217,8 @@ func begin_page(kind: String, scene: PackedScene = null) -> void:
 		surface_block = null
 		battery_slot_open = false
 		vehicle_panel = null
-	if kind != "cabin":
-		placement_mode = false
-		selected_furniture = ""
-	if kind not in ["cabin", "expansion"]:
-		build_mode = false
+	if is_instance_valid(construction):
+		construction.on_page_changed(kind)
 	screen = kind
 	selection = {}
 	grids.clear()
@@ -266,29 +267,18 @@ func show_cabin(message: String = "") -> void:
 		show_charger.bind("") if has_charger else find_charger)
 	action(view, "电池充电", Rect2(428, 78, 122, 32), show_battery_charger.bind(""))
 	action(view, "汽修培训" if state.station == AutoRepair.STATION else "技能", Rect2(560, 78, 122, 32), show_skills.bind(""))
-	var build_button := action(view, "退出建造" if build_mode else "建造模式", Rect2(692, 78, 122, 32), toggle_build_mode)
+	var build_button := action(view, "建造模式", Rect2(692, 78, 122, 32), construction.enter)
 	build_button.name = "BuildModeButton"
-	if build_mode:
-		var toolbar := Control.new()
-		toolbar.name = "BuildModePanel"
-		toolbar.mouse_filter = MOUSE_FILTER_IGNORE
-		put(view, toolbar, Rect2(32, 112, 1150, 32))
-		action(toolbar, "结束布置" if placement_mode else "家具布置", Rect2(0, 0, 112, 27), toggle_placement)
-		action(toolbar, "扩建车厢", Rect2(124, 0, 112, 27), show_expansion)
-		if placement_mode:
-			for index in range(State.FURNITURE_IDS.size()):
-				var kind: String = State.FURNITURE_IDS[index]
-				var definition: Resource = State.Furniture.DEFINITIONS[kind]
-				action(toolbar, "摆放" + definition.display_name, Rect2(248 + index * 106, 0, 100, 27), select_home_furniture.bind(kind), selected_furniture == kind)
-		else:
-			label(toolbar, "家具布置：屏幕使用四个栏杆挂点；门占两个地面槽位。", Rect2(248, 0, 700, 28), 14, AMBER)
-	else:
+	build_button.visible = not construction.active
+	if not construction.active:
 		label(view, "%d 节车厢 · 行车 %d 度/站 · 每日 %s 度" % [state.carriage_count, state.travel_cost_per_stop(), energy_text(state.daily_power_cost())], Rect2(32, 116, 1100, 25), 15, MINT)
 	if state.debt > 0:
 		label(view, "欠费 %s 度" % energy_text(state.debt), Rect2(964, 82, 268, 32), 16, AMBER)
 	if not message.is_empty():
 		plate(view, Rect2(208, 647, 864, 38), Color("211f31e8"), BORDER)
 		label(view, message, Rect2(222, 647, 836, 38), 16, MINT, HORIZONTAL_ALIGNMENT_CENTER)
+
+	construction.refresh_ui()
 
 func use_supply(kind: String) -> void:
 	var problem := state.consume_supply(kind)
@@ -1182,33 +1172,6 @@ func close_settings() -> void:
 	settings_panel.queue_free()
 	settings_panel = null
 
-func toggle_placement() -> void:
-	build_mode = true
-	placement_mode = not placement_mode
-	selected_furniture = ""
-	show_cabin("家具摆放和扩建进度会随床铺存档保存。")
-
-func select_home_furniture(kind: String) -> void:
-	build_mode = true
-	placement_mode = true
-	selected_furniture = kind
-	show_cabin("请选择空槽；原家具将移动到新槽位，不会复制。")
-
-func place_home_furniture(slot: int) -> void:
-	if not placement_mode or selected_furniture.is_empty():
-		build_mode = true
-		placement_mode = true
-		show_cabin("请先在上方选择要摆放的家具。")
-		return
-	var problem := state.place_furniture(selected_furniture, slot)
-	if problem.is_empty():
-		focused_carriage = floori(slot / float(State.SLOTS_PER_CARRIAGE))
-	show_cabin("家具已摆放。" if problem.is_empty() else problem)
-
-func store_home_furniture(kind: String) -> void:
-	var problem := state.store_furniture(kind)
-	show_cabin("家具已收纳，可重新选择空槽摆放。" if problem.is_empty() else problem)
-
 func show_expansion() -> void:
 	begin_page("expansion")
 	var panel := modal("车厢扩建 · %d / %d 节" % [state.carriage_count, State.MAX_CARRIAGES], Rect2(300, 145, 680, 430))
@@ -1230,9 +1193,3 @@ func confirm_expansion() -> void:
 		show_cabin("扩建完成，增加 6 个地面槽位和 4 个挂点。请在床铺保存进度。")
 	else:
 		report(problem)
-
-func toggle_build_mode() -> void:
-	build_mode = not build_mode
-	placement_mode = false
-	selected_furniture = ""
-	show_cabin("建造模式中可选择家具布置或扩建车厢。" if build_mode else "")

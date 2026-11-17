@@ -1,13 +1,18 @@
+class_name MetroFurniture
 extends "res://scripts/items/highlightable_item.gd"
+signal selection_requested(kind: String)
 var definition: Resource
 var home: Control
-var editing := false
+var build_controller: Node
+var is_selected := false
 
-func configure(data: Resource, owner_home: Control, surface: Control, arrange: bool) -> void:
+func configure(data: Resource, owner_home: Control, surface: Control) -> void:
 	definition = data
 	home = owner_home
-	editing = arrange
-	set_item(data.texture, "收纳" + data.display_name if arrange else data.function_text, surface)
+	var building: bool = build_controller != null and build_controller.active
+	is_selected = building and build_controller.selected_id == data.id
+	set_item(data.texture, "选择" + data.display_name if building else data.function_text, surface)
+	set_highlighted(false)
 	activated.connect(use)
 	if data.id == "screen":
 		var info := Label.new()
@@ -25,7 +30,12 @@ func configure(data: Resource, owner_home: Control, surface: Control, arrange: b
 func use() -> void:
 	if home.screen != "cabin":
 		return
-	if editing:
-		home.store_home_furniture(definition.id)
+	if build_controller != null and build_controller.active:
+		selection_requested.emit(definition.id)
 	else:
 		definition.perform(home)
+
+func set_highlighted(value: bool) -> void:
+	super.set_highlighted(value or is_selected)
+	# Selection keeps the outline; only the hovered object shows a caption.
+	caption.visible = value

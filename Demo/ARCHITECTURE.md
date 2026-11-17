@@ -9,6 +9,7 @@ Metro/
 │  ├─ scenes/
 │  │  ├─ ui/     main_menu.tscn、save_select.tscn、settings_panel.tscn
 │  │  ├─ items/ highlightable_item.tscn、furniture.tscn
+│  │  ├─ construction/construction_mode.tscn  独立建造界面
 │  │  └─ game/   home.tscn、home_backdrop.tscn、exploration_setup.tscn、exploration.tscn、main.tscn
 │  ├─ resources/furniture/         床、电脑、门、柜子、屏幕的数据与裁剪偏移
 │  ├─ scripts/
@@ -17,7 +18,8 @@ Metro/
 │  │  ├─ items/furniture_catalog.gd  家具目录、占用空间、四个栏杆挂点
 │  │  ├─ core/game_session.gd        三栏位存档选择
 │  │  ├─ ui/                        菜单、设置、车厢视角、探索整备
-│  │  ├─ items/                     可高亮物品、家具与功能定义
+│  │  ├─ items/                     通用 MetroFurniture 类、高亮与功能定义
+│  │  ├─ construction/              ConstructionMode 类与统一建造操作
 │  │  ├─ cabin_state.gd             车厢经济、生存、物品与存档
 │  │  ├─ cabin_map.gd               地铁线路与地图绘制
 │  │  ├─ cabin_markets.gd           各站供需与报价
@@ -164,9 +166,35 @@ Home 动态页面
 
 每节车厢包含 **6 个地面槽位、4 个专用栏杆挂点**。新档自带收纳中的床与电脑，门、柜子、屏幕则已按原位置安装。
 
-顶部原有“柜子／交易／出站探索”重复按钮已删除，直接点击对应素材执行功能。顶部现在只保留“建造模式”入口：进入后选择“家具布置”或“扩建车厢”，正常模式不显示空槽和挂点。
+顶部原有“柜子／交易／出站探索”重复按钮已删除，直接点击对应素材执行功能。顶部只保留“建造模式”入口。进入后直接点击家具选中，再用共用工具栏移动、拆除、取用仓库或扩建；没有逐件家具的摆放按钮，也没有第二层“家具布置”开关。正常模式不显示目标槽位。
 
-在家具布置中选择要摆放的物品，再点兼容空位。点击已有家具可收纳，移动不会复制，已占用位置不能覆盖。门占 **两个连续地面槽位**，不能跨车厢或延伸进挂点；柜子占一个地面槽位。屏幕只能选择栏杆挂点，不能放地上，床、电脑、门、柜子也不能占挂点。选屏幕时隐藏不兼容的地面槽位，挂点会置于家具前面以确保能点击。
+建造模式的统一操作：
+
+1. 点击车厢中的家具选中；此时只选中，不触发原功能，也不立即收纳。
+2. 点击“移动”显示兼容目标位置，再点击目标提交。移动前保留原布局；“取消选择”或退出不会改变尚未提交的位置。
+3. 点击“拆除”后家具进入统一仓库，可从仓库列表重新取出。拆除不是永久销毁，也不返还扩建材料。
+4. 对原本未安装的床、电脑，打开“家具仓库”，在单个 ItemList 中选中条目，再用共用的“放置选中”操作放置；不生成每件家具单独的按钮。
+5. 工具栏有明确的“退出建造模式”按钮，退出后家具恢复正常交互。Esc 优先关闭仓库、取消选择，随后退出。
+
+门仍占两个连续地面槽位，不能跨车厢；柜子占一格。屏幕只能选择四个栏杆挂点，其他家具不能占挂点。移动目标直接复用状态层校验，只显示类型、空间、占用都合法的位置。被移动家具以半透明预览并穿透点击，选中的家具保持白色轮廓。挂点控制位于家具前面，避免门拦截点击。
+
+### 独立模块与家具类
+
+```text
+Home
+├─ ConstructionMode (持久子场景，独立控制器)
+│  ├─ Toolbar：选择信息 / 家具仓库 / 移动 / 拆除 / 取消 / 扩建 / 退出
+│  └─ Warehouse：统一家具列表 / 放置选中 / 返回建造
+└─ 动态 HomeBackdrop
+   └─ MetroFurniture 实例：床、电脑、门、柜子、屏幕
+```
+
+- `scripts/construction/construction_mode.gd` 定义 `ConstructionMode` 类，配套 `scenes/construction/construction_mode.tscn`。负责进入退出、选择、移动预览、提交、拆除、仓库和 Esc 操作。
+- `scripts/items/furniture.gd` 定义 `MetroFurniture` 类，继承通用高亮物品类。正常模式执行资源定义的功能；建造模式发出 `selection_requested(id)`，不再把点击等同于拆除。
+- 所有家具由模块的 `register_furniture()` 注册，不按具体家具生成按钮或分支控制。
+- `home.gd` 只负责模块生命周期、页面刷新和扩建请求连接；旧的 `build_mode / placement_mode / selected_furniture` 状态和逐件摆放函数已移除。
+- `cabin_state.gd → furniture_placement_problem()` 是可复用的无副作用校验，预览与最终 `place_furniture()` 共用它。门的两格、屏幕挂点、跨车厢限制和占用检查保持一致。
+- 模块用 ID 保留选择，场景刷新时重新注册家具实例，避免引用已经释放的节点。切到正常游戏页面会自动退出建造；扩建页面返回则保留建造模式。
 
 屏幕的第一个挂点保持原位置。另三个挂点依据原栏杆像素校准：四个挂钩横坐标分别是源图的 `42 / 101 / 144 / 218`，末端纵坐标是 `22 / 22 / 20 / 21`；屏幕在挂钩下居中。可在 `items/furniture_catalog.gd → HANGING_ORIGINS` 修改位置。每增加一节车厢，获得独立的四个挂点。
 
@@ -175,7 +203,7 @@ Home 动态页面
 - `scenes/items/highlightable_item.tscn` + `scripts/items/highlightable_item.gd` 提供统一纹理透明度命中检测、悬停功能文字与描边材质。透明画布不会成为点击区。
 - `assets/shaders/item_outline.gdshader` 使用周围 8 个方向的 alpha 膨胀生成白色轮廓，纹理自动加两像素透明边距，防止外轮廓被截掉。每个物品独享材质，悬停不会同时点亮其他物品。
 - 后续物品可直接实例化通用场景，调用 `set_item(texture, 功能文案, home_backdrop)`，连接 `activated` 信号；无须复制描边算法。非车厢物品可省略第三个参数，不会绑定视角拖拽。
-- `furniture.tscn` 继承该通用场景，`furniture.gd` 根据布置模式决定收纳还是调用家具定义的功能。
+- `furniture.tscn` 继承该通用场景，`MetroFurniture` 根据当前模式决定请求选中还是调用家具功能。移动和拆除由统一建造控制器处理。
 - `resources/furniture/*.tres` 定义名称、素材路径、功能文案、动作、占用格数、摆放类型和裁剪偏移；`furniture_definition.gd.perform(home)` 分别连接休息、电脑、出站整备、柜子、站点地图流程。屏幕上常驻的站点／日期／天气属于内容展示，不是悬停提示。
 - 素材使用延迟加载，保存与布局校验无需提前读取 PNG，首次导入项目也不依赖纹理缓存。
 - `highlightable_item.gd` 的 `Function` 是唯一悬停功能说明。旧版同一节点另设了 `tooltip_text`，造成 Godot 默认提示框和功能文字同时出现；该字段已清空。原来叠在车厢上的隐形柜子、门、交易 Tooltip 热点已移除，交易窗也复用同一组件。背包、价格按钮等没有高亮说明的 UI 仍可保留各自的明细提示。

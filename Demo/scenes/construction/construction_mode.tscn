@@ -1,0 +1,145 @@
+[gd_scene load_steps=4 format=3]
+[ext_resource type="Script" path="res://scripts/construction/construction_mode.gd" id="1"]
+[sub_resource type="StyleBoxFlat" id="Button"]
+bg_color = Color(0.19, 0.17, 0.26, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.45, 0.4, 0.5, 1)
+content_margin_left = 8.0
+content_margin_right = 8.0
+content_margin_top = 0.0
+content_margin_bottom = 0.0
+[sub_resource type="StyleBoxFlat" id="Panel"]
+bg_color = Color(0.09, 0.08, 0.15, 0.98)
+content_margin_left = 2.0
+content_margin_right = 2.0
+content_margin_top = 0.0
+content_margin_bottom = 0.0
+[node name="ConstructionMode" type="Control"]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+z_index = 200
+script = ExtResource("1")
+[node name="Toolbar" type="PanelContainer" parent="."]
+offset_left = 32.0
+offset_top = 110.0
+offset_right = 1248.0
+offset_bottom = 144.0
+theme_override_styles/panel = SubResource("Panel")
+[node name="Margin" type="MarginContainer" parent="Toolbar"]
+layout_mode = 2
+[node name="Actions" type="HBoxContainer" parent="Toolbar/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+[node name="Selection" type="Label" parent="Toolbar/Margin/Actions"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 14
+text = "点击家具选中，再移动或拆除"
+[node name="Warehouse" type="Button" parent="Toolbar/Margin/Actions"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("Button")
+theme_override_styles/hover = SubResource("Button")
+theme_override_styles/pressed = SubResource("Button")
+theme_override_styles/disabled = SubResource("Button")
+text = "家具仓库"
+[node name="Move" type="Button" parent="Toolbar/Margin/Actions"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("Button")
+theme_override_styles/hover = SubResource("Button")
+theme_override_styles/pressed = SubResource("Button")
+theme_override_styles/disabled = SubResource("Button")
+text = "移动"
+[node name="Dismantle" type="Button" parent="Toolbar/Margin/Actions"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("Button")
+theme_override_styles/hover = SubResource("Button")
+theme_override_styles/pressed = SubResource("Button")
+theme_override_styles/disabled = SubResource("Button")
+text = "拆除"
+[node name="Cancel" type="Button" parent="Toolbar/Margin/Actions"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("Button")
+theme_override_styles/hover = SubResource("Button")
+theme_override_styles/pressed = SubResource("Button")
+theme_override_styles/disabled = SubResource("Button")
+text = "取消选择"
+[node name="Expand" type="Button" parent="Toolbar/Margin/Actions"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("Button")
+theme_override_styles/hover = SubResource("Button")
+theme_override_styles/pressed = SubResource("Button")
+theme_override_styles/disabled = SubResource("Button")
+text = "扩建车厢"
+[node name="Exit" type="Button" parent="Toolbar/Margin/Actions"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("Button")
+theme_override_styles/hover = SubResource("Button")
+theme_override_styles/pressed = SubResource("Button")
+theme_override_styles/disabled = SubResource("Button")
+text = "退出建造模式"
+[node name="Warehouse" type="Control" parent="."]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+[node name="Dimmer" type="ColorRect" parent="Warehouse"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.02, 0.02, 0.04, 0.8)
+[node name="Center" type="CenterContainer" parent="Warehouse"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+[node name="Panel" type="PanelContainer" parent="Warehouse/Center"]
+custom_minimum_size = Vector2(520, 380)
+layout_mode = 2
+[node name="Margin" type="MarginContainer" parent="Warehouse/Center/Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_bottom = 20
+[node name="Items" type="VBoxContainer" parent="Warehouse/Center/Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+[node name="Title" type="Label" parent="Warehouse/Center/Panel/Margin/Items"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+text = "家具仓库"
+[node name="Help" type="Label" parent="Warehouse/Center/Panel/Margin/Items"]
+layout_mode = 2
+text = "选择收纳中的家具，点击放置或双击条目。"
+[node name="Inventory" type="ItemList" parent="Warehouse/Center/Panel/Margin/Items"]
+custom_minimum_size = Vector2(460, 220)
+layout_mode = 2
+size_flags_vertical = 3
+fixed_icon_size = Vector2i(48, 48)
+[node name="Empty" type="Label" parent="Warehouse/Center/Panel/Margin/Items"]
+layout_mode = 2
+text = "所有家具均已安装。可选中已安装家具后拆除收纳。"
+[node name="Buttons" type="HBoxContainer" parent="Warehouse/Center/Panel/Margin/Items"]
+layout_mode = 2
+theme_override_constants/separation = 12
+[node name="Place" type="Button" parent="Warehouse/Center/Panel/Margin/Items/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "放置选中"
+[node name="Close" type="Button" parent="Warehouse/Center/Panel/Margin/Items/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "返回建造"

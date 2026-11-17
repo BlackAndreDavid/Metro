@@ -802,7 +802,7 @@ func daily_power_cost() -> float:
 func can_edit_home() -> bool:
 	return not trip_active and game_over_reason.is_empty()
 
-func place_furniture(kind: String, slot: int) -> String:
+func furniture_placement_problem(kind: String, slot: int) -> String:
 	if not can_edit_home():
 		return "当前不能布置家具。"
 	var cells := Furniture.footprint(kind, slot, carriage_count)
@@ -814,6 +814,12 @@ func place_furniture(kind: String, slot: int) -> String:
 		for used in Furniture.footprint(other, int(furniture_layout[other]), carriage_count):
 			if used in cells:
 				return "槽位已被占用，请先收纳原家具。"
+	return ""
+
+func place_furniture(kind: String, slot: int) -> String:
+	var problem := furniture_placement_problem(kind, slot)
+	if not problem.is_empty():
+		return problem
 	furniture_layout[kind] = slot
 	return ""
 

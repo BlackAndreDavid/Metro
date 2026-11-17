@@ -155,25 +155,16 @@ func configure_home(home: Control) -> void:
 	layer.name = "FurnitureSlots"
 	layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	carriage.add_child(layer)
-	var occupied: Array[int] = []
-	for kind in Catalog.IDS:
-		occupied.append_array(Catalog.footprint(kind, int(home.state.furniture_layout[kind]), train_count))
 	for slot in range(train_count * Catalog.SLOTS_PER_CARRIAGE):
-		if slot in occupied or not home.build_mode:
+		if not home.construction.can_place_at(slot):
 			continue
-		var callback: Callable = home.place_home_furniture.bind(slot)
+		var callback: Callable = home.construction.place_at.bind(slot)
 		var hanging := slot % Catalog.SLOTS_PER_CARRIAGE >= Catalog.FLOOR_SLOTS
-		if hanging and not home.build_mode:
-			continue
-		if home.placement_mode and not home.selected_furniture.is_empty():
-			var selected_hanging: bool = DEFINITIONS[home.selected_furniture].placement_type == "hanging"
-			if hanging != selected_hanging:
-				continue
-		var text := "挂点 %d" % (slot % Catalog.SLOTS_PER_CARRIAGE - Catalog.FLOOR_SLOTS + 1) if hanging else "空槽 %d" % (slot % Catalog.SLOTS_PER_CARRIAGE + 1)
+		var text := "挂点 %d" % (slot % Catalog.SLOTS_PER_CARRIAGE - Catalog.FLOOR_SLOTS + 1) if hanging else "槽位 %d" % (slot % Catalog.SLOTS_PER_CARRIAGE + 1)
 		var button: Button = home.action(layer, text, slot_rect(slot), callback)
 		button.name = "Slot%d" % slot
 		button.set_meta("hanging_point", hanging)
-		button.modulate.a = 0.75 if home.placement_mode else 0.4
+		button.modulate.a = 0.75
 		bind_hotspot(button, callback)
 	for kind in Catalog.IDS:
 		var slot: int = home.state.furniture_layout[kind]
@@ -188,7 +179,11 @@ func configure_home(home: Control) -> void:
 		item.size = padded * fit
 		item.position = bounds.get_center() - item.size * 0.5
 		layer.add_child(item)
-		item.configure(data, home, self, home.placement_mode)
+		home.construction.register_furniture(item, data)
+		item.configure(data, home, self)
+		if home.construction.moving and home.construction.selected_id == kind:
+			item.modulate.a = 0.5
+			item.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# Hanging controls must be last in the GUI tree as well as drawn on top;
 	# z_index alone would leave the door intercepting a hanger click.
 	for child in layer.get_children():
@@ -197,7 +192,7 @@ func configure_home(home: Control) -> void:
 	_apply_offset()
 
 func _open_trade() -> void:
-	if is_instance_valid(home_controller) and home_controller.screen == "cabin":
+	if is_instance_valid(home_controller) and home_controller.screen == "cabin" and not home_controller.construction.active:
 		home_controller.use_hotspot("trade")
 
 func zoom_for_count() -> float:
