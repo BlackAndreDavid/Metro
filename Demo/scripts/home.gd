@@ -59,14 +59,6 @@ func _ready() -> void:
 			save_path = argument.trim_prefix("--save-file=")
 	if not GameSession.active_save_path.is_empty():
 		save_path = GameSession.active_save_path
-	var menu_button := Button.new()
-	menu_button.name = "SettingsButton"
-	menu_button.text = "设置"
-	menu_button.position = Vector2(1160, 12)
-	menu_button.size = Vector2(88, 36)
-	menu_button.z_index = 100
-	menu_button.pressed.connect(show_settings)
-	add_child(menu_button)
 	var has_save := FileAccess.file_exists(save_path)
 	var loaded := state.load_cabin(save_path, Rail.STATIONS.keys())
 	if not state.game_over_reason.is_empty():
@@ -150,6 +142,8 @@ func begin_page(kind: String, scene: PackedScene = null) -> void:
 		view.name = kind.capitalize()
 	view.mouse_filter = MOUSE_FILTER_IGNORE
 	add_child(view)
+	# Keep page visuals and GUI hit testing beneath the persistent settings button.
+	move_child(view, $SettingsButton.get_index())
 	view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 func report(message: String, color: Color = AMBER) -> void:

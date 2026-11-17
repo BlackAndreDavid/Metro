@@ -8,3 +8,15 @@ anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 script = ExtResource("1_qtgwc")
+
+[node name="SettingsButton" type="Button" parent="."]
+layout_mode = 0
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -120.0
+offset_top = 12.0
+offset_right = -32.0
+offset_bottom = 48.0
+text = "设置"
+
+[connection signal="pressed" from="SettingsButton" to="." method="show_settings"]

@@ -8,7 +8,7 @@ const CELL_SIDE := 956.0 / 35.0
 const CELL_SIZE := Vector2(CELL_SIDE, CELL_SIDE)
 const GRID_ORIGIN := INTERIOR_RECT.position
 const CARRIAGE_PITCH := 972.0
-const MOUNT_SIZE := Vector2i(3, 3)
+const MOUNT_SIZE := Vector2i(4, 3)
 const HANGING_ORIGINS := [Vector2(28, 22), Vector2(87, 22), Vector2(130, 20), Vector2(204, 21)]
 const IDS := ["bed", "computer", "locker", "door", "screen"]
 const DEFINITIONS := {
@@ -42,7 +42,7 @@ static func default_placement(kind: String, car: int = 0) -> Dictionary:
 static func initial_layout() -> Dictionary:
 	return {"bed": null, "computer": null, "locker": default_placement("locker"), "door": default_placement("door"), "screen": default_placement("screen")}
 
-static func valid_placement(kind: String, p: Variant, count: int, version: int = 9) -> bool:
+static func valid_placement(kind: String, p: Variant, count: int, version: int = 10) -> bool:
 	if not DEFINITIONS.has(kind) or not p is Dictionary:
 		return false
 	var hanging: bool = DEFINITIONS[kind].placement_type == "hanging"
@@ -53,12 +53,12 @@ static func valid_placement(kind: String, p: Variant, count: int, version: int =
 			return false
 	if p.car < 0 or p.car >= count:
 		return false
-	var bounds := (Vector2i(2, 2) if version <= 8 else MOUNT_SIZE) if hanging else (Vector2i(16, 12) if version == 6 else (Vector2i(34, 12) if version == 7 else GRID_SIZE))
+	var bounds := (Vector2i(2, 2) if version <= 8 else (Vector2i(3, 3) if version == 9 else MOUNT_SIZE)) if hanging else (Vector2i(16, 12) if version == 6 else (Vector2i(34, 12) if version == 7 else GRID_SIZE))
 	if hanging and (not integer(p.get("mount")) or p.mount < 0 or p.mount >= HANGING_ORIGINS.size()):
 		return false
 	return Rect2i(Vector2i.ZERO, bounds).encloses(Rect2i(Vector2i(int(p.x), int(p.y)), footprint(kind, version)))
 
-static func overlaps(a_kind: String, a: Dictionary, b_kind: String, b: Dictionary, version: int = 9) -> bool:
+static func overlaps(a_kind: String, a: Dictionary, b_kind: String, b: Dictionary, version: int = 10) -> bool:
 	if int(a.car) != int(b.car) or a.has("mount") != b.has("mount"):
 		return false
 	if a.has("mount") and int(a.mount) != int(b.mount):
@@ -80,7 +80,8 @@ static func copy_layout(layout: Dictionary) -> Dictionary:
 		result[kind] = canonical(layout[kind]) if layout[kind] != null else null
 	return result
 
-static func footprint(kind: String, version: int = 9) -> Vector2i:
+static func footprint(kind: String, version: int = 10) -> Vector2i:
+	if version == 9 and kind == "screen": return Vector2i(3, 3)
 	if version <= 8 and kind == "screen": return Vector2i(2, 2)
 	if version == 8 and kind == "bed": return Vector2i(2, 8)
 	if version <= 7 and kind == "bed": return Vector2i(4, 1)

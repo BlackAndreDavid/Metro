@@ -9,4 +9,4 @@ action = "map"
 placement_type = "hanging"
 texture_path = "res://assets/textures/Screen.png"
 source_origin = Vector2(28, 22)
-grid_size = Vector2i(3, 3)
+grid_size = Vector2i(4, 3)

@@ -76,7 +76,11 @@ def main():
         run('item_map_flow', ['--script', str(root / 'cases/test_item_map_flow.gd'), '--',
                               '--save-file=' + str(output / 'item_map_flow_save.json')],
             ['ITEM_MAP_FLOW_OK'])
-    passed = len(results) == 8 and all(item['passed'] for item in results)
+    if results[0]['passed']:
+        run('settings_input', ['--script', str(root / 'cases/test_settings_input.gd'), '--',
+                               '--save-file=' + str(output / 'settings_input_save.json')],
+            ['SETTINGS_INPUT_OK'])
+    passed = len(results) == 9 and all(item['passed'] for item in results)
     summary = dict(run_id=run_id, passed=passed, results=results)
     (output / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print(f'Results: {output}')

@@ -73,7 +73,21 @@ func run() -> void:
 		if item.kind == "computer": item.rotated = true
 	home.show_locker()
 	await capture("rotated_item")
-	home.show_settings()
+	home.show_cabin()
+	await process_frame
+	var at: Vector2 = home.get_node("SettingsButton").get_global_rect().get_center()
+	for pressed in [true,false]:
+		var event := InputEventMouseButton.new()
+		event.button_index = MOUSE_BUTTON_LEFT
+		event.position = at
+		event.global_position = at
+		event.pressed = pressed
+		root.push_input(event)
+	await process_frame
+	if not is_instance_valid(home.settings_panel):
+		push_error("Actual settings button click failed")
+		quit(1)
+		return
 	await capture("home_settings")
 	home.close_settings()
 	home.queue_free()

@@ -10,7 +10,7 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 func _initialize() -> void: call_deferred("run")
 func run() -> void:
-	var expected := {"computer": Vector2i(2,2), "locker": Vector2i(3,12), "door": Vector2i(8,12), "bed": Vector2i(8,2), "screen": Vector2i(3,3)}
+	var expected := {"computer": Vector2i(2,2), "locker": Vector2i(3,12), "door": Vector2i(8,12), "bed": Vector2i(8,2), "screen": Vector2i(4,3)}
 	for kind in expected: check(Catalog.DEFINITIONS[kind].grid_size == expected[kind], "explicit footprint: " + kind)
 	check(Catalog.CELL_SIZE.x == Catalog.CELL_SIZE.y, "furniture cells are square")
 	check(Catalog.placement_rect("locker",Catalog.default_placement("locker")).size.is_equal_approx(Vector2(3,12) * Catalog.CELL_SIZE), "locker display occupies 3x12 square cells")
@@ -30,7 +30,7 @@ func run() -> void:
 	check(not state.place_furniture("locker", {"car":0,"mount":0,"x":0,"y":0}).is_empty(), "ground furniture cannot use mounting plane")
 	for mount in range(4):
 		check(state.place_furniture("screen", {"car":0,"mount":mount,"x":0,"y":0}).is_empty(), "four independent mounts")
-	check(not state.place_furniture("screen", {"car":0,"mount":0,"x":1,"y":0}).is_empty(), "mount maximum 3x3")
+	check(not state.place_furniture("screen", {"car":0,"mount":0,"x":1,"y":0}).is_empty(), "mount maximum 4x3")
 	check(state.place_furniture("computer", {"car":0,"x":18,"y":0}).is_empty(), "floor independent of hanging screen")
 	var before := state.save_data()
 	before.furniture_layout.computer.x = 14
@@ -50,7 +50,7 @@ func run() -> void:
 		item.set_highlighted(true)
 		check(item.caption.visible and item.visual.material.get_shader_parameter("highlighted") and item.tooltip_text.is_empty(), "single shared hover: " + name)
 	var screen = backdrop.get_node("Carriage/HangingFixtures/Screen")
-	check(screen.definition.grid_size == Vector2i(3,3) and screen.get_parent().name == "HangingFixtures", "screen renders on mount plane")
+	check(screen.definition.grid_size == Vector2i(4,3) and screen.get_parent().name == "HangingFixtures", "screen renders on mount plane")
 	check(screen.get_node("StationInfo").text == "%s\n%s\n%s" % [home.state.station,home.state.date_text(),home.state.weather()], "screen consistently displays station date and weather")
 	for mount in range(4):
 		var rect := Catalog.mount_rect(0,mount)

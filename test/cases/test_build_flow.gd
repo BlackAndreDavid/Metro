@@ -73,6 +73,11 @@ func run() -> void:
 	restored.write_save(path,grid_legacy)
 	check(restored.load_cabin(path,Rail.STATIONS.keys()) and restored.valid_home_layout(restored.save_data()), "version 8 migrates wider door and bed")
 	check(restored.furniture_layout.bed.car == 0 and restored.furniture_layout.bed.x >= 17 and restored.furniture_layout.screen.mount == 2, "migration retains carriage and hook without overlap")
+	var mount_legacy := restored.save_data()
+	mount_legacy.version = 9
+	restored.write_save(path,mount_legacy)
+	var old_layout: Dictionary = restored.furniture_layout.duplicate(true)
+	check(restored.load_cabin(path,Rail.STATIONS.keys()) and restored.furniture_layout == old_layout, "version 9 screen expansion preserves exact floor layout and hooks")
 	legacy.version = 4
 	legacy.furniture_layout = {"bed": 3, "computer": 0}
 	restored.write_save(path, legacy)

@@ -11,6 +11,7 @@ test/
 │  ├─ test_home_flow.gd      31 项检查：视角、真实电脑点击、设置与地表流程
 │  ├─ test_build_flow.gd     家具、材料、扩建、耗电、存档迁移和多车厢回正
 │  ├─ test_fixture_flow.gd   五类占格、边界、四挂点、前景层和统一高亮
+│  ├─ test_settings_input.gd  Home 下静态设置按钮、真实鼠标命中、多个页面打开与关闭
 │  ├─ test_item_map_flow.gd  电脑旋转与收纳、满格保护、地图往返 Home／建造
 │  └─ test_construction_flow.gd  独立场景、状态共享、真实鼠标选择／按钮、1秒蓄力与真实拖放、无效落点、拆除、仓库及退出
 ├─ tools/
@@ -27,6 +28,7 @@ test/
 │  │  ├─ fixture_flow.log
 │  │  ├─ construction_flow.log
 │  │  ├─ item_map_flow.log
+│  │  ├─ settings_input.log
 │  │  └─ 生成的存档、配置与缓存
 │  ├─ legacy/              迁移前已有的测试存档（如存在）
 │  └─ logs/                Windows 游戏、编辑器启动日志
