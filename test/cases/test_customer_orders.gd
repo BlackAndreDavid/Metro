@@ -93,7 +93,7 @@ func run() -> void:
 		Orders.next(capped)
 	check(Orders.ensure(capped).is_empty() and Orders.record(capped).arrived == Orders.daily_limit(origin), "daily customer cap cannot be exceeded")
 	capped.station = "四平路"
-	check(not Orders.ensure(capped).is_empty() and Orders.record(capped).arrived == 1, "new station has independent quota")
+	check(Orders.ensure(capped).is_empty() and Orders.record(capped).arrived == 0, "same customer cannot visit twice across stations on one day")
 	capped.station = origin
 	check(Orders.ensure(capped).is_empty(), "returning station does not reset quota")
 	capped.next_day()

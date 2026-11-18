@@ -14,6 +14,8 @@ import secrets
 import tempfile
 import os
 import webbrowser
+import subprocess
+import shutil
 from urllib.parse import parse_qs, urlparse
 from PIL import Image
 
@@ -44,14 +46,19 @@ def resource(path):
 
 def conditions(value):
     require(isinstance(value,dict),'条件必须是对象')
-    allowed={'stations','day_min','day_max','account_min','account_max','debt_min','debt_max','completed_min','has_items','flags_all','flags_none','blackout'}
+    allowed={'stations','day_min','day_max','account_min','account_max','debt_min','debt_max','completed_min','has_items','flags_all','flags_none','blackout','affection_min','affection_max','trust_min','trust_max','events_all'}
     require(set(value)<=allowed,'未知条件字段')
     for key,term in value.items():
         if key=='stations': require(isinstance(term,list) and set(term)<=set(read(GAME/'content/stations.json')),'条件站点无效')
-        elif key in ['flags_all','flags_none']: require(isinstance(term,list) and all(isinstance(x,str) and 0<len(x)<=128 for x in term),'标记条件须为字符串数组')
+        elif key in ['flags_all','flags_none','events_all']: require(isinstance(term,list) and all(isinstance(x,str) and 0<len(x)<=128 for x in term),'标记条件须为字符串数组')
         elif key=='has_items': require(isinstance(term,dict) and all(k in ITEMS and integer(v,1,1000) for k,v in term.items()),'物品条件无效')
         elif key=='blackout': require(isinstance(term,bool),'停电条件须为布尔值')
-        else: require(number(term,0,1000000),'数值条件超出范围')
+        else: require(number(term,-100 if key.startswith(('affection','trust')) else 0,1000000),'数值条件超出范围')
+
+def effects(value):
+    require(isinstance(value,dict) and set(value)<= {'affection','trust','set_flags'},'效果字段无效')
+    for key in ['affection','trust']: require(number(value.get(key,0),-100,100),'好感/信任变化须在 -100～100')
+    require(isinstance(value.get('set_flags',[]),list) and all(isinstance(x,str) and 0<len(x)<=128 for x in value.get('set_flags',[])),'效果标记无效')
 
 def validate_customer(data):
     require(isinstance(data,dict) and ID.fullmatch(data.get('id','')),'顾客ID须为英文小写、数字、短横线或下划线')
@@ -63,45 +70,66 @@ def validate_customer(data):
     require(isinstance(data.get('enabled'),bool),'启用字段无效')
     for key in ['buy_categories','sell_categories']:
         require(isinstance(data.get(key),list) and set(data[key])<=CATEGORIES,'买卖类别无效')
-    require(data['buy_categories'] or data['sell_categories'] or not data['enabled'],'启用顾客至少需要一个买入或卖出类别')
+    require(data['buy_categories'] or data['sell_categories'] or not data['enabled'] or not data.get('trade_enabled',True),'启用顾客至少需要一个买入或卖出类别')
     require(set(data.get('stations',[]))<=set(read(GAME/'content/stations.json')),'顾客站点无效')
     require(isinstance(data.get('stories',[]),list),'剧情须为数组')
+    require(data.get('faction','none') in ['red','yellow','blue','none'],'阵营无效')
+    require(isinstance(data.get('trade_enabled',True),bool),'交易启用字段无效')
     ids=set()
     for story in data.get('stories',[]):
         require(isinstance(story,dict) and ID.fullmatch(story.get('id','')) and story['id'] not in ids,'剧情ID无效或重复'); ids.add(story['id'])
         require(integer(story.get('priority',0),-1000,1000) and isinstance(story.get('once',True),bool),'剧情优先级/单次字段无效')
         conditions(story.get('conditions',{}))
+        require(isinstance(story.get('contexts',['trade']),list) and bool(story.get('contexts',['trade'])) and set(story.get('contexts',['trade'])) <= {'trade','exploration'},'互动场景无效')
+        require(isinstance(story.get('after',[]),list),'前置事件须为数组')
+        for event in story.get('after',[]):
+            require(isinstance(event,dict) and ID.fullmatch(event.get('npc',data['id'])) and ID.fullmatch(event.get('story','')) and integer(event.get('days',1),0,10000),'前置事件或间隔天数无效')
         nodes=story.get('nodes',{})
         require(isinstance(nodes,dict) and 0<len(nodes)<=200 and story.get('start') in nodes,'剧情必须包含有效的起始节点')
         for key,node in nodes.items():
             require(ID.fullmatch(key) and isinstance(node,dict) and isinstance(node.get('text'),str),'节点ID或文本无效')
             require(isinstance(node.get('set_flags',[]),list) and all(isinstance(x,str) and 0<len(x)<=128 for x in node.get('set_flags',[])),'节点标记无效')
+            effects(node.get('effects',{}))
             choices=node.get('choices',[]); require(isinstance(choices,list) and len(choices)<=12,'分支数量无效')
             require(not node.get('next') or node['next'] in nodes,'继续节点不存在')
             for choice in choices:
                 require(isinstance(choice,dict) and isinstance(choice.get('text'),str) and bool(choice['text']),'分支文字不能为空')
                 require(not choice.get('next') or choice['next'] in nodes,'分支目标不存在')
                 conditions(choice.get('conditions',{}))
+                effects(choice.get('effects',{}))
         # Every reachable node must have a path to an ending; cycles with no exit are rejected.
         ending={k for k,n in nodes.items() if (not n.get('choices') and not n.get('next')) or any(not c.get('next') for c in n.get('choices',[]))}
         for _ in nodes:
             ending |= {k for k,n in nodes.items() if n.get('next') in ending or any(c.get('next') in ending for c in n.get('choices',[]))}
         require(set(nodes)<=ending,'剧情中存在无法结束的循环/节点，请增加结束分支')
+    known={c['id']:c for c in read(GAME/'content/customers.json')['customers']}; known[data['id']]=data
+    for story in data.get('stories',[]):
+        for event in story.get('after',[]):
+            parent=known.get(event.get('npc',data['id']),{})
+            require(any(s['id']==event['story'] for s in parent.get('stories',[])),'前置 NPC 或剧情不存在，请先保存前置角色与事件')
 
 def validate_level(station,data):
     require(station in read(GAME/'content/stations.json'),'请选择已有地铁站')
     require(isinstance(data,dict) and ID.fullmatch(data.get('id','')),'关卡ID无效')
     require(number(data.get('segment'),256,1600) and number(data.get('ground'),200,480) and number(data.get('floor_height'),50,130),'地图尺寸无效')
     cells=data.get('cell_names',[])
-    require(isinstance(cells,list) and len(cells)==3 and all(isinstance(r,list) and 1<=len(r)<=8 for r in cells),'地图须为三条街道、每条1–8个分段')
+    require(isinstance(cells,list) and 1<=len(cells)<=8 and all(isinstance(r,list) and 1<=len(r)<=8 for r in cells),'地图须为1–8条街道、每条1–8个分段')
     require(len({len(r) for r in cells})==1 and all(isinstance(n,str) and n for r in cells for n in r),'地图分段数量与名称无效')
     width=data['segment']*len(cells[0])
     require(data.get('loot_station') in read(GAME/'content/stations.json'),'战利品来源站无效')
     for key in ['stations','buildings','junctions','loot','vehicles']:
         require(isinstance(data.get(key),list) and len(data[key])<=200,'地图对象列表无效')
-        for entry in data[key]: require(isinstance(entry,dict) and integer(entry.get('row'),0,1 if key=='junctions' else 2) and number(entry.get('x'),24,width-24),'对象行号或横坐标无效')
+        for entry in data[key]: require(isinstance(entry,dict) and integer(entry.get('row'),0,len(cells)-2 if key=='junctions' else len(cells)-1) and number(entry.get('x'),24,width-24),'对象行号或横坐标无效')
     require(any(s.get('name')==station for s in data['stations']),'关卡必须有本站入口/撤离口')
     require(all(s.get('name') in read(GAME/'content/stations.json') for s in data['stations']),'撤离站点名称无效')
+    require(number(data.get('grid_size',20),5,200),'栅格大小须在5～200')
+    npcs=data.get('npcs',[])
+    require(isinstance(npcs,list) and len(npcs)<=200,'NPC列表无效')
+    known={c['id'] for c in read(GAME/'content/customers.json')['customers']}
+    placed=set()
+    for npc in npcs:
+        require(isinstance(npc,dict) and npc.get('npc') in known and npc['npc'] not in placed,'NPC不存在或在关卡内重复'); placed.add(npc['npc'])
+        require(integer(npc.get('row'),0,len(cells)-1) and number(npc.get('x'),24,width-24),'NPC位置无效')
     buildings={}
     for building in data['buildings']:
         require(ID.fullmatch(building.get('id','')) and building['id'] not in buildings,'建筑ID无效或重复')
@@ -122,8 +150,10 @@ def validate_level(station,data):
             b=buildings[building]; require(point['row']==b['row'] and b['x']<=point['x']<=b['x']+b['width'],'室内物资必须在对应建筑内')
 
 def save_customer(data):
+    data=copy.deepcopy(data); create=data.pop('_create',False)
     validate_customer(data)
     document=read(GAME/'content/customers.json'); entries=document['customers']
+    require(not create or not any(c['id']==data['id'] for c in entries),'顾客ID已存在，请为新顾客使用独立ID')
     for index,old in enumerate(entries):
         if old['id']==data['id']: entries[index]=data; break
     else: entries.append(data)
@@ -141,6 +171,28 @@ def save_level(station,data):
     atomic(GAME/'content/registry.json',registry)
     return registry['stations'][station]
 
+def editor_settings():
+    path=GAME/'content/editor-settings.local.json'
+    return read(path) if path.exists() else {'godot_executable':shutil.which('godot') or shutil.which('godot4') or '', 'project':str(GAME)}
+
+def godot_action(data):
+    settings=editor_settings(); executable=settings.get('godot_executable','')
+    require(isinstance(executable,str) and bool(executable),'请先在总设置填写 Godot 可执行文件路径')
+    resolved=shutil.which(executable) or str(Path(executable).expanduser().resolve())
+    require(Path(resolved).is_file(),'Godot 可执行文件不存在')
+    action=data.get('action','probe')
+    require(action in ['probe','editor','game','preview'],'未知 Godot 操作')
+    probe=subprocess.run([resolved,'--version'],capture_output=True,text=True,timeout=10,check=True)
+    if action=='probe': return {'ok':True,'version':probe.stdout.strip(),'project':str(GAME)}
+    args=[resolved,'--path',str(GAME)]
+    if action=='editor': args+=['--editor']
+    if action=='preview':
+        station=data.get('station',''); require(station in read(GAME/'content/registry.json')['stations'],'请先保存关卡')
+        args+=['--script','res://scripts/content/preview_level.gd','--','--preview-station='+station]
+    log=ROOT/'test/results/logs/content-editor-godot.log'; log.parent.mkdir(parents=True,exist_ok=True)
+    with log.open('ab') as output: subprocess.Popen(args,stdout=output,stderr=output,start_new_session=True)
+    return {'ok':True,'version':probe.stdout.strip(),'log':str(log)}
+
 class Handler(BaseHTTPRequestHandler):
     token=''
     def log_message(self,*args): pass
@@ -149,14 +201,14 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         route=urlparse(self.path)
         try:
-            if route.path=='/api/project': return self.respond({'token':self.token,'stations':read(GAME/'content/stations.json'),'customers':read(GAME/'content/customers.json')['customers'],'registry':read(GAME/'content/registry.json'),'categories':{'supplies':'生活补给','power':'电力用品','materials':'工业材料','documents':'文书旧物'}})
+            if route.path=='/api/project': return self.respond({'settings':editor_settings(),'token':self.token,'stations':read(GAME/'content/stations.json'),'customers':read(GAME/'content/customers.json')['customers'],'registry':read(GAME/'content/registry.json'),'categories':{'supplies':'生活补给','power':'电力用品','materials':'工业材料','documents':'文书旧物'}})
             if route.path=='/api/level':
                 station=parse_qs(route.query).get('station',['邮电新村'])[0]; entry=read(GAME/'content/registry.json')['stations'].get(station)
                 return self.respond({'definition':read(resource(entry['level'])) if entry else None,'template':read(GAME/'content/levels/postal.json')})
             if route.path=='/asset':
                 path=resource(parse_qs(route.query).get('path',[''])[0]); require(path.suffix.lower()=='.png','只能预览PNG'); data=path.read_bytes(); mime='image/png'
             else:
-                file={'/':'index.html','/editor.js':'editor.js','/style.css':'style.css'}.get(route.path)
+                file={'/':'index.html','/editor.js':'editor.js','/style.css':'style.css','/enhancements.js':'enhancements.js'}.get(route.path)
                 if not file: return self.respond({'error':'未找到'},404)
                 path=WEB/file; data=path.read_bytes(); mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'}[path.suffix]
             self.send_response(200); self.send_header('Content-Type',mime); self.end_headers(); self.wfile.write(data)
@@ -166,6 +218,11 @@ class Handler(BaseHTTPRequestHandler):
             require(self.headers.get('X-Editor-Token')==self.token,'编辑令牌无效，请刷新页面')
             length=int(self.headers.get('Content-Length','0')); require(0<length<=16*1024*1024,'请求体过大或为空')
             data=json.loads(self.rfile.read(length))
+            if self.path=='/api/settings':
+                require(isinstance(data.get('godot_executable'),str) and len(data['godot_executable'])<=1024,'Godot路径无效')
+                atomic(GAME/'content/editor-settings.local.json',{'godot_executable':data['godot_executable'],'project':str(GAME)})
+                return self.respond({'ok':True,'settings':editor_settings()})
+            if self.path=='/api/godot': return self.respond(godot_action(data))
             if self.path=='/api/customer': save_customer(data); return self.respond({'ok':True})
             if self.path=='/api/level': return self.respond({'ok':True,**save_level(data['station'],data['definition'])})
             if self.path=='/api/upload':
@@ -179,7 +236,7 @@ class Handler(BaseHTTPRequestHandler):
                 path='res://assets/textures/customers/editor_'+data['id']+'.png'; runtime.save(resource(path))
                 return self.respond({'ok':True,'texture':path})
             self.respond({'error':'未找到'},404)
-        except (ValueError,KeyError,TypeError,OSError) as error: self.respond({'error':str(error)},400)
+        except (ValueError,KeyError,TypeError,OSError,subprocess.SubprocessError) as error: self.respond({'error':str(error)},400)
 
 def main():
     global GAME

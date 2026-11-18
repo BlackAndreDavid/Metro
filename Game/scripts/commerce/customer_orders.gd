@@ -48,6 +48,7 @@ static func ensure(state: RefCounted) -> Dictionary:
 	if side == "sell":
 		for kind in CATEGORIES[category].items: stock[kind] = 2
 	visits.active = {"id":"%d/%s/%d" % [state.day,state.station,index],"visitor":visitor,"side":side,"category":category,"budget":float(definition.get("base_budget",120)),"status":"open","stock":stock,"total":0.0}
+	state.daily_customer_ids[definition.id] = true
 	visits.arrived += 1
 	return visits.active
 
@@ -56,6 +57,8 @@ static func pick_visitor(state: RefCounted, index: int, side: String) -> int:
 	var total := 0.0
 	for i in range(Visitors.ENTRIES.size()):
 		var data: Dictionary = Visitors.definition(i)
+		if state.daily_customer_ids.has(data.id): continue
+		if not data.get("trade_enabled",true): continue
 		if not data.get("enabled",true) or float(data.get("weight",1)) <= 0 or data.get(side+"_categories",CATEGORIES.keys()).is_empty(): continue
 		if not data.get("stations",[]).is_empty() and state.station not in data.stations: continue
 		candidates.append(i)

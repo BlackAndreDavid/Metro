@@ -60,6 +60,7 @@ func _ready() -> void:
 			save_path = argument.trim_prefix("--save-file=")
 	if not GameSession.active_save_path.is_empty():
 		save_path = GameSession.active_save_path
+	if get_meta("content_preview",false): save_path = "user://content_preview/session_%d.json" % Time.get_ticks_usec()
 	var has_save := FileAccess.file_exists(save_path)
 	var loaded := state.load_cabin(save_path, Rail.STATIONS.keys())
 	if not state.game_over_reason.is_empty():

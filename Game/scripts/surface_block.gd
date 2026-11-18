@@ -7,6 +7,7 @@ const AutoRepair = preload("res://scripts/auto_repair.gd")
 signal pickup_requested(slot: int)
 signal extraction_requested(station: String)
 signal vehicle_requested(vehicle_id: String)
+signal npc_requested(id: String)
 signal moved
 
 const NORTH := 0
@@ -79,6 +80,9 @@ var VEHICLES := DEFAULT_VEHICLES.duplicate(true)
 
 var state
 var font: Font
+var NPCS: Array = []
+var npc_textures: Dictionary = {}
+var interacting_npc := false
 var row := SOUTH
 var player_x := 88.0
 var building := ""
@@ -116,6 +120,14 @@ func setup(owner_state: RefCounted, ui_font: Font) -> void:
 
 func apply_level(data: Dictionary) -> void:
 	if data.is_empty(): return
+	NPCS = data.get("npcs",[]).duplicate(true)
+	var catalog = preload("res://scripts/commerce/customer_catalog.gd")
+	catalog.reload()
+	for npc in NPCS:
+		for entry in catalog.ENTRIES:
+			if entry.id == npc.npc:
+				npc_textures[npc.npc] = catalog.load_texture(entry.texture)
+				npc["name"] = entry.name
 	SEGMENT = float(data.get("segment",DEFAULT_SEGMENT))
 	GROUND = float(data.get("ground",DEFAULT_GROUND))
 	FLOOR_HEIGHT = float(data.get("floor_height",DEFAULT_FLOOR_HEIGHT))
@@ -158,10 +170,10 @@ func junction_destination(junction: Dictionary) -> int:
 	return -1
 
 func junction_caption(destination: int) -> String:
-	return ["去北街", "去中街", "去南街"][destination]
+	return ["去北街", "去中街", "去南街"][destination] if destination < 3 else "去第%d街" % (destination+1)
 
 func _process(delta: float) -> void:
-	if state == null or not state.trip_active or inspecting_vehicle or get_viewport().gui_is_dragging():
+	if state == null or not state.trip_active or inspecting_vehicle or interacting_npc or get_viewport().gui_is_dragging():
 		return
 	var left := Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)
 	var right := Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT)
@@ -210,6 +222,10 @@ func nearby_vehicle() -> String:
 	return ""
 
 func interaction() -> Dictionary:
+	if interacting_npc: return {}
+	for npc in NPCS:
+		if building.is_empty() and npc.row == row and absf(player_x-npc.x) <= REACH:
+			return {"kind":"npc","id":npc.npc,"caption":"交谈 · "+npc.get("name",npc.npc)}
 	var location := active_building()
 	for slot in range(LOOT.size()):
 		if not can_take(slot):
@@ -245,6 +261,7 @@ func interaction() -> Dictionary:
 func interact() -> void:
 	var target := interaction()
 	match target.get("kind", ""):
+		"npc": npc_requested.emit(target.id)
 		"pickup": pickup_requested.emit(target.slot)
 		"extract": extraction_requested.emit(target.station)
 		"vehicle": vehicle_requested.emit(target.id)
@@ -340,6 +357,9 @@ func _draw() -> void:
 			var tint: Color = state.rarity_color(kind)
 			draw_rect(Rect2(point.x - 9, GROUND - point.floor * FLOOR_HEIGHT - 12, 18, 10), tint.darkened(0.44))
 			draw_line(Vector2(point.x - 8, GROUND - point.floor * FLOOR_HEIGHT - 12), Vector2(point.x + 8, GROUND - point.floor * FLOOR_HEIGHT - 12), tint, 2.0)
+	for npc in NPCS:
+		if npc.row == row and building.is_empty() and npc_textures.get(npc.npc) != null:
+			draw_texture_rect(npc_textures[npc.npc],Rect2(npc.x-24,GROUND-80,48,80),false)
 	draw_player(Vector2(player_x, GROUND - floor_index * FLOOR_HEIGHT))
 	draw_set_transform(Vector2.ZERO)
 	draw_rect(Rect2(Vector2.ZERO, size), Color("726176"), false, 2.0)

@@ -14,6 +14,7 @@ func configure(home: Control) -> void:
 	$StreetFrame/SurfaceBlock.pickup_requested.connect(home.pick_up_surface_item)
 	$StreetFrame/SurfaceBlock.extraction_requested.connect(home.extract_from_block)
 	$StreetFrame/SurfaceBlock.vehicle_requested.connect(home.show_vehicle)
+	$StreetFrame/SurfaceBlock.npc_requested.connect(show_npc)
 	$StreetFrame/SurfaceBlock.moved.connect(home.update_surface_position)
 	$Minimap.setup($StreetFrame/SurfaceBlock, home.font)
 	for label in [$Departure, $Location, $Timer, $InteractionPrompt, $Status]:
@@ -21,3 +22,9 @@ func configure(home: Control) -> void:
 	$Departure.add_theme_color_override("font_color", home.MINT)
 	$InteractionPrompt.add_theme_color_override("font_color", home.AMBER)
 	$Status.add_theme_color_override("font_color", home.AMBER)
+
+func show_npc(id: String) -> void:
+	if $StreetFrame/SurfaceBlock.interacting_npc: return
+	var panel := preload("res://scripts/content/npc_interaction.gd").new()
+	add_child(panel)
+	panel.setup(controller.state,$StreetFrame/SurfaceBlock,id)

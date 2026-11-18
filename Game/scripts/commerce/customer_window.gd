@@ -24,6 +24,13 @@ func _ready() -> void:
 	hide_customer()
 
 func set_customer(index: int) -> void:
+	Catalog.reload()
+	textures.clear()
+	for data in Catalog.ENTRIES:
+		var texture := AtlasTexture.new()
+		texture.atlas = Catalog.load_texture(data.texture)
+		texture.region = Rect2(0,0,48,44)
+		textures.append(texture)
 	customer_index = posmod(index,Catalog.ENTRIES.size())
 	portrait.texture = textures[customer_index]
 	$Name.text = Catalog.ENTRIES[customer_index].name

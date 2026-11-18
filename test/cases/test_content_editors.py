@@ -30,15 +30,20 @@ class ContentEditors(unittest.TestCase):
         editor.GAME=self.original;self.temp.cleanup()
     def customer(self):
         customer=copy.deepcopy(editor.read(self.game/'content/customers.json')['customers'][0])
-        customer.update(id='editor_test',name='编辑器客户',base_budget=77,weight=1000,buy_categories=['supplies'],sell_categories=['documents'])
+        customer.update(faction='red',id='editor_test',name='编辑器客户',base_budget=77,weight=1000,buy_categories=['supplies'],sell_categories=['documents'])
         customer['stories']=[dict(id='test_story',name='分支测试',priority=20,once=True,conditions={'day_min':1,'has_items':{'water':1}},start='greeting',nodes={
-            'greeting':dict(speaker='编辑器客户',text='先聊聊再交易。',choices=[dict(text='听消息',next='thanks',conditions={}),dict(text='先告别',next='',conditions={})]),
-            'thanks':dict(speaker='编辑器客户',text='谢谢你听我说。',set_flags=['editor_story_done'],choices=[])})]
+            'greeting':dict(speaker='编辑器客户',text='先聊聊再交易。',choices=[dict(text='听消息',next='thanks',conditions={},effects={'affection':3,'trust':5}),dict(text='先告别',next='',conditions={})]),
+            'thanks':dict(effects={'affection':7,'trust':6},speaker='编辑器客户',text='谢谢你听我说。',set_flags=['editor_story_done'],choices=[])})]
+        customer['stories'].append(dict(id='explore_followup',name='跨日探索后续',contexts=['exploration'],after=[dict(npc='editor_test',story='test_story',days=1)],conditions={'affection_min':10,'trust_min':11},once=True,start='hello',nodes={'hello':dict(text='昨天的消息有了后续。',effects={'affection':2,'trust':3})}))
         return customer
     def level(self):
         level=editor.read(self.game/'content/levels/postal.json')
         level.update(loot_station='南京东路',stations=[{'name':'南京东路','row':2,'x':88}])
         level['buildings'][0]['name']='编辑建筑';level['loot'][0]['kind']='book'
+        level['npcs']=[dict(npc='editor_test',row=3,x=330)]
+        for row in level['cell_names']: row.append('新增地图格')
+        level['cell_names'].append(['第四街'+str(i) for i in range(4)])
+        level['junctions'].append(dict(row=2,x=330))
         return level
     def test_customer_fields_branch_validation_and_stable_order(self):
         original=editor.read(self.game/'content/customers.json')['customers']
@@ -54,6 +59,7 @@ class ContentEditors(unittest.TestCase):
         bad=copy.deepcopy(c);bad['texture']='res://../outside.png'
         with self.assertRaises(ValueError):editor.save_customer(bad)
     def test_station_scene_export_and_reference_validation(self):
+        editor.save_customer(self.customer())
         result=editor.save_level('南京东路',self.level())
         self.assertIn('exploration.tscn',editor.resource(result['scene']).read_text())
         self.assertEqual(editor.read(self.game/'content/registry.json')['stations']['南京东路'],result)
@@ -62,6 +68,22 @@ class ContentEditors(unittest.TestCase):
         with self.assertRaises(ValueError):editor.save_level('南京东路',bad)
         bad=self.level();bad['buildings'][0]['x']=100000
         with self.assertRaises(ValueError):editor.save_level('南京东路',bad)
+    def test_social_schema_new_ids_npcs_and_godot_interface(self):
+        customer=self.customer();editor.save_customer(customer)
+        duplicate=copy.deepcopy(customer);duplicate['_create']=True
+        with self.assertRaises(ValueError):editor.save_customer(duplicate)
+        bad=copy.deepcopy(customer);bad['faction']='unknown'
+        with self.assertRaises(ValueError):editor.save_customer(bad)
+        bad=copy.deepcopy(customer);bad['stories'][0]['nodes']['thanks']['effects']['trust']=101
+        with self.assertRaises(ValueError):editor.save_customer(bad)
+        level=self.level();editor.validate_level('南京东路',level)
+        level['npcs'][0]['npc']='missing'
+        with self.assertRaises(ValueError):editor.validate_level('南京东路',level)
+        godot=os.environ.get('METRO_GODOT')
+        if godot:
+            editor.atomic(self.game/'content/editor-settings.local.json',{'godot_executable':godot})
+            self.assertIn('4.7',editor.godot_action({'action':'probe'})['version'])
+
     def test_http_api_requires_token_and_writes_validated_content(self):
         editor.Handler.token='test-token'
         server=editor.ThreadingHTTPServer(('127.0.0.1',0),editor.Handler)
@@ -87,7 +109,7 @@ class ContentEditors(unittest.TestCase):
         env=os.environ.copy()
         for name,folder in [('XDG_CONFIG_HOME','config'),('XDG_DATA_HOME','data'),('XDG_CACHE_HOME','cache')]:
             path=Path(self.temp.name)/folder;path.mkdir(exist_ok=True);env[name]=str(path)
-        for name,args in [('editor_content_import',['--editor','--import']),('editor_content_runtime',['--script',str(ROOT/'test/cases/test_content_runtime.gd'),'--','--save-file='+str(output/'editor_runtime_home.json')])]:
+        for name,args in [('editor_content_import',['--editor','--import']),('editor_level_preview',['--script','res://scripts/content/preview_level.gd','--quit-after','3','--','--preview-station=南京东路']),('editor_content_runtime',['--script',str(ROOT/'test/cases/test_content_runtime.gd'),'--','--save-file='+str(output/'editor_runtime_home.json')])]:
             result=subprocess.run([godot,'--headless','--path',str(self.game)]+args,env=env,capture_output=True,text=True,timeout=100)
             log=result.stdout+result.stderr;(output/(name+'.log')).write_text(log)
             self.assertEqual(result.returncode,0,log);self.assertNotIn('SCRIPT ERROR:',log);self.assertNotIn('ERROR:',log)

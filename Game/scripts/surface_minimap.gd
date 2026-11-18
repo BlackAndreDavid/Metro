@@ -26,9 +26,12 @@ func update_location() -> void:
 		current = point
 		queue_redraw()
 
+func spacing() -> Vector2:
+	return Vector2(minf(SPACING.x,(size.x-64)/maxi(1,street.CELL_NAMES[0].size()-1)),minf(SPACING.y,(size.y-60)/maxi(1,street.CELL_NAMES.size()-1)))
+
 func center(point: Vector2i) -> Vector2:
-	var span := Vector2(street.CELL_NAMES[0].size() - 1, street.CELL_NAMES.size() - 1) * SPACING
-	return (size - span) * 0.5 + Vector2(point) * SPACING
+	var span := Vector2(street.CELL_NAMES[0].size() - 1, street.CELL_NAMES.size() - 1) * spacing()
+	return (size - span) * 0.5 + Vector2(point) * spacing()
 
 func _draw() -> void:
 	if street == null:
@@ -45,7 +48,8 @@ func _draw() -> void:
 				fill = CURRENT_COLOR
 			elif street.visited.has(point):
 				fill = VISITED_COLOR
-			var bounds := Rect2(center(point) - CELL_SIZE * 0.5, CELL_SIZE)
+			var cell_size := Vector2(minf(CELL_SIZE.x,spacing().x*0.65),minf(CELL_SIZE.y,spacing().y*0.65))
+			var bounds := Rect2(center(point) - cell_size * 0.5, cell_size)
 			draw_rect(bounds, fill)
 			draw_rect(bounds, fill.lightened(0.28), false)
 	for station in street.STATIONS:

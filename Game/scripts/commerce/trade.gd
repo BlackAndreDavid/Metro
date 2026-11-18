@@ -181,10 +181,10 @@ func show_dialogue_node(id: String) -> void:
 	var options: Array = node.get("choices",[])
 	var shown := 0
 	for choice in options:
-		if not Dialogue.matches(state,choice.get("conditions",{})): continue
+		if not Dialogue.matches(state,choice.get("conditions",{}),window.Catalog.definition(int(order.visitor)).id): continue
 		var button := Button.new()
 		button.text = choice.text
-		button.pressed.connect(choose_dialogue.bind(choice.get("next","")))
+		button.pressed.connect(apply_choice.bind(choice,options.find(choice)))
 		$DialogueOverlay/Card/Scroll/Choices.add_child(button)
 		shown += 1
 	if shown == 0:
@@ -201,3 +201,9 @@ func choose_dialogue(next: String) -> void:
 	active_story = {}
 	$DialogueOverlay.hide()
 	if not maybe_start_dialogue(): refresh("")
+
+func apply_choice(choice: Dictionary, index: int) -> void:
+	var order: Dictionary = Orders.record(state).active
+	var current: String = state.dialogue_progress.get(order.id,{}).get("node",active_story.start)
+	Dialogue.apply_effects(state,order,active_story,current+"/choice/"+str(index),choice.get("effects",{}))
+	choose_dialogue(choice.get("next",""))
