@@ -12,6 +12,10 @@
     "同济大学": {
       "level": "res://content/levels/postal.json",
       "scene": "res://scenes/game/exploration.tscn"
+    },
+    "五角场": {
+      "level": "res://content/levels/station_47f7d95b2745.json",
+      "scene": "res://scenes/exploration/stations/station_47f7d95b2745.tscn"
     }
   }
 }

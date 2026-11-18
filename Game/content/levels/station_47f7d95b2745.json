@@ -1,0 +1,231 @@
+{
+  "buildings": [
+    {
+      "floors": 1,
+      "id": "lab",
+      "name": "实习工坊",
+      "row": 0,
+      "wall": "#5e5a61",
+      "width": 190,
+      "x": 205
+    },
+    {
+      "floors": 2,
+      "id": "school",
+      "name": "教学楼",
+      "row": 0,
+      "wall": "#736163",
+      "width": 266,
+      "x": 574
+    },
+    {
+      "floors": 1,
+      "id": "campus_shop",
+      "name": "校门书店",
+      "row": 0,
+      "wall": "#59576a",
+      "width": 165,
+      "x": 1150
+    },
+    {
+      "floors": 1,
+      "id": "shop",
+      "name": "文具店",
+      "row": 1,
+      "wall": "#635957",
+      "width": 198,
+      "x": 88
+    },
+    {
+      "floors": 2,
+      "id": "office",
+      "name": "街道办事处",
+      "row": 1,
+      "wall": "#4d6061",
+      "width": 255,
+      "x": 585
+    },
+    {
+      "floors": 2,
+      "id": "tower",
+      "name": "写字楼",
+      "row": 1,
+      "wall": "#4b5964",
+      "width": 201,
+      "x": 1416
+    },
+    {
+      "floors": 1,
+      "id": "service",
+      "name": "社区服务站",
+      "row": 2,
+      "wall": "#625957",
+      "width": 152,
+      "x": 372
+    },
+    {
+      "floors": 2,
+      "id": "dorm",
+      "name": "学生宿舍",
+      "row": 2,
+      "wall": "#655664",
+      "width": 267,
+      "x": 600
+    },
+    {
+      "floors": 1,
+      "id": "repair",
+      "name": "沿街维修铺",
+      "row": 2,
+      "wall": "#635552",
+      "width": 235,
+      "x": 1224
+    }
+  ],
+  "cell_names": [
+    [
+      "校园西街",
+      "教学楼",
+      "同济大学"
+    ],
+    [
+      "文具店",
+      "四平路",
+      "办公街"
+    ],
+    [
+      "五角场",
+      "学生宿舍",
+      "沿街商铺"
+    ]
+  ],
+  "floor_height": 110,
+  "ground": 416,
+  "id": "station_47f7d95b2745",
+  "junctions": [
+    {
+      "row": 0,
+      "x": 478
+    },
+    {
+      "row": 0,
+      "x": 1364
+    },
+    {
+      "row": 1,
+      "x": 324
+    },
+    {
+      "row": 1,
+      "x": 908
+    }
+  ],
+  "loot": [
+    {
+      "building": "",
+      "floor": 0,
+      "row": 2,
+      "x": 217,
+      "kind": ""
+    },
+    {
+      "building": "dorm",
+      "floor": 0,
+      "row": 2,
+      "x": 726,
+      "kind": ""
+    },
+    {
+      "building": "dorm",
+      "floor": 1,
+      "row": 2,
+      "x": 745,
+      "kind": ""
+    },
+    {
+      "building": "office",
+      "floor": 1,
+      "row": 1,
+      "x": 752,
+      "kind": ""
+    },
+    {
+      "building": "shop",
+      "floor": 0,
+      "row": 1,
+      "x": 210,
+      "kind": ""
+    },
+    {
+      "building": "school",
+      "floor": 1,
+      "row": 0,
+      "x": 719,
+      "kind": ""
+    },
+    {
+      "building": "tower",
+      "floor": 1,
+      "row": 1,
+      "x": 1495,
+      "kind": ""
+    },
+    {
+      "building": "repair",
+      "floor": 0,
+      "row": 2,
+      "x": 1361,
+      "kind": ""
+    },
+    {
+      "building": "campus_shop",
+      "floor": 0,
+      "row": 0,
+      "x": 1265,
+      "kind": ""
+    },
+    {
+      "building": "",
+      "floor": 0,
+      "row": 2,
+      "x": 272,
+      "kind": ""
+    }
+  ],
+  "loot_station": "五角场",
+  "name": "五角场街区",
+  "segment": 560,
+  "stations": [
+    {
+      "name": "五角场",
+      "row": 2,
+      "x": 88
+    }
+  ],
+  "vehicles": [
+    {
+      "color": "#846268",
+      "id": "dorm_sedan",
+      "row": 2,
+      "x": 535
+    },
+    {
+      "color": "#677378",
+      "id": "repair_sedan",
+      "row": 2,
+      "x": 1560
+    },
+    {
+      "color": "#79777e",
+      "id": "office_sedan",
+      "row": 1,
+      "x": 1184
+    },
+    {
+      "color": "#7d7562",
+      "id": "campus_sedan",
+      "row": 0,
+      "x": 1448
+    }
+  ]
+}
