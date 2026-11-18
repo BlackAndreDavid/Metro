@@ -1,49 +1,14 @@
-# 测试
+# 测试与结果
 
-测试用例、运行工具和结果统一存放于此目录，与 `Game/` 游戏工程分离。
+用例、检查工具和结果统一在本目录，与 Game 工程分离。以下命令从仓库根目录执行。
 
-```text
-test/
-├─ cases/
-│  ├─ test_state.gd          经济、许可证、存档：32 项断言
-│  ├─ test_menu_flow.gd      菜单与三栏位：18 项检查，包含状态回归
-│  ├─ test_cabin_smoke.gd    规则页 → Home UI 初始化
-│  ├─ test_home_flow.gd      31 项检查：视角、真实电脑点击、设置与地表流程
-│  ├─ test_build_flow.gd     家具、材料、扩建、耗电、存档迁移和多车厢回正
-│  ├─ test_fixture_flow.gd   五类占格、边界、四挂点、前景层和统一高亮
-│  ├─ test_art_tools.py      区域中位数、块多数色、帧对齐、筛选清理、文生图API离线契约
-│  ├─ test_customer_orders.gd  类别订单、预算、原子结算、库存、读档、每日人数和次日刷新
-│  ├─ test_commerce_flow.gd  Home不变、左进右出、上半身、真实拖拽/移除/确认、预算提示与订单恢复
-│  ├─ test_settings_input.gd  Home 下静态设置按钮、真实鼠标命中、多个页面打开与关闭
-│  ├─ test_item_map_flow.gd  电脑旋转与收纳、满格保护、地图往返 Home
-│  └─ test_construction_flow.gd  独立场景、状态共享、真实鼠标选择／按钮、1秒蓄力与真实拖放、无效落点、拆除、仓库及退出
-├─ tools/
-│  ├─ capture_home.gd       可选 OpenGL 图形截图验证
-│  └─ run_tests.py           统一入口：资源导入 → 菜单与状态 → Home 冒烟 → Home 集成 → 家具与建造 → 独立设施 → 建造模块
-├─ results/
-│  ├─ <UTC时间-唯一编号>/   每次运行独立保存
-│  │  ├─ summary.json       各步骤退出码、通过状态和日志路径
-│  │  ├─ import.log
-│  │  ├─ menu_flow.log
-│  │  ├─ cabin_smoke.log
-│  │  ├─ home_flow.log
-│  │  ├─ build_flow.log
-│  │  ├─ fixture_flow.log
-│  │  ├─ construction_flow.log
-│  │  ├─ item_map_flow.log
-│  │  ├─ settings_input.log
-│  │  └─ 生成的存档、配置与缓存
-│  ├─ legacy/              迁移前已有的测试存档（如存在）
-│  └─ logs/                Windows 游戏、编辑器启动日志
-└─ README.md
-```
+## 依赖与统一入口
 
-## 运行
-
-需要 Python 3 和 Godot 4.7.2，无额外 Python 包。从仓库根目录运行：
+需要 **Python 3.10+、Pillow、Godot 4.7.2**。美术工具和编辑器共用 Pillow，但各自保留 requirements 文件，便于独立安装。
 
 ```sh
-python3 test/tools/run_tests.py --godot /path/to/Godot_v4.7.2-stable_linux.x86_64
+python -m pip install -r tools/art/requirements.txt
+python test/tools/run_tests.py --godot /path/to/Godot_v4.7.2-stable_linux.x86_64
 ```
 
 Windows 示例：
@@ -52,26 +17,57 @@ Windows 示例：
 python test/tools/run_tests.py --godot "C:\Godot\Godot_v4.7.2-stable_win64.exe"
 ```
 
-支持 `GODOT_EXE` 环境变量；未指定时使用 PATH 中的 `godot`。运行工具也可以从其他工作目录调用，它自动定位 `Game/`。所有步骤成功才返回退出码 0；失败或超时返回非零，检查对应结果目录中的日志。导入失败时不执行依赖该步骤的测试，汇总中仅记录已执行步骤，整体判为失败。
+也可设置 `GODOT_EXE`；未指定时查找 PATH 中的 godot。运行工具可从其他工作目录调用，会自动定位工程。成功退出0，失败或超时返回非零。导入失败时跳过依赖步骤，汇总仍判失败。
 
-工具注入 `METRO_TEST_ROOT` 和 `METRO_TEST_RESULTS`，以绝对路径加载工程外的用例。独立运行 GDScript 用例时也必须提供这两个目录；推荐始终使用统一入口。测试隔离用户配置与游戏存档，结果目录不会提交到 Git。每次运行保留独立结果，便于对比；可在不需要时删除。
+## 用例与工具
 
-Godot AI 第三方插件内置的测试框架仍位于 `Game/addons/godot_ai/testing/`，状态用例依赖其断言与结果统计；不移动或复制第三方实现。工程外用例不再由 MCP 默认的 `res://tests/` 自动发现。
+统一入口目前包含13组：导入、10组 Godot 流程、美术工具、内容编辑器。内容编辑器组还会在隔离 Game 副本中进行资源导入、Godot 关卡预览和剧情运行检查。
 
-验证范围为无界面的场景、状态和存档流程，不包含人工图形、音频体验。
+| 用例 | 覆盖内容 |
+| --- | --- |
+| `cases/test_state.gd`、`test_menu_flow.gd` | 经济、许可证、存档、主菜单与三栏位；状态检查由菜单用例加载 |
+| `cases/test_cabin_smoke.gd`、`test_home_flow.gd` | 规则页、Home 初始化、视角、电脑、设置与地表流程 |
+| `cases/test_build_flow.gd`、`test_fixture_flow.gd` | 家具布局、边界、挂点、高亮、扩建耗电和迁移 |
+| `cases/test_construction_flow.gd` | 独立装修场景、1秒蓄力、真实拖放、仓库、拆除、退出 |
+| `cases/test_item_map_flow.gd`、`test_settings_input.gd` | 电脑收纳/旋转、地图往返、真实鼠标点击设置 |
+| `cases/test_customer_orders.gd`、`test_commerce_flow.gd` | 类别订单、预算、原子结算、拖放、送客、去重和日结 |
+| `cases/test_art_tools.py` | 区域中位数、像素块多数色、动画帧对齐、筛选和文生图离线契约 |
+| `cases/test_content_editors.py` | 编辑 API、输入/引用校验、稳定 ID、Godot 接口及场景导出 |
+| `cases/test_content_runtime.gd` | 由上述 Python 用例调用：新增头像、剧情恢复、关系去重、跨日事件、地图和 NPC |
+| `tools/run_tests.py` | 统一运行、隔离环境、超时控制及结果汇总 |
+| `tools/check_editors_browser.py` | 可选真实浏览器编辑流程 |
+| `tools/capture_home.gd`、`capture_content_story.gd` | 可选 Home/装修与剧情渲染截图 |
 
-## 可选图形验证
+按钮回归通过视口注入鼠标事件，验证真实 GUI 命中。原生商品拖放也使用真实输入路径。Godot AI 插件测试框架位于 `Game/addons/godot_ai/testing/`，状态用例依赖它；不移动第三方实现。
 
-存在 X11 显示时，可用 `tools/capture_home.gd` 生成空槽、家具、描边、扩建、设置真实渲染截图（包括门、柜子、屏幕的独立描边、四个挂点、统一建造选择与仓库）。设置 `DISPLAY`、`METRO_TEST_RESULTS` 和独立的 `--save-file` 路径，随后执行：
+## 结果位置
+
+每次运行创建独立的 `results/<UTC时间-唯一编号>/`，包含：
+
+- `summary.json`：步骤、退出码、通过状态与日志路径。
+- 各组 `.log`，例如 import.log、commerce_flow.log、content_editors.log。
+- 隔离内容检查日志：editor_content_import.log、editor_level_preview.log、editor_content_runtime.log。
+- 测试生成的存档、配置和缓存。
+
+运行器注入 `METRO_TEST_ROOT` 与 `METRO_TEST_RESULTS`，隔离配置、用户数据和存档。直接运行 GDScript 用例需自行提供这些变量，推荐使用统一入口。结果目录不提交 Git，不需要时可以删除；Windows 启动日志另在 `results/logs/`。
+
+## 浏览器交互检查
+
+需要额外安装 Playwright 和 Chromium。当前检查脚本使用 `/usr/bin/chromium`，其他系统先调整脚本的 executable_path。
+
+```sh
+python -m pip install playwright
+python test/tools/check_editors_browser.py
+```
+
+工具启动临时项目与本地服务，验证客户上传/保存、阵营、对话、跨日依赖、地图拖动/扩展、NPC 放置及 Godot 连接。当前脚本使用云环境的 Godot 绝对路径，迁移机器时一并调整。截图在 `results/editor-ui/`，不修改正在编辑的工程。
+
+## 可选图形捕获
+
+需要 X11 和图形驱动，不能使用 headless。设置 DISPLAY、METRO_TEST_RESULTS，以及独立的测试存档路径，再运行：
 
 ```sh
 Godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path Game --script /absolute/path/to/test/tools/capture_home.gd -- --save-file=/path/to/test/results/visual/capture_save.json
 ```
 
-此步骤需要图形驱动，不能加 `--headless`；目录须位于测试结果目录。`METRO_TEST_RESULTS` 指向截图输出目录。常规自动测试仍支持无界面运行。
-
-按钮回归使用 `InputEventMouseButton` 注入视口，验证实际 GUI 命中与状态变化，防止 `pressed.emit()` 绕过输入遮挡。旧问题的复现记录可保存在 results 中；图形捕获包含无 Home UI 的独立建造场景。
-
-美术工具测试需要 Pillow；统一入口现包含11组Godot导入/流程与1组美术工具检查，结果均写入 results。文生图 API 使用本地模拟响应验证请求与文件生命周期，实际客户素材来自聊天中的文生图工具。
-
-内容编辑检查新增 `test_content_editors.py`（API、校验、生成）与 `test_content_runtime.gd`（隔离 Game 副本中的客户权重、条件对话、存档节点和自定义站点运行）。统一入口自动运行，当前共13组检查；隔离导入和运行日志分别为 editor_content_import.log / editor_content_runtime.log。
+`capture_content_story.gd` 使用相同环境与参数方式，输出剧情优先级、分支和结束截图。截图需要人工检查，自动检查不覆盖主观画面和音频体验。

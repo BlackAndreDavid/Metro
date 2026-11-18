@@ -1,31 +1,49 @@
 # 终末地铁
 
-一款以末日上海地铁为背景的 Godot 游戏原型。玩家以车厢为据点，用电力支付车费、采购物资和租用防护服，在各站之间跑商，也可以出站探索。
+以末日上海地铁为背景的 Godot 游戏原型。玩家以车厢为据点，在各站之间交易、探索、收集物资并装修车厢。
 
-## 运行
+## 启动游戏
 
-用 Godot 4.7.2 打开 [Game/project.godot](Game/project.godot)，按 **F5** 进入主菜单，再选择存档或创建基地。新游戏从邮电新村开始。
+使用 **Godot 4.7.2** 打开 [Game/project.godot](Game/project.godot)，按 **F5** 运行：主菜单 → 开始 → 三个存档栏位 → 命名基地或读取存档 → Home 车厢。
 
-- 点击车厢里的窗、床、柜子和电脑，可交易、存档、整理物品、查看新闻及线路图。
-- 各站有不同的供货、收购范围和当日报价，出发前可在线路图上查询。
-- 选中或拖拽物品时，用鼠标滚轮或 **R** 旋转。
+Windows 可使用 [启动Demo.cmd](Game/启动Demo.cmd) 直接试玩，或 [打开编辑器.cmd](Game/打开编辑器.cmd) 打开 Godot。启动脚本的引擎路径配置及游戏操作见 [游戏说明](Game/README.md)。
 
-车厢的 Aseprite 源图在 [Game/assets/source/Carriage.aseprite](Game/assets/source/Carriage.aseprite)。更多玩法和编辑说明见 [Game/README.md](Game/README.md)。
+## 启动内容编辑器
 
-中心城区线路示意参考申通地铁 D202501 版，设施、辐射和物价采用游戏设定。[上海轨道交通网络示意图](https://www.shanghai.gov.cn/shanghai/newshanghai/shgl2025.pdf)
+在仓库根目录执行：
 
-工程目录、场景流转和模块职责见 [架构说明](Game/ARCHITECTURE.md)。
+```sh
+python -m pip install -r tools/editors/requirements.txt
+python tools/editors/server.py
+```
 
-测试独立位于根目录 [test/](test/README.md)，统一运行命令：`python3 test/tools/run_tests.py --godot <Godot可执行文件>`。
+浏览器默认打开 `http://127.0.0.1:8765`。在“总设置 / Godot”填写引擎路径并测试连接，再编辑客户、NPC 剧情和站点地图；点击顶部“保存当前编辑”写入工程。
 
-车厢主场景为 `Game/scenes/game/home.tscn`；背景与车厢独立分层。电脑与探索界面的调整位置见 [结构与调整指南](Game/ARCHITECTURE.md)。
+完整操作、跨日事件示例、地图预览和常见问题统一见 **[编辑器操作 README](tools/editors/README.md)**。
 
-床与电脑已拆为独立家具，可在空槽摆放和收纳，悬停显示白色轮廓与功能。扩建车厢会增加行车及每日耗电；松开拖拽后，视角匀速回到最近的车厢中心。规则与可调整参数见 [家具与车厢指南](Game/ARCHITECTURE.md)。
+## 文件与说明索引
 
-门、柜子和屏幕也已独立，顶部入口统一为“建造模式”。门占两格，屏幕使用四个栏杆挂点；悬停只显示共用高亮组件的一份说明。
+| 路径 | 内容 | 说明 |
+| --- | --- | --- |
+| `Game/scenes/` | 菜单、Home、装修、线路图、交易及探索场景 | [工程架构](Game/ARCHITECTURE.md) |
+| `Game/scripts/` | 状态、交互、绘制、交易及剧情代码 | [探索架构](Game/EXPLORATION_ARCHITECTURE.md) |
+| `Game/content/` | 客户、站点及关卡 JSON 数据 | [编辑器操作](tools/editors/README.md) |
+| `Game/resources/` | 家具与物品 Resource 定义 | [家具与模块职责](Game/ARCHITECTURE.md) |
+| `Game/assets/` | `source/` 编辑源文件、`textures/` 运行图、着色器与图标 | [美术工具](tools/art/README.md) |
+| `Game/addons/` | Godot AI 第三方插件及其运行依赖 | 保留插件内部结构 |
+| `Game/saves/legacy_demo/` | 迁移保留的旧调试存档 | [存档位置](Game/README.md#存档与设置) |
+| `tools/` | 内容编辑器、美术生成、导出和裁剪工具 | [工具索引](tools/README.md) |
+| `test/` | 测试用例、检查工具和独立运行结果 | [测试说明](test/README.md) |
 
-建造模式已独立封装：点击家具选中后使用共用移动、拆除操作，仓库统一取放，并提供明确的退出按钮。
+目录中 `source` 与 `textures` 分别用于继续编辑和运行游戏，两者都保留。Godot 的 `.uid`、贴图 `.import` 和插件依赖属于工程文件；`.godot/`、Python 缓存及 `test/results/` 是可重新生成的本机结果，不提交到 Git。
 
-建造场景与 Home UI 已分离，鼠标按钮交互按真实输入验证；拖拽范围为视口的 10%，回中速度提高到 320 逻辑像素/秒。
+## 验证
 
-工程目录现为 `Game/`（原目录已更名）。客户、剧情分支与站点探索的可视化拓展工具见 [tools/editors/README.md](tools/editors/README.md)。运行 `python tools/editors/server.py` 即可启动，不需要把工具复制进 addons。
+```sh
+python -m pip install -r tools/art/requirements.txt
+python test/tools/run_tests.py --godot /path/to/Godot_v4.7.2-stable_linux.x86_64
+```
+
+完整依赖、浏览器交互检查与结果位置见 [test/README.md](test/README.md)。
+
+中心城区线路参考申通地铁 D202501 版，设施、辐射和物价采用游戏设定：[上海轨道交通网络示意图](https://www.shanghai.gov.cn/shanghai/newshanghai/shgl2025.pdf)。
