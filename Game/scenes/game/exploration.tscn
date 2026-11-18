@@ -99,3 +99,21 @@ offset_right = 1232.0
 offset_bottom = 680.0
 mouse_filter = 2
 theme_override_font_sizes/font_size = 16
+
+[node name="StaminaLabel" type="Label" parent="."]
+offset_left = 640.0
+offset_top = 69.0
+offset_right = 810.0
+offset_bottom = 91.0
+mouse_filter = 2
+theme_override_font_sizes/font_size = 14
+text = "体力 100 / 100 · Shift跑步"
+
+[node name="Stamina" type="ProgressBar" parent="."]
+offset_left = 640.0
+offset_top = 94.0
+offset_right = 810.0
+offset_bottom = 106.0
+mouse_filter = 2
+value = 100.0
+show_percentage = false

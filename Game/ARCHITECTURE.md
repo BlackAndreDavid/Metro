@@ -41,6 +41,9 @@ Game/
 | `cabin_map.gd`、`cabin_markets.gd` | 地铁路线、站点设施、供需和报价 |
 | `ui/ui_builder.gd` | 动态界面通用控件与样式 |
 | `ui/home_backdrop.gd` | 背景/车厢分层、家具视图、视角拖动与回中 |
+| `items/item_catalog.gd` | 读取物品JSON并实例化所有 MetroItem，供背包和交易使用 |
+| `exploration/player_motion.gd`、`enemy.gd` | 体力/跑步/噪声与敌人行为、警觉、扑击 |
+| `exploration/loot_table.gd`、`container_panel.gd` | 建筑加权物资与柜子领取窗口 |
 | `items/item_definition.gd` | MetroItem Resource：物品 ID、尺寸、贴图与家具对应 |
 | `items/furniture_definition.gd`、`furniture_catalog.gd` | 家具资源字段、占格、挂点、默认布局与迁移 |
 | `items/furniture.gd`、`highlightable_item.gd` | 家具行为、透明像素命中、统一描边和功能提示 |
@@ -149,12 +152,13 @@ HomeBackdrop 仍使用原窗户热点，不显示客户。客户窗口448×360�
 
 | 数据文件 | 职责 |
 | --- | --- |
+| `content/items.json`、`enemies.json` | 物品定义及怪物素材/碰撞/行动/警觉/攻击参数 |
 | `content/building_templates.json` | 可在各站拖入复用的建筑素材类定义 |
 | `content/customers.json` | 稳定角色目录、独立贴图、预算、权重、阵营与剧情 |
 | `content/stations.json` | 内容编辑器可选的地铁站列表 |
 | `content/registry.json` | 站点到关卡 JSON 及 tscn 的映射 |
 | `content/levels/postal.json` | 邮电街区默认定义和编辑模板 |
-| `content/levels/station_<hash>.json` | 独立站点地图；包含建筑、物资、汽车和 NPC 位置 |
+| `content/levels/station_<hash>.json` | 独立站点地图；包含街道起点、建筑柜子、汽车、NPC及怪物位置 |
 | `scenes/exploration/stations/station_<hash>.tscn` | 编辑器生成的基础探索场景实例 |
 
 `content_registry.gd` 读取映射，Home 加载对应场景，SurfaceBlock.apply_level() 将 JSON 转为实例数据；绘图、交互和小地图共用同一数据。各街道长度独立，移动边界按当前街道限制，小地图不生成缺失格子的连接。未登记站点继续简化搜刮。作者操作与接口参数见 [编辑器 README](../tools/editors/README.md)。

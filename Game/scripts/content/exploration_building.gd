@@ -15,3 +15,8 @@ func stair_x() -> float:
 func bounds(ground: float, floor_height: float) -> Rect2:
 	var height := float(data.get("floors",1))*floor_height
 	return Rect2(float(data.get("x",0)),ground-height,float(data.get("width",160)),height)
+
+func collision_bounds(ground: float, floor_height: float) -> Rect2:
+	var box: Dictionary = data.get("collision",{})
+	var height := float(box.get("height",int(data.get("floors",1))*floor_height))
+	return Rect2(float(data.get("x",0))+float(box.get("x",0)),ground-height-float(box.get("y",0)),float(box.get("width",data.get("width",160))),height)

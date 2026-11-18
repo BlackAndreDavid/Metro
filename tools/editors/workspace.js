@@ -1,98 +1,104 @@
 'use strict';
 // Scene canvas, reusable assets and encounter view. Exact values stay in the inspector.
 const W={row:2,col:0,undo:[],tool:null,ghost:null,pendingLink:null,chat:[],story:null};
-const entityTypes=['buildings','stations','junctions','loot','vehicles','npcs'];
-const names={buildings:'建筑',stations:'站口',junctions:'巷口',loot:'物资',vehicles:'汽车',npcs:'NPC'};
+const entityTypes=['buildings','stations','junctions','loot','vehicles','npcs','monsters'];
+const names={buildings:'建筑',stations:'站口',junctions:'巷口',loot:'物资',vehicles:'汽车',npcs:'NPC',monsters:'怪物'};
 function dirty(){ $('dirty').textContent='● 未保存' }
 function button(text,action,className=''){const b=document.createElement('button');b.textContent=text;b.className=className;b.onclick=run(action);return b}
 function syncCells(){ $('cells').value=S.level.cell_names.map(r=>r.join(',')).join('\n') }
 function checkpoint(){W.undo.push(clone(S.level));if(W.undo.length>30)W.undo.shift()}
+function rowStart(row){return S.level.street_starts?.[row]||0}
+function rowEnd(row){return rowStart(row)+rowWidth(row)}
 function rowWidth(row){return S.level.segment*S.level.cell_names[row].length}
-worldWidth=function(){return Math.max(...S.level.cell_names.map(r=>r.length))*S.level.segment};
+worldWidth=function(){return Math.max(...S.level.cell_names.map((r,i)=>rowEnd(i)))};
 function canvasLocation(e){const[x,y]=mapPoint(e),row=Math.floor((y-20)/band());return {x:(x-20)/960*worldWidth(),row,canvas:[x,y]}}
-function validLocation(at){return at.row>=0&&at.row<S.level.cell_names.length&&at.x>=0&&at.x<rowWidth(at.row)}
-function limitFor(type,row){return type==='junctions'?Math.min(rowWidth(row),rowWidth(row+1)):rowWidth(row)}
-function selectCell(row,col){W.row=row;W.col=Math.max(0,Math.min(S.level.cell_names[row].length-1,col));$('selectedCell').textContent=`第${row+1}街 · 第${W.col+1}格`}
+function validLocation(at){return at.row>=0&&at.row<S.level.cell_names.length&&at.x>=rowStart(at.row)&&at.x<rowEnd(at.row)}
+function limitFor(type,row){return type==='junctions'?Math.min(rowEnd(row),rowEnd(row+1)):rowEnd(row)}
+function startFor(type,row){return type==='junctions'?Math.max(rowStart(row),rowStart(row+1)):rowStart(row)}
+function repairJunctions(){S.level.junctions=S.level.junctions.filter(j=>{const low=startFor('junctions',j.row)+24,high=limitFor('junctions',j.row)-24;if(low>high)return false;j.x=Math.max(low,Math.min(high,j.x));return true})}
+function selectCell(row,col){W.row=row;W.col=Math.max(0,Math.min(S.level.cell_names[row].length-1,col));if($('streetStart'))$('streetStart').value=rowStart(row);$('selectedCell').textContent=`第${row+1}街 · 第${W.col+1}格`}
 function refreshMap(){syncCells();selectCell(Math.min(W.row,S.level.cell_names.length-1),W.col);listEntities();drawMap();dirty()}
-function keepEntrance(){if(!S.level.stations.some(s=>s.name===S.station))S.level.stations.push({name:S.station,row:Math.min(W.row,S.level.cell_names.length-1),x:48})}
+function keepEntrance(){if(!S.level.stations.some(s=>s.name===S.station))S.level.stations.push({name:S.station,row:Math.min(W.row,S.level.cell_names.length-1),x:rowStart(Math.min(W.row,S.level.cell_names.length-1))+48})}
 const workspaceShowLevel=showLevel;
-showLevel=function(data){workspaceShowLevel(data);W.undo=[];W.tool=null;W.ghost=null;W.row=Math.min(W.row,S.level.cell_names.length-1);selectCell(W.row,0);renderPalette();updateStationBanner();drawMap()};
+showLevel=function(data){data=clone(data);data.monsters??=[];data.street_starts??=data.cell_names.map(()=>0);workspaceShowLevel(data);W.undo=[];W.tool=null;W.ghost=null;W.row=Math.min(W.row,S.level.cell_names.length-1);selectCell(W.row,0);renderPalette();updateStationBanner();drawMap()};
 $('addColumn').onclick=run(()=>{readLevel();const row=S.level.cell_names[W.row];if(row.length>=8)throw Error('每条街道最多8格');checkpoint();row.push('新地图格');selectCell(W.row,row.length-1);refreshMap()});
 $('removeCell').onclick=run(()=>{
   readLevel();const row=S.level.cell_names[W.row];if(row.length===1)throw Error('每条街道至少保留一个格子');checkpoint();
-  const start=W.col*S.level.segment,end=start+S.level.segment,removed=new Set();
+  const start=rowStart(W.row)+W.col*S.level.segment,end=start+S.level.segment,removed=new Set();
   for(const b of S.level.buildings)if(b.row===W.row&&b.x<end&&b.x+b.width>start)removed.add(b.id);
   row.splice(W.col,1);
   for(const type of entityTypes){S.level[type]=S.level[type].filter(e=>!((e.row===W.row&&e.x>=start&&e.x<end)||(type==='buildings'&&removed.has(e.id))||(type==='loot'&&removed.has(e.building))));for(const e of S.level[type])if(e.row===W.row&&e.x>=end)e.x-=S.level.segment}
-  S.level.junctions=S.level.junctions.filter(e=>e.x<=limitFor('junctions',e.row)-24);
+  repairJunctions();
   keepEntrance();S.entity=0;refreshMap();status('已移除选中格及其中的对象，后续对象前移；可点击撤销恢复。');
 });
 $('addRow').onclick=run(()=>{
   readLevel();if(S.level.cell_names.length>=8)throw Error('最多8条街道');checkpoint();const index=W.row+1;
   for(const type of entityTypes)for(const e of S.level[type])if(e.row>=index)e.row++;
-  S.level.cell_names.splice(index,0,['新街道']);
-  S.level.junctions=S.level.junctions.filter(e=>e.x<=limitFor('junctions',e.row)-24);
-  for(const row of[index-1,index])if(row>=0&&row<S.level.cell_names.length-1&&!S.level.junctions.some(j=>j.row===row))S.level.junctions.push({row,x:Math.min(120,limitFor('junctions',row)/2)});
-  selectCell(index,0);refreshMap();
+  S.level.cell_names.splice(index,0,['新街道']);S.level.street_starts.splice(index,0,rowStart(index-1));
+  repairJunctions();
+  for(const row of[index-1,index])if(row>=0&&row<S.level.cell_names.length-1&&!S.level.junctions.some(j=>j.row===row))S.level.junctions.push({row,x:(startFor('junctions',row)+limitFor('junctions',row))/2});
+  repairJunctions();selectCell(index,0);refreshMap();
 });
 $('removeRow').onclick=run(()=>{
   readLevel();if(S.level.cell_names.length===1)throw Error('地图至少保留一条街道');checkpoint();const row=W.row;
-  S.level.cell_names.splice(row,1);
+  S.level.cell_names.splice(row,1);S.level.street_starts.splice(row,1);
   for(const type of entityTypes){S.level[type]=S.level[type].filter(e=>type==='junctions'?e.row!==row&&e.row!==row-1:e.row!==row);for(const e of S.level[type])if(e.row>row)e.row--}
-  if(row>0&&row<S.level.cell_names.length)S.level.junctions.push({row:row-1,x:Math.min(120,limitFor('junctions',row-1)/2)});
-  W.row=Math.min(row,S.level.cell_names.length-1);keepEntrance();S.entity=0;refreshMap();status('已删除街道及其对象；本站入口已保留，可撤销恢复。');
+  if(row>0&&row<S.level.cell_names.length)S.level.junctions.push({row:row-1,x:(startFor('junctions',row-1)+limitFor('junctions',row-1))/2});
+  repairJunctions();W.row=Math.min(row,S.level.cell_names.length-1);keepEntrance();S.entity=0;refreshMap();status('已删除街道及其对象；本站入口已保留，可撤销恢复。');
 });
 $('undoMap').onclick=()=>{if(!W.undo.length)return;const history=W.undo,saved=history.pop();showLevel(saved);W.undo=history;dirty()};
 function assetCard(label,tool,swatch=null){const b=button(label,()=>{W.tool=tool;S.type=tool.type;S.entity=0;$('entityType').value=S.type;listEntities();renderPalette();status('将素材拖入地图，或点击目标位置放置。')},'building-card');b.draggable=true;b.dataset.asset=tool.key||tool.type;if(swatch)b.prepend(swatch);b.ondragstart=e=>e.dataTransfer.setData('application/x-metro-object',JSON.stringify(tool));return b}
 function renderPalette(){
   if(!S.project)return;
   const box=$('objectPalette');box.replaceChildren();box.append(button('↖ 选择 / 移动',()=>{W.tool=null;renderPalette()},W.tool?'object-chip':'object-chip selected'));
-  for(const type of['stations','junctions','loot','vehicles']){const card=assetCard(names[type],{type});card.className='object-chip'+(W.tool?.type===type?' selected':'');box.append(card)}
-  for(const npc of S.project.customers){const card=assetCard('♟ '+npc.name,{type:'npcs',npc:npc.id,key:npc.id});card.className='object-chip';box.append(card)}
+  for(const type of['stations','junctions','vehicles']){const card=assetCard(names[type],{type});card.className='object-chip'+(W.tool?.type===type?' selected':'');box.append(card)}
+  for(const npc of S.project.customers.filter(c=>!c.deleted)){const card=assetCard('♟ '+npc.name,{type:'npcs',npc:npc.id,key:npc.id});card.className='object-chip';box.append(card)}
+  for(const enemy of (S.project.enemies||[]).filter(e=>e.enabled&&!e.deleted)){const card=assetCard('⚠ '+enemy.name,{type:'monsters',enemy:enemy.id,key:enemy.id});card.className='object-chip monster-chip';box.append(card)}
   const buildings=$('buildingPalette');buildings.replaceChildren();
-  for(const template of S.project.building_templates){const swatch=document.createElement('span');swatch.className='building-swatch';swatch.style.backgroundColor=template.wall;swatch.style.height=`${template.floors*20}px`;buildings.append(assetCard(`${template.name} · ${template.floors}层`,{type:'buildings',key:template.id,template},swatch))}
-  buildings.append(button('＋ 选中建筑存为素材卡',async()=>{if(S.type!=='buildings'||!S.level.buildings[S.entity])throw Error('先在地图上选中建筑');const b=S.level.buildings[S.entity];await api('/api/building-template',{id:b.id,name:b.name,width:b.width,floors:b.floors,wall:b.wall});S.project=await api('/api/project');renderPalette();status('建筑素材已保存，可以重复拖入各个关卡。')}));
+  for(const template of S.project.building_templates.filter(t=>!t.deleted)){const swatch=document.createElement('span');swatch.className='building-swatch';swatch.style.backgroundColor=template.wall;swatch.style.height=`${template.floors*20}px`;buildings.append(assetCard(`${template.name} · ${template.floors}层`,{type:'buildings',key:template.id,template},swatch))}
+  buildings.append(button('＋ 选中建筑存为素材卡',async()=>{if(S.type!=='buildings'||!S.level.buildings[S.entity])throw Error('先在地图上选中建筑');const b=S.level.buildings[S.entity];const template=clone(b);delete template.x;delete template.row;delete template.template_id;for(const point of template.loot_points||[])delete point.legacy_slot;await api('/api/building-template',template);S.project=await api('/api/project');renderPalette();status('建筑素材已保存，可以重复拖入各个关卡。')}));
 }
 function placeAsset(tool,at){
   if(!validLocation(at))throw Error('请放置在实际存在的街道格子内');
   const row=at.row,snap=$('snap').checked?+$('gridSize').value:0;
   if(tool.type==='junctions'&&row===S.level.cell_names.length-1)throw Error('巷口连接下一条街道，请放在两条相邻街道的共同范围');
   if(tool.type==='npcs'&&S.level.npcs.some(n=>n.npc===tool.npc))throw Error('该 NPC 已在关卡中，请直接拖动它');
+  if(tool.type==='monsters'&&S.project.enemies.find(e=>e.id===tool.enemy).sprite.collision_width>rowWidth(row))throw Error('该街道不足以容纳怪物碰撞箱');
   checkpoint();let data;
   if(tool.type==='buildings')data=new BuildingDefinition(tool.template||S.project.building_templates[0]).instantiate(S.level,row,at.x,snap);
-  else {const x=Math.max(24,Math.min(limitFor(tool.type,row)-24,snap?Math.round(at.x/snap)*snap:at.x));let index=1;while(S.level.vehicles.some(e=>e.id===`vehicle_${index}`))index++;
-    data={stations:{name:S.station,row,x},junctions:{row,x},loot:{row,x,building:'',floor:0,kind:'book'},vehicles:{id:`vehicle_${index}`,row,x,color:'#677378'},npcs:{npc:tool.npc,row,x}}[tool.type]}
-  S.level[tool.type].push(data);S.type=tool.type;S.entity=S.level[S.type].length-1;selectCell(row,Math.floor(data.x/S.level.segment));W.tool=null;W.ghost=null;$('entityType').value=S.type;listEntities();drawMap();renderPalette();dirty();
+  else {const half=tool.type==='monsters'?S.project.enemies.find(e=>e.id===tool.enemy).sprite.collision_width/2:24;const x=Math.max(startFor(tool.type,row)+half,Math.min(limitFor(tool.type,row)-half,snap?Math.round(at.x/snap)*snap:at.x));let index=1;while(S.level.vehicles.some(e=>e.id===`vehicle_${index}`))index++;
+    data={stations:{name:S.station,row,x},junctions:{row,x},loot:{row,x,building:'',floor:0,kind:'book'},vehicles:{id:`vehicle_${index}`,row,x,color:'#677378'},npcs:{npc:tool.npc,row,x},monsters:{id:'monster_'+Date.now().toString(36),enemy:tool.enemy,row,x,facing:-1}}[tool.type]}
+  S.level[tool.type].push(data);S.type=tool.type;S.entity=S.level[S.type].length-1;selectCell(row,Math.floor((data.x-rowStart(row))/S.level.segment));W.tool=null;W.ghost=null;$('entityType').value=S.type;listEntities();drawMap();renderPalette();dirty();
 }
 $('addEntity').onclick=run(()=>{if(!W.tool)W.tool=S.type==='buildings'?{type:'buildings',template:S.project.building_templates[0]}:S.type==='npcs'?{type:'npcs',npc:S.project.customers[0].id}:{type:S.type};status('点击地图上的目标格放置所选素材。')});
 const workspaceRemoveEntity=$('removeEntity').onclick;$('removeEntity').onclick=()=>{checkpoint();workspaceRemoveEntity();dirty()};
-const workspaceApplyEntity=applyEntity;applyEntity=function(){const e=S.level?.[S.type]?.[S.entity];if(!e)return;checkpoint();workspaceApplyEntity();dirty()};$('applyEntity').onclick=run(applyEntity);
-function entityRect(type,e){const scale=960/worldWidth(),x=20+e.x*scale,base=20+(e.row+1)*band()-14;if(type==='buildings'){const h=Math.min(band()-40,e.floors*28);return[x,base-h,e.width*scale,h]}return[x-10,base-34,20,34]}
+const workspaceApplyEntity=applyEntity;applyEntity=function(){const e=S.level?.[S.type]?.[S.entity];if(!e)return;checkpoint();workspaceApplyEntity();if(S.type==='buildings')for(const point of e.loot_points||[]){point.x=Math.max(0,Math.min(e.width,point.x));point.floor=Math.min(point.floor,e.floors-1)}dirty()};$('applyEntity').onclick=run(applyEntity);
+function entityRect(type,e){const scale=960/worldWidth(),x=20+e.x*scale,base=20+(e.row+1)*band()-14;if(type==='monsters'){const enemy=S.project.enemies.find(t=>t.id===e.enemy);const w=(enemy?.sprite.width||128)*scale;return[x-w/2,base-26,w,26]}if(type==='buildings'){const h=Math.min(band()-40,e.floors*28);return[x,base-h,e.width*scale,h]}return[x-10,base-34,20,34]}
 drawMap=function(){
   const c=$('map').getContext('2d');c.clearRect(0,0,1000,510);if(!S.level)return;const d=S.level,scale=960/worldWidth(),height=band(),grid=Math.max(3,(+$('gridSize').value||20)*scale);c.font='12px sans-serif';
-  for(let row=0;row<d.cell_names.length;row++){const y=20+row*height,width=rowWidth(row)*scale;c.fillStyle='#342f45';c.fillRect(20,y,width,height-6);c.strokeStyle='#494355';c.lineWidth=.5;for(let x=20;x<20+width;x+=grid){c.beginPath();c.moveTo(x,y);c.lineTo(x,y+height-6);c.stroke()}for(let gy=y;gy<y+height-6;gy+=grid){c.beginPath();c.moveTo(20,gy);c.lineTo(20+width,gy);c.stroke()}c.lineWidth=1;for(let col=0;col<d.cell_names[row].length;col++){const x=20+col*d.segment*scale;c.strokeStyle=row===W.row&&col===W.col?'#efc488':'#81758e';c.lineWidth=row===W.row&&col===W.col?2:1;c.strokeRect(x,y,d.segment*scale,height-6);c.fillStyle='#d1bdad';c.fillText(`${row+1}.${col+1} ${d.cell_names[row][col]}`,x+7,y+17)}}
-  for(const type of entityTypes)(d[type]||[]).forEach((e,i)=>{const rect=entityRect(type,e);c.fillStyle=type==='buildings'?e.wall:{stations:'#a6dccc',junctions:'#a4b8e8',loot:'#f0cc91',vehicles:'#a98eac',npcs:'#ef9eae'}[type];c.fillRect(...rect);if(type==='buildings'){c.fillStyle='#d5c8ab';for(let x=rect[0]+10;x<rect[0]+rect[2]-6;x+=20)c.fillRect(x,rect[1]+9,8,9)}if(type===S.type&&i===S.entity){c.strokeStyle='#fff';c.lineWidth=2;c.strokeRect(...rect)}c.fillStyle='#f2eadd';const npc=S.project.customers.find(n=>n.id===e.npc);c.fillText((npc?.name||e.name||e.id||names[type]).slice(0,16),rect[0],rect[1]-5)});
+  for(let row=0;row<d.cell_names.length;row++){const y=20+row*height,width=rowWidth(row)*scale;c.fillStyle='#342f45';c.fillRect(20+rowStart(row)*scale,y,width,height-6);c.strokeStyle='#494355';c.lineWidth=.5;for(let x=20+rowStart(row)*scale;x<20+rowEnd(row)*scale;x+=grid){c.beginPath();c.moveTo(x,y);c.lineTo(x,y+height-6);c.stroke()}for(let gy=y;gy<y+height-6;gy+=grid){c.beginPath();c.moveTo(20+rowStart(row)*scale,gy);c.lineTo(20+rowEnd(row)*scale,gy);c.stroke()}c.lineWidth=1;for(let col=0;col<d.cell_names[row].length;col++){const x=20+(rowStart(row)+col*d.segment)*scale;c.strokeStyle=row===W.row&&col===W.col?'#efc488':'#81758e';c.lineWidth=row===W.row&&col===W.col?2:1;c.strokeRect(x,y,d.segment*scale,height-6);c.fillStyle='#d1bdad';c.fillText(`${col===0?'↔ ':''}${row+1}.${col+1} ${d.cell_names[row][col]}`,x+7,y+17)}}
+  for(const type of entityTypes)(d[type]||[]).forEach((e,i)=>{const rect=entityRect(type,e);c.fillStyle=type==='buildings'?e.wall:{stations:'#a6dccc',junctions:'#a4b8e8',loot:'#f0cc91',vehicles:'#a98eac',npcs:'#ef9eae',monsters:'#ed8075'}[type];c.fillRect(...rect);if(type==='buildings'){c.fillStyle='#d5c8ab';for(let x=rect[0]+10;x<rect[0]+rect[2]-6;x+=20)c.fillRect(x,rect[1]+9,8,9)}if(type===S.type&&i===S.entity){c.strokeStyle='#fff';c.lineWidth=2;c.strokeRect(...rect)}c.fillStyle='#f2eadd';const npc=S.project.customers.find(n=>n.id===e.npc),enemy=S.project.enemies.find(n=>n.id===e.enemy);c.fillText((enemy?.name||npc?.name||e.name||e.id||names[type]).slice(0,16),rect[0],rect[1]-5)});
   if(W.ghost&&validLocation(W.ghost)){c.fillStyle='#a6dccc66';const x=20+W.ghost.x*scale,base=20+(W.ghost.row+1)*height-14;c.fillRect(x,base-45,Math.min(130,((W.tool?.template?.width)||160)*scale),45)}
   $('levelJson').value=JSON.stringify(d,null,2);
 };
 $('map').onpointerdown=e=>{
   try{if(!S.level)return;const at=canvasLocation(e);if(!validLocation(at))return;
     if(W.tool){placeAsset(W.tool,at);return}
-    selectCell(at.row,Math.floor(at.x/S.level.segment));const[x,y]=at.canvas;let found;
+    selectCell(at.row,Math.floor((at.x-rowStart(at.row))/S.level.segment));const[x,y]=at.canvas;if(x<=20+rowStart(at.row)*960/worldWidth()+24&&y<20+at.row*band()+25){checkpoint();S.drag={kind:'street',row:at.row,start:rowStart(at.row),pointer:at.canvas[0],scale:worldWidth()/960};$('map').setPointerCapture(e.pointerId);return}let found;
     for(const type of entityTypes)S.level[type].forEach((entity,i)=>{const[a,b,w,h]=entityRect(type,entity);if(x>=a&&x<=a+w&&y>=b&&y<=b+h)found={type,i}});
     if(found){S.type=found.type;S.entity=found.i;$('entityType').value=S.type;checkpoint();listEntities();S.drag={kind:'entity',offset:at.x-S.level[S.type][S.entity].x};$('map').setPointerCapture(e.pointerId)}else{S.entity=-1;entityForm()}
     drawMap();
   }catch(error){status(error.message,true)}
 };
 $('map').onpointermove=e=>{
-  const at=canvasLocation(e);if(W.tool){W.ghost=at;drawMap()}
+  const at=canvasLocation(e);if(S.drag?.kind==='street'){setStreetStart(S.drag.row,S.drag.start+(at.canvas[0]-S.drag.pointer)*S.drag.scale,false);return}if(W.tool){W.ghost=at;drawMap()}
   if(S.drag?.kind!=='entity'||!validLocation(at))return;
   const entity=S.level[S.type][S.entity],row=at.row;if(S.type==='junctions'&&row===S.level.cell_names.length-1)return;
   let x=at.x-S.drag.offset;if($('snap').checked)x=Math.round(x/(+$('gridSize').value||20))*(+$('gridSize').value||20);
-  try{if(S.type==='buildings')BuildingDefinition.move(S.level,entity,row,x);else{entity.row=row;entity.x=Math.max(24,Math.min(limitFor(S.type,row)-24,x))}selectCell(row,Math.floor(entity.x/S.level.segment));entityForm();drawMap();dirty()}catch(error){status(error.message,true)}
+  try{if(S.type==='buildings')BuildingDefinition.move(S.level,entity,row,x);else{entity.row=row;entity.x=Math.max(startFor(S.type,row)+(S.type==='monsters'?S.project.enemies.find(e=>e.id===entity.enemy).sprite.collision_width/2:24),Math.min(limitFor(S.type,row)-(S.type==='monsters'?S.project.enemies.find(e=>e.id===entity.enemy).sprite.collision_width/2:24),x))}selectCell(row,Math.floor((entity.x-rowStart(row))/S.level.segment));entityForm();drawMap();dirty()}catch(error){status(error.message,true)}
 };
 $('map').onpointerup=()=>S.drag=null;$('map').onpointercancel=()=>S.drag=null;$('map').onpointerleave=()=>{W.ghost=null;drawMap()};
-$('map').ondblclick=e=>{const at=canvasLocation(e);if(!validLocation(at))return;const col=Math.floor(at.x/S.level.segment),name=prompt('地图格名称',S.level.cell_names[at.row][col]);if(name?.trim()){checkpoint();S.level.cell_names[at.row][col]=name.trim();syncCells();drawMap();dirty()}};
+$('map').ondblclick=e=>{const at=canvasLocation(e);if(!validLocation(at))return;const col=Math.floor((at.x-rowStart(at.row))/S.level.segment),name=prompt('地图格名称',S.level.cell_names[at.row][col]);if(name?.trim()){checkpoint();S.level.cell_names[at.row][col]=name.trim();syncCells();drawMap();dirty()}};
 $('map').ondragover=e=>{e.preventDefault();W.ghost=canvasLocation(e);drawMap()};$('map').ondragleave=()=>{W.ghost=null;drawMap()};
 $('map').ondrop=e=>{e.preventDefault();try{placeAsset(JSON.parse(e.dataTransfer.getData('application/x-metro-object')),canvasLocation(e))}catch(error){status(error.message,true)}};
 // The station picker uses the same line geometry and station coordinates as the game.
@@ -186,4 +192,14 @@ new ResizeObserver(sizeHeader).observe(editorHeader);sizeHeader();
 
 const renameTurn=$('renameNode').onclick;$('renameNode').onclick=async()=>{await renameTurn();W.pendingLink=null;W.chat=[{node:S.story.start}];renderChat();dirty()};
 
-const workspaceInspector=entityForm;entityForm=function(){workspaceInspector();const selected=Boolean(S.level?.[S.type]?.[S.entity]);$('removeEntity').disabled=!selected;$('applyEntity').disabled=!selected};
+const workspaceInspector=entityForm;entityForm=function(){workspaceInspector();for(const input of $('entityFields').querySelectorAll('input'))if(['collision','loot_points'].includes(input.dataset.key))input.closest('label').remove();const selected=Boolean(S.level?.[S.type]?.[S.entity]);$('removeEntity').disabled=!selected;$('applyEntity').disabled=!selected};
+
+function setStreetStart(row,value,snapshot=true){
+  if(snapshot)checkpoint();const grid=$('snap').checked?(+$('gridSize').value||20):1,start=Math.max(0,Math.min(8000,Math.round(value/grid)*grid)),delta=start-rowStart(row);
+  S.level.street_starts[row]=start;
+  for(const type of entityTypes)if(type!=='junctions')for(const e of S.level[type])if(e.row===row)e.x+=delta;
+  repairJunctions();selectCell(row,W.col);drawMap();entityForm();dirty();
+}
+$('streetStart').onchange=()=>setStreetStart(W.row,+$('streetStart').value);
+$('startEarlier').onclick=()=>setStreetStart(W.row,rowStart(W.row)-(+$('gridSize').value||20));
+$('startLater').onclick=()=>setStreetStart(W.row,rowStart(W.row)+(+$('gridSize').value||20));

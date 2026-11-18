@@ -1,6 +1,7 @@
 shader_type canvas_item;
 
 uniform bool highlighted = false;
+uniform bool outline_only = false;
 uniform vec4 outline_color : source_color = vec4(1.0);
 uniform float outline_width : hint_range(1.0, 2.0) = 1.0;
 
@@ -21,7 +22,8 @@ void fragment() {
 		}
 	}
 	float edge = highlighted ? max(neighborhood - source.a, 0.0) : 0.0;
-	float alpha = source.a + edge * outline_color.a;
-	vec3 rgb = alpha > 0.0 ? (source.rgb * source.a + outline_color.rgb * edge * outline_color.a) / alpha : vec3(0.0);
+	float base_alpha = outline_only ? 0.0 : source.a;
+	float alpha = base_alpha + edge * outline_color.a;
+	vec3 rgb = alpha > 0.0 ? (source.rgb * base_alpha + outline_color.rgb * edge * outline_color.a) / alpha : vec3(0.0);
 	COLOR = item_modulate * vec4(rgb, alpha);
 }

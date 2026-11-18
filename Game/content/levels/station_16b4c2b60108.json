@@ -16,7 +16,31 @@
       "row": 0,
       "wall": "#736163",
       "width": 266,
-      "x": 574
+      "x": 574,
+      "loot_points": [
+        {
+          "id": "legacy_5",
+          "x": 145,
+          "floor": 1,
+          "chance": 1,
+          "rolls": 1,
+          "choices": [
+            {
+              "kind": "book",
+              "weight": 45
+            },
+            {
+              "kind": "copper",
+              "weight": 35
+            },
+            {
+              "kind": "water",
+              "weight": 20
+            }
+          ],
+          "legacy_slot": 5
+        }
+      ]
     },
     {
       "floors": 1,
@@ -25,7 +49,31 @@
       "row": 0,
       "wall": "#59576a",
       "width": 165,
-      "x": 1150
+      "x": 1150,
+      "loot_points": [
+        {
+          "id": "legacy_8",
+          "x": 115,
+          "floor": 0,
+          "chance": 1,
+          "rolls": 1,
+          "choices": [
+            {
+              "kind": "book",
+              "weight": 45
+            },
+            {
+              "kind": "copper",
+              "weight": 35
+            },
+            {
+              "kind": "water",
+              "weight": 20
+            }
+          ],
+          "legacy_slot": 8
+        }
+      ]
     },
     {
       "floors": 1,
@@ -34,7 +82,31 @@
       "row": 1,
       "wall": "#635957",
       "width": 198,
-      "x": 88
+      "x": 88,
+      "loot_points": [
+        {
+          "id": "legacy_4",
+          "x": 122,
+          "floor": 0,
+          "chance": 1,
+          "rolls": 1,
+          "choices": [
+            {
+              "kind": "book",
+              "weight": 45
+            },
+            {
+              "kind": "copper",
+              "weight": 35
+            },
+            {
+              "kind": "water",
+              "weight": 20
+            }
+          ],
+          "legacy_slot": 4
+        }
+      ]
     },
     {
       "floors": 2,
@@ -43,7 +115,31 @@
       "row": 1,
       "wall": "#4d6061",
       "width": 255,
-      "x": 585
+      "x": 585,
+      "loot_points": [
+        {
+          "id": "legacy_3",
+          "x": 167,
+          "floor": 1,
+          "chance": 1,
+          "rolls": 1,
+          "choices": [
+            {
+              "kind": "book",
+              "weight": 45
+            },
+            {
+              "kind": "copper",
+              "weight": 35
+            },
+            {
+              "kind": "water",
+              "weight": 20
+            }
+          ],
+          "legacy_slot": 3
+        }
+      ]
     },
     {
       "floors": 2,
@@ -52,7 +148,31 @@
       "row": 1,
       "wall": "#4b5964",
       "width": 201,
-      "x": 1416
+      "x": 1416,
+      "loot_points": [
+        {
+          "id": "legacy_6",
+          "x": 79,
+          "floor": 1,
+          "chance": 1,
+          "rolls": 1,
+          "choices": [
+            {
+              "kind": "book",
+              "weight": 45
+            },
+            {
+              "kind": "copper",
+              "weight": 35
+            },
+            {
+              "kind": "water",
+              "weight": 20
+            }
+          ],
+          "legacy_slot": 6
+        }
+      ]
     },
     {
       "floors": 1,
@@ -61,7 +181,53 @@
       "row": 2,
       "wall": "#625957",
       "width": 152,
-      "x": 372
+      "x": 372,
+      "loot_points": [
+        {
+          "id": "legacy_0",
+          "x": 12,
+          "floor": 0,
+          "chance": 1,
+          "rolls": 1,
+          "choices": [
+            {
+              "kind": "book",
+              "weight": 45
+            },
+            {
+              "kind": "copper",
+              "weight": 35
+            },
+            {
+              "kind": "water",
+              "weight": 20
+            }
+          ],
+          "legacy_slot": 0
+        },
+        {
+          "id": "legacy_9",
+          "x": 12,
+          "floor": 0,
+          "chance": 1,
+          "rolls": 1,
+          "choices": [
+            {
+              "kind": "book",
+              "weight": 45
+            },
+            {
+              "kind": "copper",
+              "weight": 35
+            },
+            {
+              "kind": "water",
+              "weight": 20
+            }
+          ],
+          "legacy_slot": 9
+        }
+      ]
     },
     {
       "floors": 2,
@@ -70,7 +236,53 @@
       "row": 2,
       "wall": "#655664",
       "width": 267,
-      "x": 600
+      "x": 600,
+      "loot_points": [
+        {
+          "id": "legacy_1",
+          "x": 126,
+          "floor": 0,
+          "chance": 1,
+          "rolls": 1,
+          "choices": [
+            {
+              "kind": "book",
+              "weight": 45
+            },
+            {
+              "kind": "copper",
+              "weight": 35
+            },
+            {
+              "kind": "water",
+              "weight": 20
+            }
+          ],
+          "legacy_slot": 1
+        },
+        {
+          "id": "legacy_2",
+          "x": 145,
+          "floor": 1,
+          "chance": 1,
+          "rolls": 1,
+          "choices": [
+            {
+              "kind": "book",
+              "weight": 45
+            },
+            {
+              "kind": "copper",
+              "weight": 35
+            },
+            {
+              "kind": "water",
+              "weight": 20
+            }
+          ],
+          "legacy_slot": 2
+        }
+      ]
     },
     {
       "floors": 1,
@@ -79,7 +291,31 @@
       "row": 2,
       "wall": "#635552",
       "width": 235,
-      "x": 1224
+      "x": 1224,
+      "loot_points": [
+        {
+          "id": "legacy_7",
+          "x": 137,
+          "floor": 0,
+          "chance": 1,
+          "rolls": 1,
+          "choices": [
+            {
+              "kind": "book",
+              "weight": 45
+            },
+            {
+              "kind": "copper",
+              "weight": 35
+            },
+            {
+              "kind": "water",
+              "weight": 20
+            }
+          ],
+          "legacy_slot": 7
+        }
+      ]
     }
   ],
   "cell_names": [
@@ -120,78 +356,7 @@
       "x": 908
     }
   ],
-  "loot": [
-    {
-      "building": "",
-      "floor": 0,
-      "row": 2,
-      "x": 217,
-      "kind": ""
-    },
-    {
-      "building": "dorm",
-      "floor": 0,
-      "row": 2,
-      "x": 726,
-      "kind": ""
-    },
-    {
-      "building": "dorm",
-      "floor": 1,
-      "row": 2,
-      "x": 745,
-      "kind": ""
-    },
-    {
-      "building": "office",
-      "floor": 1,
-      "row": 1,
-      "x": 752,
-      "kind": ""
-    },
-    {
-      "building": "shop",
-      "floor": 0,
-      "row": 1,
-      "x": 210,
-      "kind": ""
-    },
-    {
-      "building": "school",
-      "floor": 1,
-      "row": 0,
-      "x": 719,
-      "kind": ""
-    },
-    {
-      "building": "tower",
-      "floor": 1,
-      "row": 1,
-      "x": 1495,
-      "kind": ""
-    },
-    {
-      "building": "repair",
-      "floor": 0,
-      "row": 2,
-      "x": 1361,
-      "kind": ""
-    },
-    {
-      "building": "campus_shop",
-      "floor": 0,
-      "row": 0,
-      "x": 1265,
-      "kind": ""
-    },
-    {
-      "building": "",
-      "floor": 0,
-      "row": 2,
-      "x": 272,
-      "kind": ""
-    }
-  ],
+  "loot": [],
   "loot_station": "四川北路",
   "name": "四川北路街区",
   "segment": 560,
@@ -229,5 +394,19 @@
     }
   ],
   "npcs": [],
-  "grid_size": 20
+  "grid_size": 20,
+  "monsters": [
+    {
+      "id": "rat_1",
+      "enemy": "mutant_rat",
+      "row": 2,
+      "x": 448,
+      "facing": -1
+    }
+  ],
+  "street_starts": [
+    0,
+    0,
+    0
+  ]
 }

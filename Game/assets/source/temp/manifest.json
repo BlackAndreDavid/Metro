@@ -1,0 +1,1502 @@
+{
+  "version": 1,
+  "alpha_cutoff": 96,
+  "note": "Names classify visible temporary artwork; original sheets retained. Common canvas and bottom-centre anchors per animation.",
+  "sources": {
+    "atlas_temp.png": "1830e72e26fb820b44d494ff6e00d6f366bf56c1f5e88b747c45d0a96a5b1bcd",
+    "heroine_temp.png": "b3391a2543dff31850b2e55af885d44df1f4e7c01e291edc62a65181c84a98a9"
+  },
+  "sprites": [
+    {
+      "id": "suit_walk_left",
+      "category": "characters",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          0,
+          0,
+          148,
+          148
+        ],
+        [
+          148,
+          0,
+          296,
+          148
+        ],
+        [
+          296,
+          0,
+          443,
+          148
+        ],
+        [
+          443,
+          0,
+          591,
+          148
+        ]
+      ],
+      "reverse": false,
+      "frames": 4,
+      "frame_size": [
+        93,
+        123
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/characters/suit_walk_left.aseprite",
+      "texture": "res://assets/textures/temp/characters/suit_walk_left.png"
+    },
+    {
+      "id": "suit_walk_right",
+      "category": "characters",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          591,
+          0,
+          739,
+          148
+        ],
+        [
+          739,
+          0,
+          886,
+          148
+        ],
+        [
+          886,
+          0,
+          1034,
+          148
+        ],
+        [
+          1034,
+          0,
+          1182,
+          148
+        ]
+      ],
+      "reverse": false,
+      "frames": 4,
+      "frame_size": [
+        89,
+        124
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/characters/suit_walk_right.aseprite",
+      "texture": "res://assets/textures/temp/characters/suit_walk_right.png"
+    },
+    {
+      "id": "suit_walk_front",
+      "category": "characters",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          0,
+          148,
+          148,
+          296
+        ],
+        [
+          148,
+          148,
+          296,
+          296
+        ],
+        [
+          296,
+          148,
+          443,
+          296
+        ],
+        [
+          443,
+          148,
+          591,
+          296
+        ]
+      ],
+      "reverse": false,
+      "frames": 4,
+      "frame_size": [
+        95,
+        129
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/characters/suit_walk_front.aseprite",
+      "texture": "res://assets/textures/temp/characters/suit_walk_front.png"
+    },
+    {
+      "id": "suit_walk_back",
+      "category": "characters",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          591,
+          148,
+          739,
+          296
+        ],
+        [
+          739,
+          148,
+          886,
+          296
+        ],
+        [
+          886,
+          148,
+          1034,
+          296
+        ],
+        [
+          1034,
+          148,
+          1182,
+          296
+        ]
+      ],
+      "reverse": false,
+      "frames": 4,
+      "frame_size": [
+        91,
+        129
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/characters/suit_walk_back.aseprite",
+      "texture": "res://assets/textures/temp/characters/suit_walk_back.png"
+    },
+    {
+      "id": "mutant_rat",
+      "category": "monsters",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          0,
+          296,
+          148,
+          443
+        ],
+        [
+          148,
+          296,
+          296,
+          443
+        ],
+        [
+          296,
+          296,
+          443,
+          443
+        ],
+        [
+          443,
+          296,
+          591,
+          443
+        ]
+      ],
+      "reverse": false,
+      "frames": 4,
+      "frame_size": [
+        133,
+        79
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/monsters/mutant_rat.aseprite",
+      "texture": "res://assets/textures/temp/monsters/mutant_rat.png"
+    },
+    {
+      "id": "hooded_scavenger",
+      "category": "monsters",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          591,
+          296,
+          739,
+          443
+        ],
+        [
+          739,
+          296,
+          886,
+          443
+        ],
+        [
+          886,
+          296,
+          1034,
+          443
+        ],
+        [
+          1034,
+          296,
+          1182,
+          443
+        ]
+      ],
+      "reverse": false,
+      "frames": 4,
+      "frame_size": [
+        110,
+        122
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/monsters/hooded_scavenger.aseprite",
+      "texture": "res://assets/textures/temp/monsters/hooded_scavenger.png"
+    },
+    {
+      "id": "fungus_turret",
+      "category": "monsters",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          0,
+          443,
+          148,
+          591
+        ],
+        [
+          148,
+          443,
+          296,
+          591
+        ],
+        [
+          296,
+          443,
+          443,
+          591
+        ],
+        [
+          443,
+          443,
+          591,
+          591
+        ]
+      ],
+      "reverse": false,
+      "frames": 4,
+      "frame_size": [
+        118,
+        124
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/monsters/fungus_turret.aseprite",
+      "texture": "res://assets/textures/temp/monsters/fungus_turret.png"
+    },
+    {
+      "id": "mutant_crawler",
+      "category": "monsters",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          591,
+          443,
+          739,
+          591
+        ],
+        [
+          739,
+          443,
+          886,
+          591
+        ],
+        [
+          886,
+          443,
+          1034,
+          591
+        ],
+        [
+          1034,
+          443,
+          1182,
+          591
+        ]
+      ],
+      "reverse": false,
+      "frames": 4,
+      "frame_size": [
+        140,
+        91
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/monsters/mutant_crawler.aseprite",
+      "texture": "res://assets/textures/temp/monsters/mutant_crawler.png"
+    },
+    {
+      "id": "rust_robot",
+      "category": "monsters",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          0,
+          591,
+          148,
+          739
+        ],
+        [
+          148,
+          591,
+          296,
+          739
+        ],
+        [
+          296,
+          591,
+          443,
+          739
+        ],
+        [
+          443,
+          591,
+          591,
+          739
+        ]
+      ],
+      "reverse": false,
+      "frames": 4,
+      "frame_size": [
+        142,
+        128
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/monsters/rust_robot.aseprite",
+      "texture": "res://assets/textures/temp/monsters/rust_robot.png"
+    },
+    {
+      "id": "metal_bottle",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          591,
+          591,
+          739,
+          739
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        100,
+        118
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/metal_bottle.aseprite",
+      "texture": "res://assets/textures/temp/items/metal_bottle.png"
+    },
+    {
+      "id": "water_bottle",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          739,
+          591,
+          886,
+          739
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        68,
+        122
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/water_bottle.aseprite",
+      "texture": "res://assets/textures/temp/items/water_bottle.png"
+    },
+    {
+      "id": "reagent_flask",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          886,
+          591,
+          1034,
+          739
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        95,
+        117
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/reagent_flask.aseprite",
+      "texture": "res://assets/textures/temp/items/reagent_flask.png"
+    },
+    {
+      "id": "hazard_canister",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          1034,
+          591,
+          1182,
+          739
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        104,
+        130
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/hazard_canister.aseprite",
+      "texture": "res://assets/textures/temp/items/hazard_canister.png"
+    },
+    {
+      "id": "power_box",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          0,
+          739,
+          148,
+          887
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        116,
+        112
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/power_box.aseprite",
+      "texture": "res://assets/textures/temp/items/power_box.png"
+    },
+    {
+      "id": "single_cell",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          148,
+          739,
+          296,
+          887
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        75,
+        112
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/single_cell.aseprite",
+      "texture": "res://assets/textures/temp/items/single_cell.png"
+    },
+    {
+      "id": "battery_pair",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          296,
+          739,
+          443,
+          887
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        110,
+        110
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/battery_pair.aseprite",
+      "texture": "res://assets/textures/temp/items/battery_pair.png"
+    },
+    {
+      "id": "battery_pack",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          443,
+          739,
+          591,
+          887
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        122,
+        113
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/battery_pack.aseprite",
+      "texture": "res://assets/textures/temp/items/battery_pack.png"
+    },
+    {
+      "id": "ration",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          591,
+          739,
+          739,
+          887
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        124,
+        104
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/ration.aseprite",
+      "texture": "res://assets/textures/temp/items/ration.png"
+    },
+    {
+      "id": "mushroom_can",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          739,
+          739,
+          886,
+          887
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        105,
+        110
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/mushroom_can.aseprite",
+      "texture": "res://assets/textures/temp/items/mushroom_can.png"
+    },
+    {
+      "id": "herb_tray",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          886,
+          739,
+          1034,
+          887
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        132,
+        109
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/herb_tray.aseprite",
+      "texture": "res://assets/textures/temp/items/herb_tray.png"
+    },
+    {
+      "id": "supply_crate",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          1034,
+          739,
+          1182,
+          887
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        113,
+        109
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/supply_crate.aseprite",
+      "texture": "res://assets/textures/temp/items/supply_crate.png"
+    },
+    {
+      "id": "bandage",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          0,
+          887,
+          148,
+          1034
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        127,
+        106
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/bandage.aseprite",
+      "texture": "res://assets/textures/temp/items/bandage.png"
+    },
+    {
+      "id": "syringe",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          148,
+          887,
+          296,
+          1034
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        126,
+        120
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/syringe.aseprite",
+      "texture": "res://assets/textures/temp/items/syringe.png"
+    },
+    {
+      "id": "capsules",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          296,
+          887,
+          443,
+          1034
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        110,
+        102
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/capsules.aseprite",
+      "texture": "res://assets/textures/temp/items/capsules.png"
+    },
+    {
+      "id": "medkit",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          443,
+          887,
+          591,
+          1034
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        125,
+        113
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/medkit.aseprite",
+      "texture": "res://assets/textures/temp/items/medkit.png"
+    },
+    {
+      "id": "beacon",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          591,
+          887,
+          739,
+          1034
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        123,
+        114
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/beacon.aseprite",
+      "texture": "res://assets/textures/temp/items/beacon.png"
+    },
+    {
+      "id": "battery_cluster",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          739,
+          887,
+          886,
+          1034
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        122,
+        114
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/battery_cluster.aseprite",
+      "texture": "res://assets/textures/temp/items/battery_cluster.png"
+    },
+    {
+      "id": "shield_emitter",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          886,
+          887,
+          1034,
+          1034
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        126,
+        115
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/shield_emitter.aseprite",
+      "texture": "res://assets/textures/temp/items/shield_emitter.png"
+    },
+    {
+      "id": "lens_device",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          1034,
+          887,
+          1182,
+          1034
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        125,
+        118
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/lens_device.aseprite",
+      "texture": "res://assets/textures/temp/items/lens_device.png"
+    },
+    {
+      "id": "armor_plate",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          0,
+          1034,
+          148,
+          1182
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        118,
+        124
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/armor_plate.aseprite",
+      "texture": "res://assets/textures/temp/items/armor_plate.png"
+    },
+    {
+      "id": "exoskeleton_frame",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          148,
+          1034,
+          296,
+          1182
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        118,
+        118
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/exoskeleton_frame.aseprite",
+      "texture": "res://assets/textures/temp/items/exoskeleton_frame.png"
+    },
+    {
+      "id": "battery_core",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          296,
+          1034,
+          443,
+          1182
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        136,
+        108
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/battery_core.aseprite",
+      "texture": "res://assets/textures/temp/items/battery_core.png"
+    },
+    {
+      "id": "mutant_tentacle",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          443,
+          1034,
+          591,
+          1182
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        131,
+        129
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/mutant_tentacle.aseprite",
+      "texture": "res://assets/textures/temp/items/mutant_tentacle.png"
+    },
+    {
+      "id": "green_ammo",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          591,
+          1034,
+          739,
+          1182
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        36,
+        118
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/green_ammo.aseprite",
+      "texture": "res://assets/textures/temp/items/green_ammo.png"
+    },
+    {
+      "id": "red_ammo",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          739,
+          1034,
+          886,
+          1182
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        39,
+        123
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/red_ammo.aseprite",
+      "texture": "res://assets/textures/temp/items/red_ammo.png"
+    },
+    {
+      "id": "wood_crate",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          886,
+          1034,
+          1034,
+          1182
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        119,
+        144
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/wood_crate.aseprite",
+      "texture": "res://assets/textures/temp/items/wood_crate.png"
+    },
+    {
+      "id": "locked_case",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          1034,
+          1034,
+          1182,
+          1182
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        139,
+        108
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/locked_case.aseprite",
+      "texture": "res://assets/textures/temp/items/locked_case.png"
+    },
+    {
+      "id": "metro_car",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          0,
+          1182,
+          148,
+          1330
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        136,
+        139
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/metro_car.aseprite",
+      "texture": "res://assets/textures/temp/items/metro_car.png"
+    },
+    {
+      "id": "hazmat_helmet",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          148,
+          1182,
+          296,
+          1330
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        126,
+        127
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/hazmat_helmet.aseprite",
+      "texture": "res://assets/textures/temp/items/hazmat_helmet.png"
+    },
+    {
+      "id": "metal_plate",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          296,
+          1182,
+          443,
+          1330
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        121,
+        118
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/metal_plate.aseprite",
+      "texture": "res://assets/textures/temp/items/metal_plate.png"
+    },
+    {
+      "id": "scrap_metal",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          443,
+          1182,
+          591,
+          1330
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        134,
+        119
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/scrap_metal.aseprite",
+      "texture": "res://assets/textures/temp/items/scrap_metal.png"
+    },
+    {
+      "id": "workbench",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          591,
+          1182,
+          739,
+          1330
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        129,
+        141
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/workbench.aseprite",
+      "texture": "res://assets/textures/temp/items/workbench.png"
+    },
+    {
+      "id": "bunk",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          739,
+          1182,
+          886,
+          1330
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        132,
+        141
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/bunk.aseprite",
+      "texture": "res://assets/textures/temp/items/bunk.png"
+    },
+    {
+      "id": "grow_cabinet",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          886,
+          1182,
+          1034,
+          1330
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        133,
+        141
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/grow_cabinet.aseprite",
+      "texture": "res://assets/textures/temp/items/grow_cabinet.png"
+    },
+    {
+      "id": "credit_card",
+      "category": "items",
+      "source": "atlas_temp.png",
+      "source_boxes": [
+        [
+          1034,
+          1182,
+          1182,
+          1330
+        ]
+      ],
+      "reverse": false,
+      "frames": 1,
+      "frame_size": [
+        130,
+        99
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/items/credit_card.aseprite",
+      "texture": "res://assets/textures/temp/items/credit_card.png"
+    },
+    {
+      "id": "heroine_walk_left",
+      "category": "characters",
+      "source": "heroine_temp.png",
+      "source_boxes": [
+        [
+          0,
+          0,
+          256,
+          256
+        ],
+        [
+          256,
+          0,
+          512,
+          256
+        ],
+        [
+          512,
+          0,
+          768,
+          256
+        ],
+        [
+          768,
+          0,
+          1024,
+          256
+        ]
+      ],
+      "reverse": false,
+      "frames": 4,
+      "frame_size": [
+        150,
+        221
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/characters/heroine_walk_left.aseprite",
+      "texture": "res://assets/textures/temp/characters/heroine_walk_left.png"
+    },
+    {
+      "id": "heroine_walk_right",
+      "category": "characters",
+      "source": "heroine_temp.png",
+      "source_boxes": [
+        [
+          0,
+          256,
+          256,
+          512
+        ],
+        [
+          256,
+          256,
+          512,
+          512
+        ],
+        [
+          512,
+          256,
+          768,
+          512
+        ],
+        [
+          768,
+          256,
+          1024,
+          512
+        ]
+      ],
+      "reverse": false,
+      "frames": 4,
+      "frame_size": [
+        152,
+        223
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/characters/heroine_walk_right.aseprite",
+      "texture": "res://assets/textures/temp/characters/heroine_walk_right.png"
+    },
+    {
+      "id": "heroine_walk_front",
+      "category": "characters",
+      "source": "heroine_temp.png",
+      "source_boxes": [
+        [
+          0,
+          512,
+          256,
+          768
+        ],
+        [
+          256,
+          512,
+          512,
+          768
+        ],
+        [
+          512,
+          512,
+          768,
+          768
+        ],
+        [
+          768,
+          512,
+          1024,
+          768
+        ]
+      ],
+      "reverse": false,
+      "frames": 4,
+      "frame_size": [
+        104,
+        221
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/characters/heroine_walk_front.aseprite",
+      "texture": "res://assets/textures/temp/characters/heroine_walk_front.png"
+    },
+    {
+      "id": "heroine_walk_back",
+      "category": "characters",
+      "source": "heroine_temp.png",
+      "source_boxes": [
+        [
+          0,
+          768,
+          256,
+          1002
+        ],
+        [
+          256,
+          768,
+          512,
+          1002
+        ],
+        [
+          512,
+          768,
+          768,
+          1002
+        ],
+        [
+          768,
+          768,
+          1024,
+          1002
+        ]
+      ],
+      "reverse": false,
+      "frames": 4,
+      "frame_size": [
+        111,
+        219
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/characters/heroine_walk_back.aseprite",
+      "texture": "res://assets/textures/temp/characters/heroine_walk_back.png"
+    },
+    {
+      "id": "heroine_undress",
+      "category": "characters",
+      "source": "heroine_temp.png",
+      "source_boxes": [
+        [
+          0,
+          1002,
+          256,
+          1284
+        ],
+        [
+          256,
+          1002,
+          512,
+          1284
+        ],
+        [
+          512,
+          1002,
+          768,
+          1284
+        ],
+        [
+          768,
+          1002,
+          1024,
+          1284
+        ],
+        [
+          0,
+          1284,
+          256,
+          1536
+        ],
+        [
+          256,
+          1284,
+          512,
+          1536
+        ],
+        [
+          512,
+          1284,
+          768,
+          1536
+        ],
+        [
+          768,
+          1284,
+          1024,
+          1536
+        ]
+      ],
+      "reverse": false,
+      "frames": 8,
+      "frame_size": [
+        151,
+        262
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/characters/heroine_undress.aseprite",
+      "texture": "res://assets/textures/temp/characters/heroine_undress.png"
+    },
+    {
+      "id": "heroine_dress",
+      "category": "characters",
+      "source": "heroine_temp.png",
+      "source_boxes": [
+        [
+          0,
+          1002,
+          256,
+          1284
+        ],
+        [
+          256,
+          1002,
+          512,
+          1284
+        ],
+        [
+          512,
+          1002,
+          768,
+          1284
+        ],
+        [
+          768,
+          1002,
+          1024,
+          1284
+        ],
+        [
+          0,
+          1284,
+          256,
+          1536
+        ],
+        [
+          256,
+          1284,
+          512,
+          1536
+        ],
+        [
+          512,
+          1284,
+          768,
+          1536
+        ],
+        [
+          768,
+          1284,
+          1024,
+          1536
+        ]
+      ],
+      "reverse": true,
+      "frames": 8,
+      "frame_size": [
+        151,
+        262
+      ],
+      "duration_ms": 120,
+      "anchor": "bottom_center",
+      "aseprite": "assets/source/temp/characters/heroine_dress.aseprite",
+      "texture": "res://assets/textures/temp/characters/heroine_dress.png"
+    }
+  ]
+}

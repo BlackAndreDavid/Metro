@@ -43,6 +43,8 @@ func run() -> void:
 	catalog_file.close()
 	window.set_customer(5)
 	check(window.get_node("Name").text == "动态新增客户" and window.portrait.texture.atlas != null,"an already-open trade window displays a newly appended customer without stale texture indices")
+	check(home.state.item_name("editor_part") == "编辑零件" and home.state.footprint("editor_part") == Vector2i(2,1) and home.state.footprint("editor_part",true) == Vector2i(1,2),"registered custom item supplies names and rotated grid footprint")
+	check(Orders.category_of("editor_part") == "materials" and Orders.price(home.state,{"side":"buy"},"editor_part") == 12.9,"custom item category and edited price reach real trade rules")
 	var order := Orders.ensure(home.state)
 	window.set_customer(int(order.visitor))
 	check(window.Catalog.definition(int(order.visitor)).id == "editor_test" and order.budget == 77, "editor weighted visitor and base budget used by runtime")

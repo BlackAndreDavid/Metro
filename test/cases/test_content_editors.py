@@ -22,9 +22,7 @@ class ContentEditors(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory(prefix='metro-editors-')
         self.game=Path(self.temp.name)/'Game'
         shutil.copytree(ROOT/'Game/content',self.game/'content')
-        (self.game/'assets/textures/customers').mkdir(parents=True)
-        for p in (ROOT/'Game/assets/textures/customers').glob('*.png'):
-            shutil.copy2(p,self.game/'assets/textures/customers'/p.name)
+        shutil.copytree(ROOT/'Game/assets/textures',self.game/'assets/textures')
         self.original=editor.GAME;editor.GAME=self.game
     def tearDown(self):
         editor.GAME=self.original;self.temp.cleanup()
@@ -41,12 +39,14 @@ class ContentEditors(unittest.TestCase):
     def level(self):
         level=editor.read(self.game/'content/levels/postal.json')
         level.update(loot_station='南京东路',stations=[{'name':'南京东路','row':2,'x':88}])
-        level['buildings'][0]['name']='编辑建筑';level['loot'][0]['kind']='book'
+        level['buildings'][0]['name']='编辑建筑'
         level['npcs']=[dict(npc='editor_test',row=3,x=330)]
         level['cell_names']=[['短街'],['中街'+str(i) for i in range(4)],['南街'+str(i) for i in range(3)],['第四街'+str(i) for i in range(2)]]
+        level['street_starts']=[0,0,0,0]
         level['buildings']=[b for b in level['buildings'] if b['x']+b['width']<=level['segment']*len(level['cell_names'][b['row']])]
-        ids={b['id'] for b in level['buildings']}
-        level['loot']=[p for p in level['loot'] if not p['building'] or p['building'] in ids]
+        for building in level['buildings']:building['loot_points']=[]
+        level['buildings'][0]['loot_points']=[dict(id='test_cabinet',x=40,floor=0,chance=1,rolls=1,legacy_slot=0,choices=[dict(kind='book',weight=1)])]
+        level['loot']=[]
         level['vehicles']=[v for v in level['vehicles'] if v['x']<=level['segment']*len(level['cell_names'][v['row']])-24]
         level['junctions']=[j for j in level['junctions'] if j['x']<=min(level['segment']*len(level['cell_names'][j['row']]),level['segment']*len(level['cell_names'][j['row']+1]))-24]
         level['junctions'].append(dict(row=2,x=330))
@@ -70,7 +70,7 @@ class ContentEditors(unittest.TestCase):
         self.assertIn('exploration.tscn',editor.resource(result['scene']).read_text())
         self.assertEqual(editor.read(self.game/'content/registry.json')['stations']['南京东路'],result)
         self.assertEqual(editor.read(editor.resource(result['level']))['buildings'][0]['name'],'编辑建筑')
-        bad=self.level();bad['loot'][1]['building']='missing'
+        bad=self.level();bad['buildings'][0]['loot_points'][0]['choices'][0]['kind']='missing'
         with self.assertRaises(ValueError):editor.save_level('南京东路',bad)
         bad=self.level();bad['buildings'][0]['x']=100000
         with self.assertRaises(ValueError):editor.save_level('南京东路',bad)
@@ -127,6 +127,35 @@ console.log('EDITOR_MODELS_OK');
         result=subprocess.run([node,'-e',source+checks],capture_output=True,text=True)
         self.assertEqual(result.returncode,0,result.stderr);self.assertIn('EDITOR_MODELS_OK',result.stdout)
 
+    def test_item_enemy_catalogues_and_offset_weighted_buildings(self):
+        item=copy.deepcopy(editor.catalog('items','items')[0]);item.update(id='editor_part',name='编辑零件',texture='res://assets/textures/temp/items/scrap_metal.png',price=17.25,width=2,height=1,category='materials',rarity=1)
+        editor.validate_item(item);editor.upsert_catalog('items','items',item)
+        self.assertIn('editor_part',editor.item_ids())
+        bad=copy.deepcopy(item);bad['width']=0
+        with self.assertRaises(ValueError):editor.validate_item(bad)
+        enemy=copy.deepcopy(editor.catalog('enemies','enemies')[0]);enemy.update(id='editor_rat')
+        editor.validate_enemy(enemy);editor.upsert_catalog('enemies','enemies',enemy)
+        bad=copy.deepcopy(enemy);bad['movement']['patrol_min']=4;bad['movement']['patrol_max']=2
+        with self.assertRaises(ValueError):editor.validate_enemy(bad)
+        editor.save_customer(self.customer());level=self.level();level['street_starts'][0]=300
+        for key in ['buildings','vehicles','stations']:
+            for entry in level[key]:
+                if entry['row']==0:entry['x']+=300
+        level['junctions']=[j for j in level['junctions'] if j['row']!=0]
+        level['monsters']=[dict(id='placed_rat',enemy='editor_rat',row=0,x=400)]
+        level['buildings'][0]['loot_points'][0]['choices']=[dict(kind='editor_part',weight=9),dict(kind='water',weight=1)]
+        editor.validate_level('南京东路',level)
+        bad=copy.deepcopy(level);bad['monsters'][0]['x']=330
+        with self.assertRaises(ValueError):editor.validate_level('南京东路',bad)
+        bad=copy.deepcopy(level);bad['buildings'][0]['loot_points'][0]['choices'][0]['weight']=-1
+        with self.assertRaises(ValueError):editor.validate_level('南京东路',bad)
+        self.assertEqual(editor.migrate_level(level)['street_starts'][0],300)
+        old=copy.deepcopy(level)
+        for building in old['buildings']:building['loot_points']=[]
+        old['loot']=[dict(x=650,row=0,building='',floor=0,kind='water')]
+        migrated=editor.migrate_level(old)
+        self.assertEqual(migrated['loot'],[]);self.assertEqual(migrated['buildings'][0]['loot_points'][0]['legacy_slot'],0)
+
     def test_http_api_requires_token_and_writes_validated_content(self):
         editor.Handler.token='test-token'
         server=editor.ThreadingHTTPServer(('127.0.0.1',0),editor.Handler)
@@ -143,6 +172,10 @@ console.log('EDITOR_MODELS_OK');
             with self.assertRaises(urllib.error.HTTPError):urllib.request.urlopen(request)
             request.add_header('X-Editor-Token','test-token')
             with urllib.request.urlopen(request) as response:self.assertTrue(json.load(response)['ok'])
+            for deleted in [True,False]:
+                request=urllib.request.Request(url+'/api/catalog/archive',data=json.dumps({'catalog':'customers','id':'editor_test','deleted':deleted}).encode(),headers={'Content-Type':'application/json','X-Editor-Token':'test-token'})
+                with urllib.request.urlopen(request) as response:self.assertTrue(json.load(response)['ok'])
+                saved=next(c for c in editor.catalog('customers','customers') if c['id']=='editor_test');self.assertEqual(saved['deleted'],deleted)
         finally:server.shutdown();server.server_close();thread.join()
     def test_authored_content_runs_in_isolated_game(self):
         godot=os.environ.get('METRO_GODOT')
@@ -152,6 +185,8 @@ console.log('EDITOR_MODELS_OK');
         data=editor.read(self.game/'content/customers.json')
         for customer in data['customers']:customer['weight']=0
         editor.atomic(self.game/'content/customers.json',data)
+        custom=copy.deepcopy(editor.catalog('items','items')[0]);custom.update(id='editor_part',name='编辑零件',texture='res://assets/textures/temp/items/scrap_metal.png',price=17.25,width=2,height=1,category='materials',rarity=1)
+        editor.validate_item(custom);editor.upsert_catalog('items','items',custom)
         editor.save_customer(self.customer());editor.save_level('南京东路',self.level())
         output=Path(os.environ['METRO_TEST_RESULTS'])
         env=os.environ.copy()

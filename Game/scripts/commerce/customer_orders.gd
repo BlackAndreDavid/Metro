@@ -2,6 +2,7 @@ extends RefCounted
 ## Customer-facing directions: buy = customer buys from player; sell = customer sells to player.
 const Visitors = preload("res://scripts/commerce/customer_catalog.gd")
 const Dialogue = preload("res://scripts/commerce/customer_dialogue.gd")
+const ItemCatalog = preload("res://scripts/items/item_catalog.gd")
 const Markets = preload("res://scripts/cabin_markets.gd")
 const CATEGORIES := {
 	"supplies":{"name":"生活补给","items":["water","ration","meds"]},
@@ -20,9 +21,7 @@ static func daily_limit(station: String) -> int:
 	return GROUP_LIMITS.community
 
 static func category_of(kind: String) -> String:
-	for category in CATEGORIES:
-		if kind in CATEGORIES[category].items: return category
-	return ""
+	return ItemCatalog.definition(kind).get("category","")
 
 static func record(state: RefCounted) -> Dictionary:
 	return state.customer_visits.get(state.station,{"arrived":0,"completed":0,"dismissed":0,"active":{}})
@@ -46,7 +45,11 @@ static func ensure(state: RefCounted) -> Dictionary:
 	var category: String = allowed[index % allowed.size()]
 	var stock := {}
 	if side == "sell":
-		for kind in CATEGORIES[category].items: stock[kind] = 2
+		var kinds: Array = CATEGORIES[category].items.duplicate()
+		for extra in ItemCatalog.in_category(category):
+			if extra not in kinds: kinds.append(extra)
+		for kind in kinds:
+			if kind in ItemCatalog.in_category(category): stock[kind] = 2
 	visits.active = {"id":"%d/%s/%d" % [state.day,state.station,index],"visitor":visitor,"side":side,"category":category,"budget":float(definition.get("base_budget",120)),"status":"open","stock":stock,"total":0.0}
 	state.daily_customer_ids[definition.id] = true
 	visits.arrived += 1
@@ -87,8 +90,8 @@ static func dismiss(state: RefCounted) -> String:
 
 static func price(state: RefCounted, order: Dictionary, kind: String, charge: int = 100) -> float:
 	var offer: Dictionary = state.market_offer("demand" if order.side == "buy" else "stock",kind,state.station,charge)
-	if not offer.is_empty(): return offer.price
-	var value: float = BASE_PRICES[kind] * state.market_multiplier(kind) * (0.75 if order.side == "buy" else 1.0)
+	if not offer.is_empty(): return snappedf(offer.price*float(ItemCatalog.definition(kind).get("price",BASE_PRICES.get(kind,1)))/maxf(0.01,float(BASE_PRICES.get(kind,1))),0.1)
+	var value: float = float(ItemCatalog.definition(kind).get("price",BASE_PRICES.get(kind,1))) * state.market_multiplier(kind) * (0.75 if order.side == "buy" else 1.0)
 	if kind == "aaa" and order.side == "buy": value *= lerpf(0.5,1.0,float(charge)/100.0)
 	return snappedf(value,0.1)
 

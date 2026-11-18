@@ -86,11 +86,14 @@ def main():
             ['COMMERCE_FLOW_OK'])
     if results[0]['passed']:
         run('customer_orders', ['--script', str(root / 'cases/test_customer_orders.gd')], ['CUSTOMER_ORDERS_OK'])
+    if results[0]['passed']:
+        run('exploration_systems', ['--script', str(root / 'cases/test_exploration_systems.gd'), '--', '--save-file='+str(output/'exploration_systems.json')], ['EXPLORATION_SYSTEMS_OK'])
+    run('temp_art', [], ['OK'], command_override=[sys.executable, '-m', 'unittest', 'discover', '-s', str(root/'cases'), '-p', 'test_temp_art.py'])
     run('art_tools', [], ['OK'], command_override=[sys.executable, '-m', 'unittest', 'discover',
         '-s', str(root / 'cases'), '-p', 'test_art_tools.py'])
     run('content_editors', [], ['OK'], command_override=[sys.executable, '-m', 'unittest', 'discover',
         '-s', str(root / 'cases'), '-p', 'test_content_editors.py'])
-    passed = len(results) == 13 and all(item['passed'] for item in results)
+    passed = len(results) == 15 and all(item['passed'] for item in results)
     summary = dict(run_id=run_id, passed=passed, results=results)
     (output / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print(f'Results: {output}')

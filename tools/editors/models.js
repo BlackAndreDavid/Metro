@@ -3,17 +3,19 @@
 class BuildingDefinition {
   constructor(data){this.data=structuredClone(data)}
   instantiate(level,row,x,snap=0){
-    const data=structuredClone(this.data),limit=level.segment*level.cell_names[row].length;
+    const data=structuredClone(this.data),start=level.street_starts?.[row]||0,limit=start+level.segment*level.cell_names[row].length;
     let serial=1;while(level.buildings.some(b=>b.id===`${data.id}_${serial}`))serial++;
     data.template_id=data.id;data.id=`${data.id}_${serial}`;data.row=row;
-    data.width=Math.min(data.width,limit-48);data.x=Math.max(24,Math.min(limit-data.width,x));
-    if(snap)data.x=Math.max(24,Math.min(limit-data.width,Math.round(data.x/snap)*snap));
+    data.width=Math.min(data.width,limit-start-48);data.x=Math.max(start+24,Math.min(limit-data.width,x));
+    if(snap)data.x=Math.max(start+24,Math.min(limit-data.width,Math.round(data.x/snap)*snap));
+    for(const point of data.loot_points||[]){point.x=Math.max(0,Math.min(data.width,point.x));point.floor=Math.min(point.floor,data.floors-1);delete point.legacy_slot}
+    if(data.collision)data.collision.width=Math.min(data.width,data.collision.width);
     return data;
   }
   static move(level,building,row,x){
-    const limit=level.segment*level.cell_names[row].length;
-    if(building.width>limit-24)throw Error('该街道不足以容纳建筑，请缩小建筑或选择更长的街道');
-    const oldX=building.x;building.x=Math.max(24,Math.min(limit-building.width,x));building.row=row;
+    const start=level.street_starts?.[row]||0,limit=start+level.segment*level.cell_names[row].length;
+    if(building.width>limit-start-24)throw Error('该街道不足以容纳建筑，请缩小建筑或选择更长的街道');
+    const oldX=building.x;building.x=Math.max(start+24,Math.min(limit-building.width,x));building.row=row;
     for(const loot of level.loot)if(loot.building===building.id){loot.x+=building.x-oldX;loot.row=row}
   }
 }

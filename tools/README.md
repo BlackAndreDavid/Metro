@@ -8,6 +8,7 @@
 | `art_asset_tool.py`、`art/` | 统一画风、生成候选、筛选与像素精简 | [美术 README](art/README.md) |
 | `import_customer_candidates.py` | 从客户候选表拆分独立角色素材，保留原图与评估 | [美术 README](art/README.md) |
 | `export_home_art.py` | 将七张 Home Aseprite 源图的首帧导出为透明 PNG | 下方命令 |
+| `split_temp_art.py` | 将上传的两张临时图分类、裁剪并导出51份动画/静物 Aseprite及PNG | [素材清单](../Game/assets/source/temp/README.md) |
 | `trim_aseprite.py` | 原生裁剪支持的 Aseprite 透明画布，并验证像素 | 下方命令 |
 
 ## Home 素材导出与裁剪

@@ -9,6 +9,9 @@ signal pickup_requested(slot: int)
 signal extraction_requested(station: String)
 signal vehicle_requested(vehicle_id: String)
 signal npc_requested(id: String)
+signal cabinet_requested(id: String)
+signal motion_updated(stamina: float, running: bool, slowed: float)
+signal player_attacked(seconds: float)
 signal moved
 
 const NORTH := 0
@@ -25,7 +28,9 @@ const DEFAULT_CELL_NAMES := [
 const DEFAULT_WIDTH := DEFAULT_SEGMENT * 3
 const DEFAULT_GROUND := 416.0
 const DEFAULT_FLOOR_HEIGHT := 110.0
-const SPEED := 235.0
+const SPEED := 188.0
+const Motion = preload("res://scripts/exploration/player_motion.gd")
+const Enemy = preload("res://scripts/exploration/enemy.gd")
 const REACH := 43.0
 ## Each alley joins its row to the next row at the same horizontal position.
 const DEFAULT_JUNCTIONS := [
@@ -71,6 +76,17 @@ const Content = preload("res://scripts/content/content_registry.gd")
 var SEGMENT := DEFAULT_SEGMENT
 var CELL_NAMES := DEFAULT_CELL_NAMES.duplicate(true)
 var WIDTH := DEFAULT_WIDTH
+var STREET_STARTS: Array = []
+var motion := Motion.new()
+var enemies: Array = []
+var enemy_textures: Dictionary = {}
+var hero_textures: Dictionary = {}
+var hero_view: TextureRect
+var hero_frame_key := ""
+var visual_prompt_key := ""
+var animation_time := 0.0
+var footstep_time := 0.0
+var footstep_audio: AudioStreamPlayer
 var GROUND := DEFAULT_GROUND
 var FLOOR_HEIGHT := DEFAULT_FLOOR_HEIGHT
 var JUNCTIONS := DEFAULT_JUNCTIONS.duplicate(true)
@@ -96,6 +112,9 @@ var fares: Dictionary = {}
 var shade: ColorRect
 var lighting: ShaderMaterial
 var inspecting_vehicle := false
+var inspecting_container := false
+var interaction_visuals: Dictionary = {}
+var building_textures: Dictionary = {}
 
 static func supports(station: String) -> bool:
 	return not Content.entry(station).is_empty()
@@ -104,6 +123,25 @@ func setup(owner_state: RefCounted, ui_font: Font) -> void:
 	state = owner_state
 	apply_level(Content.level(state.station))
 	font = ui_font
+	var loader = preload("res://scripts/commerce/customer_catalog.gd")
+	for direction in ["left","right"]:
+		hero_textures[direction] = loader.load_texture("res://assets/textures/temp/characters/suit_walk_"+direction+".png")
+	var specs: Array = Content.read_json("res://content/enemies.json").get("enemies",[])
+	for placement in Content.level(state.station).get("monsters",[]):
+		for definition in specs:
+			if definition.id == placement.enemy and definition.get("enabled",true):
+				enemies.append(Enemy.new(definition,placement))
+				enemy_textures[definition.id] = loader.load_texture(definition.sprite.texture)
+	footstep_audio = AudioStreamPlayer.new()
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_8_BITS
+	stream.mix_rate = 11025
+	var samples := PackedByteArray()
+	for i in range(660): samples.append(clampi(int(128+sin(i*1.71)*34*(1.0-float(i)/660)),0,255))
+	stream.data = samples
+	footstep_audio.stream = stream
+	add_child(footstep_audio)
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	mouse_filter = MOUSE_FILTER_IGNORE
 	for station in STATIONS:
 		fares[station.name] = state.extraction_cost(station.name)
@@ -119,6 +157,13 @@ func setup(owner_state: RefCounted, ui_font: Font) -> void:
 	shade.material = lighting
 	shade.hide()
 	add_child(shade)
+	setup_interaction_visuals()
+	hero_view = TextureRect.new()
+	hero_view.size = Vector2(32,64)
+	hero_view.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	hero_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(hero_view)
+	update_hero_visual()
 
 func apply_level(data: Dictionary) -> void:
 	if data.is_empty(): return
@@ -134,8 +179,10 @@ func apply_level(data: Dictionary) -> void:
 	GROUND = float(data.get("ground",DEFAULT_GROUND))
 	FLOOR_HEIGHT = float(data.get("floor_height",DEFAULT_FLOOR_HEIGHT))
 	CELL_NAMES = data.get("cell_names",DEFAULT_CELL_NAMES).duplicate(true)
+	STREET_STARTS = data.get("street_starts",[]).duplicate()
+	while STREET_STARTS.size() < CELL_NAMES.size(): STREET_STARTS.append(0.0)
 	WIDTH = 0.0
-	for street in CELL_NAMES: WIDTH = maxf(WIDTH,SEGMENT*street.size())
+	for index in range(CELL_NAMES.size()): WIDTH = maxf(WIDTH,street_end(index))
 	STATIONS = data.get("stations",DEFAULT_STATIONS).duplicate(true)
 	BUILDINGS = data.get("buildings",DEFAULT_BUILDINGS).duplicate(true)
 	JUNCTIONS = data.get("junctions",DEFAULT_JUNCTIONS).duplicate(true)
@@ -152,11 +199,18 @@ func apply_level(data: Dictionary) -> void:
 func cell() -> Vector2i:
 	return Vector2i(street_column(player_x), row)
 
+func street_start(street: int = -1) -> float:
+	var index := row if street < 0 else street
+	return float(STREET_STARTS[index]) if index < STREET_STARTS.size() else 0.0
+
+func street_end(street: int = -1) -> float:
+	return street_start(street)+street_width(street)
+
 func street_width(street: int = -1) -> float:
 	return SEGMENT * CELL_NAMES[row if street < 0 else street].size()
 
 func street_column(x: float, street: int = -1) -> int:
-	return clampi(floori(x / SEGMENT), 0, CELL_NAMES[row if street < 0 else street].size() - 1)
+	return clampi(floori((x-street_start(street)) / SEGMENT), 0, CELL_NAMES[row if street < 0 else street].size() - 1)
 
 func map_connections() -> Array[Array]:
 	var connections: Array[Array] = []
@@ -164,15 +218,16 @@ func map_connections() -> Array[Array]:
 		for column in range(CELL_NAMES[street].size() - 1):
 			connections.append([Vector2i(column, street), Vector2i(column + 1, street)])
 	for junction in JUNCTIONS:
-		if junction.x > minf(street_width(junction.row),street_width(junction.row+1))-24: continue
+		if junction.x < maxf(street_start(junction.row),street_start(junction.row+1))+24 or junction.x > minf(street_end(junction.row),street_end(junction.row+1))-24: continue
 		var column := street_column(junction.x,junction.row)
-		var alley := [Vector2i(column, junction.row), Vector2i(column, junction.row + 1)]
+		var target_column := street_column(junction.x,junction.row+1)
+		var alley := [Vector2i(column, junction.row), Vector2i(target_column, junction.row + 1)]
 		if not connections.has(alley):
 			connections.append(alley)
 	return connections
 
 func junction_destination(junction: Dictionary) -> int:
-	if junction.x > minf(street_width(junction.row),street_width(junction.row+1))-24: return -1
+	if junction.x < maxf(street_start(junction.row),street_start(junction.row+1))+24 or junction.x > minf(street_end(junction.row),street_end(junction.row+1))-24: return -1
 	if row == junction.row:
 		return row + 1
 	if row == junction.row + 1:
@@ -183,30 +238,54 @@ func junction_caption(destination: int) -> String:
 	return ["去北街", "去中街", "去南街"][destination] if destination < 3 else "去第%d街" % (destination+1)
 
 func _process(delta: float) -> void:
-	if state == null or not state.trip_active or inspecting_vehicle or interacting_npc or get_viewport().gui_is_dragging():
-		return
+	if state == null or not state.trip_active: return
+	animation_time += delta
+	var blocked := inspecting_vehicle or interacting_npc or inspecting_container or get_viewport().gui_is_dragging()
 	var left := Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)
 	var right := Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT)
-	move_horizontal(float(right) - float(left), delta)
+	move_horizontal(0.0 if blocked else float(right)-float(left),delta,not blocked and Input.is_physical_key_pressed(KEY_SHIFT))
+	update_enemies(delta)
+	motion_updated.emit(motion.stamina,motion.running,motion.slow_remaining)
+	update_interaction_visuals()
+	queue_redraw()
 
-func move_horizontal(axis: float, delta: float) -> void:
+func move_horizontal(axis: float, delta: float, sprint: bool = false) -> void:
+	var velocity := motion.step(delta,axis,sprint)
 	if is_zero_approx(axis):
-		if not is_zero_approx(pace):
-			pace = 0.0
-			queue_redraw()
+		pace = 0.0
 		return
 	var location := active_building()
-	var minimum := 24.0
-	var maximum := street_width() - 24.0
+	var minimum := street_start()+24.0
+	var maximum := street_end()-24.0
 	if not location.is_empty():
-		minimum = location.x + 12.0
-		maximum = location.x + location.width - 12.0
-	player_x = clampf(player_x + axis * SPEED * delta, minimum, maximum)
+		var area: Rect2 = building_instances[location.id].collision_bounds(GROUND,FLOOR_HEIGHT)
+		minimum = clampf(area.position.x+12.0,street_start()+24,street_end()-24)
+		maximum = clampf(area.end.x-12.0,minimum,street_end()-24)
+	var previous := player_x
+	player_x = clampf(player_x+velocity*delta,minimum,maximum)
+	motion.moving = not is_equal_approx(previous,player_x)
 	facing = signf(axis)
-	pace += delta * 14.0
+	pace += delta*14.0*(1.5 if motion.running else 1.0)
+	if motion.moving:
+		footstep_time += delta
+		if footstep_time >= (0.24 if motion.running else 0.4):
+			footstep_time = 0
+			if is_instance_valid(footstep_audio):
+				footstep_audio.volume_db = -20 if motion.running else -28
+				footstep_audio.play()
 	position_changed()
 
+func update_enemies(delta: float) -> void:
+	var perception := {"row":row,"x":player_x,"indoors":not building.is_empty(),"moving":motion.moving,"noise_radius":motion.noise_radius(),"vertical_offset":-floor_index*FLOOR_HEIGHT}
+	for enemy in enemies:
+		var hit: Dictionary = enemy.step(delta,perception,Vector2(street_start(enemy.row),street_end(enemy.row)),GROUND)
+		if not hit.is_empty():
+			state.trip_deadline_ms -= int(hit.time_penalty*1000)
+			motion.apply_slow(float(hit.slow_seconds),float(hit.slow_multiplier))
+			player_attacked.emit(float(hit.time_penalty))
+
 func position_changed() -> void:
+	update_hero_visual()
 	visited[cell()] = true
 	update_lighting()
 	queue_redraw()
@@ -232,11 +311,15 @@ func nearby_vehicle() -> String:
 	return ""
 
 func interaction() -> Dictionary:
-	if interacting_npc: return {}
+	if interacting_npc or inspecting_container: return {}
 	for npc in NPCS:
 		if building.is_empty() and npc.row == row and absf(player_x-npc.x) <= REACH:
 			return {"kind":"npc","id":npc.npc,"caption":"交谈 · "+npc.get("name",npc.npc)}
 	var location := active_building()
+	for point in LOOT:
+		if point.has("cabinet") and point.row == row and point.building == building and int(point.floor) == floor_index and absf(player_x-point.x) <= REACH:
+			if not building.is_empty() and not state.flashlight_on: continue
+			return {"kind":"cabinet","id":point.cabinet,"caption":"打开柜子"}
 	for slot in range(LOOT.size()):
 		if not can_take(slot):
 			continue
@@ -247,7 +330,7 @@ func interaction() -> Dictionary:
 		if location.floors > 1 and absf(player_x - stair_x(location)) <= REACH:
 			return {"kind": "stairs", "caption": "上二楼" if floor_index == 0 else "下一楼"}
 		if floor_index == 0 and absf(player_x - door_x(location)) <= REACH:
-			return {"kind": "leave", "caption": "回到街道"}
+			return {"kind": "leave", "id":building,"caption": "回到街道"}
 		return {}
 	for station in STATIONS:
 		if row == station.row and absf(player_x - station.x) <= REACH:
@@ -271,6 +354,7 @@ func interaction() -> Dictionary:
 func interact() -> void:
 	var target := interaction()
 	match target.get("kind", ""):
+		"cabinet": cabinet_requested.emit(target.id)
 		"npc": npc_requested.emit(target.id)
 		"pickup": pickup_requested.emit(target.slot)
 		"extract": extraction_requested.emit(target.station)
@@ -297,7 +381,7 @@ func stair_x(entry: Dictionary) -> float:
 	return (building_instances[entry.id] if building_instances.has(entry.id) else Building.new(entry)).stair_x()
 
 func camera_offset() -> float:
-	return clampf(player_x - size.x * 0.5, 0.0, maxf(0.0, street_width() - size.x))
+	return clampf(player_x-size.x*0.5,street_start(),maxf(street_start(),street_end()-size.x))
 
 func update_lighting() -> void:
 	var location := active_building()
@@ -334,10 +418,10 @@ func _draw() -> void:
 		draw_rect(Rect2(0, 323, size.x, 28), Color("514452"))
 		draw_line(Vector2(0, 323), Vector2(size.x, 323), Color("746172"), 2.0)
 	draw_set_transform(Vector2(-camera_x, 0))
-	draw_rect(Rect2(0, GROUND, street_width(), size.y - GROUND), Color("292738"))
-	draw_rect(Rect2(0, GROUND, street_width(), 13), Color("6d5b69"))
-	draw_rect(Rect2(0, GROUND + 13, street_width(), 16), Color("423b51"))
-	for x in range(0, int(street_width()), 96):
+	draw_rect(Rect2(street_start(), GROUND, street_width(), size.y - GROUND), Color("292738"))
+	draw_rect(Rect2(street_start(), GROUND, street_width(), 13), Color("6d5b69"))
+	draw_rect(Rect2(street_start(), GROUND + 13, street_width(), 16), Color("423b51"))
+	for x in range(int(street_start()),int(street_end()),96):
 		draw_rect(Rect2(x, GROUND + 59, 46, 2), Color("665367"))
 	for junction in JUNCTIONS:
 		var destination := junction_destination(junction)
@@ -363,13 +447,17 @@ func _draw() -> void:
 	for slot in range(LOOT.size()):
 		var point: Dictionary = LOOT[slot]
 		var kind: String = state.ground_kind(slot)
+		if point.has("cabinet"): continue
 		if point.row == row and point.building == building and (building.is_empty() or state.flashlight_on) and not kind.is_empty():
 			var tint: Color = state.rarity_color(kind)
 			draw_rect(Rect2(point.x - 9, GROUND - point.floor * FLOOR_HEIGHT - 12, 18, 10), tint.darkened(0.44))
 			draw_line(Vector2(point.x - 8, GROUND - point.floor * FLOOR_HEIGHT - 12), Vector2(point.x + 8, GROUND - point.floor * FLOOR_HEIGHT - 12), tint, 2.0)
 	for npc in NPCS:
-		if npc.row == row and building.is_empty() and npc_textures.get(npc.npc) != null:
+		if not interaction_visuals.has("npc/"+npc.npc) and npc.row == row and building.is_empty() and npc_textures.get(npc.npc) != null:
 			draw_texture_rect(npc_textures[npc.npc],Rect2(npc.x-24,GROUND-80,48,80),false)
+	draw_enemies()
+	if motion.moving:
+		draw_arc(Vector2(player_x,GROUND-floor_index*FLOOR_HEIGHT-32),motion.noise_radius(),0,TAU,48,Color(0.6,0.85,0.8,0.2),1.0)
 	draw_player(Vector2(player_x, GROUND - floor_index * FLOOR_HEIGHT))
 	draw_set_transform(Vector2.ZERO)
 	draw_rect(Rect2(Vector2.ZERO, size), Color("726176"), false, 2.0)
@@ -400,6 +488,9 @@ func draw_vehicle(vehicle: Dictionary) -> void:
 		draw_rect(Rect2(x - 21, y - 36, 40, 12), Color("413844"))
 
 func draw_facade(entry: Dictionary, distant: bool) -> void:
+	if building_textures.has(entry.id):
+		draw_texture_rect(building_textures[entry.id],Rect2(entry.x,GROUND-entry.floors*FLOOR_HEIGHT,entry.width,entry.floors*FLOOR_HEIGHT),false)
+		return
 	var top: float = GROUND - entry.floors * FLOOR_HEIGHT
 	var wall: Color = entry.wall.lerp(Color("735f72"), 0.68) if distant else entry.wall
 	draw_rect(Rect2(entry.x, top, entry.width, GROUND - top), wall)
@@ -462,11 +553,112 @@ func sign_at(caption: String, x: float, bottom: float, width: float, fill: Color
 	draw_string(font, Vector2(x - width / 2.0, bottom - 5), caption, HORIZONTAL_ALIGNMENT_CENTER, width, 13, Color("efdbcc"))
 
 func draw_player(at: Vector2) -> void:
-	var stride := roundf(sin(pace) * 4.0)
-	draw_rect(Rect2(at + Vector2(-10, -26), Vector2(9, 18)), Color("536c6f"))
-	draw_rect(Rect2(at + Vector2(-6, -29), Vector2(15, 21)), Color("b9b79b"))
-	draw_rect(Rect2(at + Vector2(-6, -41), Vector2(15, 14)), Color("d4d0af"))
-	draw_rect(Rect2(at + Vector2(facing * 4 - 5, -37), Vector2(11, 6)), Color("273746"))
-	draw_rect(Rect2(at + Vector2(facing * 6, -36), Vector2(3, 3)), Color("efc481"))
-	draw_rect(Rect2(at + Vector2(-6 + stride, -9), Vector2(6, 9)), Color("314652"))
-	draw_rect(Rect2(at + Vector2(3 - stride, -9), Vector2(6, 9)), Color("41505e"))
+	if is_instance_valid(hero_view): return
+	var texture: Texture2D = hero_textures.get("right" if facing >= 0 else "left")
+	if texture == null: return
+	var frame := int(animation_time*(12 if motion.running else 8))%4 if motion.moving else 0
+	var width := texture.get_width()/4.0
+	draw_texture_rect_region(texture,Rect2(at-Vector2(16,64),Vector2(32,64)),Rect2(frame*width,0,width,texture.get_height()))
+
+func draw_enemies() -> void:
+	for enemy in enemies:
+		if enemy.row != row or not building.is_empty(): continue
+		var sprite: Dictionary = enemy.sprite()
+		var texture: Texture2D = enemy_textures.get(enemy.definition.id)
+		if texture != null:
+			var count := maxi(1,int(sprite.get("frames",1)))
+			var frame: int = int(enemy.animation_clock*float(sprite.get("fps",8)))%count if enemy.action.ends_with("move") or enemy.action == "pounce" else 0
+			var width := float(sprite.get("width",128))
+			var height := float(sprite.get("height",32))
+			var target := Rect2(enemy.x-width/2,GROUND-height-enemy.attack_jump(),width,height)
+			var flip: bool = (enemy.facing > 0) == bool(sprite.get("faces_left",true))
+			if flip: target.position.x += target.size.x; target.size.x = -target.size.x
+			draw_texture_rect_region(texture,target,Rect2(frame*texture.get_width()/float(count),0,texture.get_width()/float(count),texture.get_height()))
+		if enemy.awareness > 0:
+			var top := GROUND-float(sprite.get("height",32))-12
+			draw_rect(Rect2(enemy.x-30,top,60,5),Color("292738"))
+			draw_rect(Rect2(enemy.x-30,top,60*enemy.awareness/100,5),Color("e87b75") if enemy.alerted else Color("efc488"))
+			if enemy.alerted: draw_string(font,Vector2(enemy.x-4,top-3),"!",HORIZONTAL_ALIGNMENT_LEFT,-1,18,Color("ff9690"))
+
+func target_key(target: Dictionary) -> String:
+	return target.get("kind","")+"/"+str(target.get("id",target.get("station",target.get("slot",""))))
+
+func has_visual_target(target: Dictionary) -> bool:
+	var key := target_key(target)
+	return interaction_visuals.has(key) and interaction_visuals[key].control.visible
+
+func add_interaction_visual(target: Dictionary, placement: Dictionary, texture: Texture2D, display_size: Vector2, outline_only: bool = false) -> void:
+	if texture == null: return
+	var key := target_key(target)
+	if interaction_visuals.has(key): return
+	var control = preload("res://scenes/items/highlightable_item.tscn").instantiate()
+	add_child(control)
+	control.size = display_size
+	control.set_item(texture,"[ E ] "+target.caption)
+	control.caption.position.y = -48
+	control.visual.material.set_shader_parameter("outline_only",outline_only)
+	control.activated.connect(activate_visual.bind(target))
+	interaction_visuals[key] = {"control":control,"placement":placement,"size":display_size,"target":target}
+
+func activate_visual(target: Dictionary) -> void:
+	if target_key(interaction()) == target_key(target): interact()
+
+func setup_interaction_visuals() -> void:
+	var loader = preload("res://scripts/commerce/customer_catalog.gd")
+	var cabinet_texture: Texture2D = loader.load_texture("res://assets/textures/Locker.png")
+	for point in LOOT:
+		if point.has("cabinet"):
+			add_interaction_visual({"kind":"cabinet","id":point.cabinet,"caption":"打开柜子"},point,cabinet_texture,Vector2(28,48))
+	for npc in NPCS:
+		add_interaction_visual({"kind":"npc","id":npc.npc,"caption":"交谈 · "+npc.get("name",npc.npc)}, {"x":npc.x,"row":npc.row,"building":"","floor":0},npc_textures.get(npc.npc),Vector2(48,80))
+	var door_texture: Texture2D = loader.load_texture("res://assets/textures/Door.png")
+	for entry in BUILDINGS:
+		if not entry.get("texture","").is_empty(): building_textures[entry.id] = loader.load_texture(entry.texture)
+		add_interaction_visual({"kind":"enter","id":entry.id,"caption":"进入"+entry.name},{"x":door_x(entry),"row":entry.row,"building":"","floor":0},door_texture,Vector2(24,54))
+		add_interaction_visual({"kind":"leave","id":entry.id,"caption":"回到街道"},{"x":door_x(entry),"row":entry.row,"building":entry.id,"floor":0},door_texture,Vector2(24,54))
+	var mask := Image.create(128,64,false,Image.FORMAT_RGBA8);mask.fill(Color.TRANSPARENT)
+	mask.fill_rect(Rect2i(3,25,122,31),Color.WHITE);mask.fill_rect(Rect2i(32,3,51,38),Color.WHITE)
+	for center in [Vector2i(27,53),Vector2i(99,53)]:
+		for y in range(64):
+			for x in range(128):
+				if Vector2(center).distance_to(Vector2(x,y)) <= 10:mask.set_pixel(x,y,Color.WHITE)
+	for vehicle in VEHICLES:
+		add_interaction_visual({"kind":"vehicle","id":vehicle.id,"caption":"检查废弃汽车"},{"x":vehicle.x,"row":vehicle.row,"building":"","floor":0},ImageTexture.create_from_image(mask),Vector2(128,64),true)
+	var station_mask := Image.create(64,76,false,Image.FORMAT_RGBA8);station_mask.fill(Color.TRANSPARENT);station_mask.fill_rect(Rect2i(4,3,56,73),Color.WHITE)
+	for station in STATIONS:
+		add_interaction_visual({"kind":"extract","station":station.name,"caption":"从"+station.name+"站撤离"},{"x":station.x,"row":station.row,"building":"","floor":0},ImageTexture.create_from_image(station_mask),Vector2(64,76),true)
+	update_interaction_visuals()
+
+func update_interaction_visuals() -> void:
+	var active_key := target_key(interaction())
+	for key in interaction_visuals:
+		var entry: Dictionary = interaction_visuals[key]
+		var control: Control = entry.control
+		var point: Dictionary = entry.placement
+		control.visible = int(point.row) == row and point.get("building","") == building and int(point.get("floor",0)) == floor_index
+		if not building.is_empty() and not state.flashlight_on: control.visible = false
+		if not control.visible: continue
+		control.position = Vector2(float(point.x)-camera_offset()-entry.size.x/2,GROUND-floor_index*FLOOR_HEIGHT-entry.size.y)
+		var local := control.get_local_mouse_position()
+		var hover: bool = control.get_rect().has_point(control.position+local) and control._has_point(local)
+		control.set_highlighted(key == active_key or hover)
+	update_hero_visual()
+	var current_prompt := active_key if has_visual_target(interaction()) else ""
+	if current_prompt != visual_prompt_key:
+		visual_prompt_key = current_prompt
+		moved.emit()
+
+func update_hero_visual() -> void:
+	if not is_instance_valid(hero_view): return
+	var direction := "right" if facing >= 0 else "left"
+	var texture: Texture2D = hero_textures.get(direction)
+	if texture == null: return
+	var frame := int(animation_time*(12 if motion.running else 8))%4 if motion.moving else 0
+	var key := direction+str(frame)
+	if key != hero_frame_key:
+		hero_frame_key = key
+		var atlas := AtlasTexture.new()
+		atlas.atlas = texture
+		atlas.region = Rect2(frame*texture.get_width()/4.0,0,texture.get_width()/4.0,texture.get_height())
+		hero_view.texture = atlas
+	hero_view.position = Vector2(player_x-camera_offset()-16,GROUND-floor_index*FLOOR_HEIGHT-64)

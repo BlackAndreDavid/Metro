@@ -27,16 +27,14 @@ func update_location() -> void:
 		queue_redraw()
 
 func columns() -> int:
-	var count := 1
-	for street_row in street.CELL_NAMES: count = maxi(count,street_row.size())
-	return count
+	return maxi(1,ceili(street.WIDTH/street.SEGMENT))
 
 func spacing() -> Vector2:
 	return Vector2(minf(SPACING.x,(size.x-64)/maxi(1,columns()-1)),minf(SPACING.y,(size.y-60)/maxi(1,street.CELL_NAMES.size()-1)))
 
 func center(point: Vector2i) -> Vector2:
 	var span := Vector2(columns() - 1, street.CELL_NAMES.size() - 1) * spacing()
-	return (size - span) * 0.5 + Vector2(point) * spacing()
+	return (size - span) * 0.5 + Vector2(float(point.x)+street.street_start(point.y)/street.SEGMENT,float(point.y)) * spacing()
 
 func _draw() -> void:
 	if street == null:

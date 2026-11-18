@@ -1,231 +1,420 @@
 {
-	"buildings": [
-		{
-			"floors": 1,
-			"id": "lab",
-			"name": "实习工坊",
-			"row": 0,
-			"wall": "#5e5a61",
-			"width": 190.0,
-			"x": 205.0
-		},
-		{
-			"floors": 2,
-			"id": "school",
-			"name": "教学楼",
-			"row": 0,
-			"wall": "#736163",
-			"width": 266.0,
-			"x": 574.0
-		},
-		{
-			"floors": 1,
-			"id": "campus_shop",
-			"name": "校门书店",
-			"row": 0,
-			"wall": "#59576a",
-			"width": 165.0,
-			"x": 1150.0
-		},
-		{
-			"floors": 1,
-			"id": "shop",
-			"name": "文具店",
-			"row": 1,
-			"wall": "#635957",
-			"width": 198.0,
-			"x": 88.0
-		},
-		{
-			"floors": 2,
-			"id": "office",
-			"name": "街道办事处",
-			"row": 1,
-			"wall": "#4d6061",
-			"width": 255.0,
-			"x": 585.0
-		},
-		{
-			"floors": 2,
-			"id": "tower",
-			"name": "写字楼",
-			"row": 1,
-			"wall": "#4b5964",
-			"width": 201.0,
-			"x": 1416.0
-		},
-		{
-			"floors": 1,
-			"id": "service",
-			"name": "社区服务站",
-			"row": 2,
-			"wall": "#625957",
-			"width": 152.0,
-			"x": 372.0
-		},
-		{
-			"floors": 2,
-			"id": "dorm",
-			"name": "学生宿舍",
-			"row": 2,
-			"wall": "#655664",
-			"width": 267.0,
-			"x": 600.0
-		},
-		{
-			"floors": 1,
-			"id": "repair",
-			"name": "沿街维修铺",
-			"row": 2,
-			"wall": "#635552",
-			"width": 235.0,
-			"x": 1224.0
-		}
-	],
-	"cell_names": [
-		[
-			"校园西街",
-			"教学楼",
-			"同济大学"
-		],
-		[
-			"文具店",
-			"四平路",
-			"办公街"
-		],
-		[
-			"邮电新村",
-			"学生宿舍",
-			"沿街商铺"
-		]
-	],
-	"floor_height": 110.0,
-	"ground": 416.0,
-	"id": "postal",
-	"junctions": [
-		{
-			"row": 0,
-			"x": 478.0
-		},
-		{
-			"row": 0,
-			"x": 1364.0
-		},
-		{
-			"row": 1,
-			"x": 324.0
-		},
-		{
-			"row": 1,
-			"x": 908.0
-		}
-	],
-	"loot": [
-		{
-			"building": "",
-			"floor": 0,
-			"row": 2,
-			"x": 217.0
-		},
-		{
-			"building": "dorm",
-			"floor": 0,
-			"row": 2,
-			"x": 726.0
-		},
-		{
-			"building": "dorm",
-			"floor": 1,
-			"row": 2,
-			"x": 745.0
-		},
-		{
-			"building": "office",
-			"floor": 1,
-			"row": 1,
-			"x": 752.0
-		},
-		{
-			"building": "shop",
-			"floor": 0,
-			"row": 1,
-			"x": 210.0
-		},
-		{
-			"building": "school",
-			"floor": 1,
-			"row": 0,
-			"x": 719.0
-		},
-		{
-			"building": "tower",
-			"floor": 1,
-			"row": 1,
-			"x": 1495.0
-		},
-		{
-			"building": "repair",
-			"floor": 0,
-			"row": 2,
-			"x": 1361.0
-		},
-		{
-			"building": "campus_shop",
-			"floor": 0,
-			"row": 0,
-			"x": 1265.0
-		},
-		{
-			"building": "",
-			"floor": 0,
-			"row": 2,
-			"x": 272.0
-		}
-	],
-	"loot_station": "邮电新村",
-	"name": "邮电新村街区",
-	"segment": 560.0,
-	"stations": [
-		{
-			"name": "同济大学",
-			"row": 0,
-			"x": 1542.0
-		},
-		{
-			"name": "四平路",
-			"row": 1,
-			"x": 1042.0
-		},
-		{
-			"name": "邮电新村",
-			"row": 2,
-			"x": 88.0
-		}
-	],
-	"vehicles": [
-		{
-			"color": "#846268",
-			"id": "dorm_sedan",
-			"row": 2,
-			"x": 535.0
-		},
-		{
-			"color": "#677378",
-			"id": "repair_sedan",
-			"row": 2,
-			"x": 1560.0
-		},
-		{
-			"color": "#79777e",
-			"id": "office_sedan",
-			"row": 1,
-			"x": 1184.0
-		},
-		{
-			"color": "#7d7562",
-			"id": "campus_sedan",
-			"row": 0,
-			"x": 1448.0
-		}
-	]
+  "buildings": [
+    {
+      "floors": 1,
+      "id": "lab",
+      "name": "实习工坊",
+      "row": 0,
+      "wall": "#5e5a61",
+      "width": 190.0,
+      "x": 205.0
+    },
+    {
+      "floors": 2,
+      "id": "school",
+      "name": "教学楼",
+      "row": 0,
+      "wall": "#736163",
+      "width": 266.0,
+      "x": 574.0,
+      "loot_points": [
+        {
+          "id": "legacy_5",
+          "x": 145.0,
+          "floor": 1,
+          "chance": 1,
+          "rolls": 1,
+          "choices": [
+            {
+              "kind": "book",
+              "weight": 45
+            },
+            {
+              "kind": "copper",
+              "weight": 35
+            },
+            {
+              "kind": "water",
+              "weight": 20
+            }
+          ],
+          "legacy_slot": 5
+        }
+      ]
+    },
+    {
+      "floors": 1,
+      "id": "campus_shop",
+      "name": "校门书店",
+      "row": 0,
+      "wall": "#59576a",
+      "width": 165.0,
+      "x": 1150.0,
+      "loot_points": [
+        {
+          "id": "legacy_8",
+          "x": 115.0,
+          "floor": 0,
+          "chance": 1,
+          "rolls": 1,
+          "choices": [
+            {
+              "kind": "book",
+              "weight": 45
+            },
+            {
+              "kind": "copper",
+              "weight": 35
+            },
+            {
+              "kind": "water",
+              "weight": 20
+            }
+          ],
+          "legacy_slot": 8
+        }
+      ]
+    },
+    {
+      "floors": 1,
+      "id": "shop",
+      "name": "文具店",
+      "row": 1,
+      "wall": "#635957",
+      "width": 198.0,
+      "x": 88.0,
+      "loot_points": [
+        {
+          "id": "legacy_4",
+          "x": 122.0,
+          "floor": 0,
+          "chance": 1,
+          "rolls": 1,
+          "choices": [
+            {
+              "kind": "book",
+              "weight": 45
+            },
+            {
+              "kind": "copper",
+              "weight": 35
+            },
+            {
+              "kind": "water",
+              "weight": 20
+            }
+          ],
+          "legacy_slot": 4
+        }
+      ]
+    },
+    {
+      "floors": 2,
+      "id": "office",
+      "name": "街道办事处",
+      "row": 1,
+      "wall": "#4d6061",
+      "width": 255.0,
+      "x": 585.0,
+      "loot_points": [
+        {
+          "id": "legacy_3",
+          "x": 167.0,
+          "floor": 1,
+          "chance": 1,
+          "rolls": 1,
+          "choices": [
+            {
+              "kind": "book",
+              "weight": 45
+            },
+            {
+              "kind": "copper",
+              "weight": 35
+            },
+            {
+              "kind": "water",
+              "weight": 20
+            }
+          ],
+          "legacy_slot": 3
+        }
+      ]
+    },
+    {
+      "floors": 2,
+      "id": "tower",
+      "name": "写字楼",
+      "row": 1,
+      "wall": "#4b5964",
+      "width": 201.0,
+      "x": 1416.0,
+      "loot_points": [
+        {
+          "id": "legacy_6",
+          "x": 79.0,
+          "floor": 1,
+          "chance": 1,
+          "rolls": 1,
+          "choices": [
+            {
+              "kind": "book",
+              "weight": 45
+            },
+            {
+              "kind": "copper",
+              "weight": 35
+            },
+            {
+              "kind": "water",
+              "weight": 20
+            }
+          ],
+          "legacy_slot": 6
+        }
+      ]
+    },
+    {
+      "floors": 1,
+      "id": "service",
+      "name": "社区服务站",
+      "row": 2,
+      "wall": "#625957",
+      "width": 152.0,
+      "x": 372.0,
+      "loot_points": [
+        {
+          "id": "legacy_0",
+          "x": 12,
+          "floor": 0,
+          "chance": 1,
+          "rolls": 1,
+          "choices": [
+            {
+              "kind": "book",
+              "weight": 45
+            },
+            {
+              "kind": "copper",
+              "weight": 35
+            },
+            {
+              "kind": "water",
+              "weight": 20
+            }
+          ],
+          "legacy_slot": 0
+        },
+        {
+          "id": "legacy_9",
+          "x": 12,
+          "floor": 0,
+          "chance": 1,
+          "rolls": 1,
+          "choices": [
+            {
+              "kind": "book",
+              "weight": 45
+            },
+            {
+              "kind": "copper",
+              "weight": 35
+            },
+            {
+              "kind": "water",
+              "weight": 20
+            }
+          ],
+          "legacy_slot": 9
+        }
+      ]
+    },
+    {
+      "floors": 2,
+      "id": "dorm",
+      "name": "学生宿舍",
+      "row": 2,
+      "wall": "#655664",
+      "width": 267.0,
+      "x": 600.0,
+      "loot_points": [
+        {
+          "id": "legacy_1",
+          "x": 126.0,
+          "floor": 0,
+          "chance": 1,
+          "rolls": 1,
+          "choices": [
+            {
+              "kind": "book",
+              "weight": 45
+            },
+            {
+              "kind": "copper",
+              "weight": 35
+            },
+            {
+              "kind": "water",
+              "weight": 20
+            }
+          ],
+          "legacy_slot": 1
+        },
+        {
+          "id": "legacy_2",
+          "x": 145.0,
+          "floor": 1,
+          "chance": 1,
+          "rolls": 1,
+          "choices": [
+            {
+              "kind": "book",
+              "weight": 45
+            },
+            {
+              "kind": "copper",
+              "weight": 35
+            },
+            {
+              "kind": "water",
+              "weight": 20
+            }
+          ],
+          "legacy_slot": 2
+        }
+      ]
+    },
+    {
+      "floors": 1,
+      "id": "repair",
+      "name": "沿街维修铺",
+      "row": 2,
+      "wall": "#635552",
+      "width": 235.0,
+      "x": 1224.0,
+      "loot_points": [
+        {
+          "id": "legacy_7",
+          "x": 137.0,
+          "floor": 0,
+          "chance": 1,
+          "rolls": 1,
+          "choices": [
+            {
+              "kind": "book",
+              "weight": 45
+            },
+            {
+              "kind": "copper",
+              "weight": 35
+            },
+            {
+              "kind": "water",
+              "weight": 20
+            }
+          ],
+          "legacy_slot": 7
+        }
+      ]
+    }
+  ],
+  "cell_names": [
+    [
+      "校园西街",
+      "教学楼",
+      "同济大学"
+    ],
+    [
+      "文具店",
+      "四平路",
+      "办公街"
+    ],
+    [
+      "邮电新村",
+      "学生宿舍",
+      "沿街商铺"
+    ]
+  ],
+  "floor_height": 110.0,
+  "ground": 416.0,
+  "id": "postal",
+  "junctions": [
+    {
+      "row": 0,
+      "x": 478.0
+    },
+    {
+      "row": 0,
+      "x": 1364.0
+    },
+    {
+      "row": 1,
+      "x": 324.0
+    },
+    {
+      "row": 1,
+      "x": 908.0
+    }
+  ],
+  "loot": [],
+  "loot_station": "邮电新村",
+  "name": "邮电新村街区",
+  "segment": 560.0,
+  "stations": [
+    {
+      "name": "同济大学",
+      "row": 0,
+      "x": 1542.0
+    },
+    {
+      "name": "四平路",
+      "row": 1,
+      "x": 1042.0
+    },
+    {
+      "name": "邮电新村",
+      "row": 2,
+      "x": 88.0
+    }
+  ],
+  "vehicles": [
+    {
+      "color": "#846268",
+      "id": "dorm_sedan",
+      "row": 2,
+      "x": 535.0
+    },
+    {
+      "color": "#677378",
+      "id": "repair_sedan",
+      "row": 2,
+      "x": 1560.0
+    },
+    {
+      "color": "#79777e",
+      "id": "office_sedan",
+      "row": 1,
+      "x": 1184.0
+    },
+    {
+      "color": "#7d7562",
+      "id": "campus_sedan",
+      "row": 0,
+      "x": 1448.0
+    }
+  ],
+  "monsters": [
+    {
+      "id": "rat_1",
+      "enemy": "mutant_rat",
+      "row": 2,
+      "x": 448.0,
+      "facing": -1
+    }
+  ],
+  "street_starts": [
+    0,
+    0,
+    0
+  ]
 }

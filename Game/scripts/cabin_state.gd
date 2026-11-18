@@ -32,7 +32,8 @@ const EPOCH := "2026-07-11T00:00:00"
 const CABIN_SAVE_VERSION := 15
 const CustomerDialogue = preload("res://scripts/commerce/customer_dialogue.gd")
 const CustomerOrders = preload("res://scripts/commerce/customer_orders.gd")
-const ITEM_DEFINITIONS := {"computer": preload("res://resources/items/computer.tres")}
+const ItemCatalog = preload("res://scripts/items/item_catalog.gd")
+static var ITEM_DEFINITIONS: Dictionary = {}
 const Furniture = preload("res://scripts/items/furniture_catalog.gd")
 const MAX_CARRIAGES := 3
 const EXPANSION_COST := {"steel_plate": 2, "bolts": 4, "tools": 1}
@@ -88,6 +89,7 @@ var trip_loot_station := ""
 var auto_repair_level := 0
 
 func _init() -> void:
+	ITEM_DEFINITIONS = ItemCatalog.resources()
 	account = ACCOUNT_START_POWER
 	give_starter_supplies()
 	add_supply("computer", "locker")
@@ -176,10 +178,10 @@ func item_name(kind: String) -> String:
 	return ITEMS[kind].name
 
 func rarity_name(kind: String) -> String:
-	return RARITY_NAMES[RARITY[kind]]
+	return RARITY_NAMES[int(ItemCatalog.definition(kind).get("rarity",RARITY.get(kind,0)))]
 
 func rarity_color(kind: String) -> Color:
-	return RARITY_COLORS[RARITY[kind]]
+	return RARITY_COLORS[int(ItemCatalog.definition(kind).get("rarity",RARITY.get(kind,0)))]
 
 func bag_size() -> Vector2i:
 	return LARGE if wide_bag else SMALL
@@ -820,7 +822,7 @@ func read_cargo(raw: Variant, bounds: Vector2i) -> Dictionary:
 		return {}
 	var cargo: Array[Dictionary] = []
 	for entry in raw:
-		if not entry is Dictionary or not FOOTPRINTS.has(entry.get("kind")) or not entry.get("rotated") is bool:
+		if not entry is Dictionary or not ITEM_DEFINITIONS.has(entry.get("kind")) or not entry.get("rotated") is bool:
 			return {}
 		if not valid_index(entry.get("x"), 0, bounds.x - 1) or not valid_index(entry.get("y"), 0, bounds.y - 1):
 			return {}

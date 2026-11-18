@@ -631,7 +631,9 @@ func confirm_departure() -> void:
 			while state.trip_loot.size() < points.size():
 				state.trip_loot.append(["copper","book","tools","aaa"][state.station_roll(state.station,"editor-loot/%d" % state.trip_loot.size(),3)])
 			for i in range(points.size()):
-				if not points[i].get("kind","").is_empty(): state.trip_loot[i] = points[i].kind
+				if points[i].has("choices"):
+					state.trip_loot[i] = preload("res://scripts/exploration/loot_table.gd").roll(state,points[i],loot_station,i)
+				elif not points[i].get("kind","").is_empty(): state.trip_loot[i] = points[i].kind
 		var debt_note := added_debt_note(previous_debt)
 		show_surface("防护服已租用" + debt_note if not debt_note.is_empty() else "")
 	else:
@@ -721,7 +723,7 @@ func update_surface_position() -> void:
 		title = "%s · %d 楼" % [location.name, surface_block.floor_index + 1]
 	surface_location.text = title
 	var target: Dictionary = surface_block.interaction()
-	surface_prompt.text = "" if target.is_empty() else "[ E ]  " + target.caption
+	surface_prompt.text = "" if target.is_empty() or surface_block.has_visual_target(target) else "[ E ]  " + target.caption
 	if not location.is_empty() and not state.flashlight_on and target.is_empty():
 		surface_prompt.text = "[ 1 ]  打开手电筒"
 	if selection.get("source") == "ground" and not surface_block.can_take(selection.id):

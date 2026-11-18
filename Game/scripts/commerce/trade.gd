@@ -87,7 +87,7 @@ func show_items(parent: Control, title: String, stock: bool, order: Dictionary) 
 			add_card(rows,{"source":"stock","kind":kind},kind,Orders.price(state,order,kind),"库存 %d" % order.stock[kind])
 	else:
 		for entry in state.inventory:
-			var value := Orders.price(state,order,entry.kind,int(entry.get("charge",100))) if not order.is_empty() and Orders.BASE_PRICES.has(entry.kind) else 0.0
+			var value := Orders.price(state,order,entry.kind,int(entry.get("charge",100))) if not order.is_empty() and not Orders.ItemCatalog.definition(entry.kind).is_empty() else 0.0
 			add_card(rows,{"source":"bag","id":entry.id},entry.kind,value,"%s类" % Orders.CATEGORIES[Orders.category_of(entry.kind)].name if not Orders.category_of(entry.kind).is_empty() else "非订单商品")
 
 func add_card(parent: Control, payload: Dictionary, kind: String, value: float, detail: String) -> void:

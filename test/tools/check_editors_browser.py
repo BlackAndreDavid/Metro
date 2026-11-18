@@ -8,7 +8,7 @@ output=root/'test/results/editor-ui';output.mkdir(parents=True,exist_ok=True)
 godot=os.environ.get('METRO_GODOT','/workspace/tools/godot-4.7.2/Godot_v4.7.2-stable_linux.x86_64')
 with tempfile.TemporaryDirectory(prefix='metro-editor-browser-') as scratch:
  game=Path(scratch)/'Game'
- shutil.copytree(root/'Game/content',game/'content');shutil.copytree(root/'Game/assets/textures/customers',game/'assets/textures/customers');shutil.copy2(root/'Game/project.godot',game/'project.godot')
+ shutil.copytree(root/'Game/content',game/'content');shutil.copytree(root/'Game/assets/textures',game/'assets/textures');shutil.copy2(root/'Game/project.godot',game/'project.godot')
  server=subprocess.Popen(['python3','tools/editors/server.py','--project',str(game),'--port','0','--no-browser'],cwd=root,stdout=subprocess.PIPE,text=True)
  try:
   url=server.stdout.readline().strip().split('Metro editors: ',1)[1]

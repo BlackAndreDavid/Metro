@@ -21,7 +21,7 @@ python test/tools/run_tests.py --godot "C:\Godot\Godot_v4.7.2-stable_win64.exe"
 
 ## 用例与工具
 
-统一入口目前包含13组：导入、10组 Godot 流程、美术工具、内容编辑器。内容编辑器组还会在隔离 Game 副本中进行资源导入、Godot 关卡预览和剧情运行检查。
+统一入口目前包含15组：导入、11组 Godot 流程、临时素材、美术工具、内容编辑器。内容编辑器组还会在隔离 Game 副本中进行资源导入、Godot 关卡预览和剧情运行检查。
 
 | 用例 | 覆盖内容 |
 | --- | --- |
@@ -34,6 +34,10 @@ python test/tools/run_tests.py --godot "C:\Godot\Godot_v4.7.2-stable_win64.exe"
 | `cases/test_art_tools.py` | 区域中位数、像素块多数色、动画帧对齐、筛选和文生图离线契约 |
 | `cases/test_content_editors.py` | 编辑 API、输入/引用校验、稳定 ID、Godot 接口及场景导出 |
 | `cases/test_content_runtime.gd` | 由上述 Python 用例调用：新增头像、剧情恢复、关系去重、跨日事件、地图和 NPC |
+| `cases/test_exploration_systems.gd` | 真实Shift输入、体力/减速、噪声与警觉、扑击、柜子、共用高亮及偏移街道 |
+| `cases/test_temp_art.py` | 51份Aseprite的全部帧与运行PNG逐像素一致 |
+| `tools/check_content_catalogs_browser.py` | 新目录增删/恢复、素材选择、加权柜子、偏移起点、怪物拖放与实例编辑 |
+| `tools/capture_exploration.gd` | 可选角色/老鼠/体力、柜子描边及内容窗口渲染截图 |
 | `tools/run_tests.py` | 统一运行、隔离环境、超时控制及结果汇总 |
 | `tools/check_editors_browser.py` | 可选真实浏览器的卡片/地图/对话编辑流程 |
 | `tools/capture_home.gd`、`capture_content_story.gd` | 可选 Home/装修与剧情渲染截图 |
@@ -71,3 +75,5 @@ Godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Du
 ```
 
 `capture_content_story.gd` 使用相同环境与参数方式，输出剧情优先级、分支和结束截图。截图需要人工检查，自动检查不覆盖主观画面和音频体验。
+
+新增目录的真实鼠标检查：`python test/tools/check_content_catalogs_browser.py`。同样使用隔离项目，截图输出至 `results/catalog-ui/`。

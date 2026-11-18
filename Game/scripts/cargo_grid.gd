@@ -88,21 +88,21 @@ func _draw() -> void:
 		draw_rect(Rect2(rect.position + Vector2(4, 4), Vector2(rect.size.x - 8, 3)), tint)
 		var short_name: String = {"copper": "铜线", "tools": "工具", "book": "手册", "meds": "医疗", "circuit": "电路", "powercore": "电源", "relic": "相机", "aaa": "电池", "water": "饮水", "ration": "口粮", "car_battery": "车电池"}.get(entry.kind, host.state.item_name(entry.kind))
 		var title: String = host.state.item_name(entry.kind) if box.size.x >= 2 else short_name
-		draw_string(host.font, rect.position + Vector2(7, 28), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color("f0ebdf"))
-		if host.state.ITEM_DEFINITIONS.has(entry.kind):
+		draw_string(host.font, rect.position + Vector2(5, rect.size.y-5), title, HORIZONTAL_ALIGNMENT_CENTER, rect.size.x-10, 12, Color("f0ebdf"))
+		if host.state.ITEM_DEFINITIONS.has(entry.kind) and host.state.ITEM_DEFINITIONS[entry.kind].texture != null:
 			var texture: Texture2D = host.state.ITEM_DEFINITIONS[entry.kind].texture
-			var area := rect.size - Vector2(12, 44)
+			var area := (rect.size-Vector2(12,24)).max(Vector2(8,8))
 			var raw := Vector2(texture.get_size())
 			var oriented := Vector2(raw.y, raw.x) if entry.rotated else raw
 			var fit := minf(area.x / oriented.x, area.y / oriented.y)
-			var center := rect.position + Vector2(rect.size.x / 2, 36 + area.y / 2)
+			var center := rect.position+rect.size/2-Vector2(0,6)
 			draw_set_transform(center, PI / 2 if entry.rotated else 0.0)
 			draw_texture_rect(texture, Rect2(-raw * fit / 2, raw * fit), false)
 			draw_set_transform(Vector2.ZERO)
 		if entry.kind == "aaa":
-			draw_string(host.font, rect.position + Vector2(7, 43), "%d%%" % entry.charge, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, tint)
+			draw_string(host.font, rect.position+Vector2(rect.size.x-30,13), "%d%%" % entry.charge, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, tint)
 		elif box.size.y >= 2:
-			draw_string(host.font, rect.end + Vector2(-39, -10), "%d×%d" % [box.size.x, box.size.y], HORIZONTAL_ALIGNMENT_LEFT, -1, 13, tint)
+			draw_string(host.font, rect.position+Vector2(rect.size.x-27,13), "%d×%d" % [box.size.x, box.size.y], HORIZONTAL_ALIGNMENT_LEFT, -1, 13, tint)
 	if host.selection.is_empty() or not Rect2i(Vector2i.ZERO, bounds).has_point(hover_cell):
 		return
 	var selected: Dictionary = host.state.picked(host.selection.source, host.selection.id)

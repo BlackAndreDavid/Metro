@@ -45,6 +45,70 @@ def resource(path):
     require(resolved.is_relative_to(GAME.resolve()),'资源必须位于 Game 内')
     return resolved
 
+def catalog(name,key):
+    path=GAME/'content'/(name+'.json')
+    return read(path if path.exists() else ROOT/'Game/content'/(name+'.json')).get(key,[])
+def item_ids(): return {v['id'] for v in catalog('items','items')}
+def upsert_catalog(name,key,data):
+    entries=catalog(name,key);old=next((e for e in entries if e['id']==data['id']),None)
+    if old is not None: entries[entries.index(old)]=data
+    else:entries.append(data)
+    atomic(GAME/'content'/(name+'.json'),{'version':1,key:entries})
+def validate_texture(path,optional=False):
+    if optional and not path:return
+    file=resource(path);require(file.is_file() and file.suffix.lower()=='.png','请选择工程内PNG或上传素材')
+def validate_enemy(data):
+    require(isinstance(data,dict) and ID.fullmatch(data.get('id','')) and isinstance(data.get('name'),str) and data['name'],'怪物ID或名称无效')
+    require(isinstance(data.get('enabled',True),bool),'启用状态无效')
+    sprite=data.get('sprite',{});validate_texture(sprite.get('texture',''))
+    require(integer(sprite.get('frames'),1,64) and number(sprite.get('fps'),0.1,60),'动画帧数/帧率无效')
+    with Image.open(resource(sprite['texture'])) as image: require(image.width%int(sprite['frames'])==0,'横向帧条宽度必须能被帧数整除')
+    for key in ['width','height','collision_width','collision_height']:require(number(sprite.get(key),1,1024),'显示或碰撞尺寸无效')
+    movement=data.get('movement',{})
+    for key in ['patrol_speed','chase_speed']:require(number(movement.get(key),0,2000),'移动速度无效')
+    for key in ['patrol_min','patrol_max','wait_seconds','chase_seconds']:require(number(movement.get(key),0.05,60),'移动/停留时间无效')
+    require(movement['patrol_min']<=movement['patrol_max'],'最短巡逻时间不能大于最长时间')
+    alert=data.get('alert',{})
+    for key in ['cone_length','circle_radius']:require(number(alert.get(key),0,4096),'警觉距离无效')
+    require(number(alert.get('cone_angle'),0,360),'视锥角度无效')
+    for key in ['visual_gain','sound_gain','decay_per_second']:require(number(alert.get(key),0,100),'警觉增减量无效')
+    attack=data.get('attack',{})
+    require(number(attack.get('jump_height',24),0,256),'扑起高度无效')
+    for key in ['range','speed']:require(number(attack.get(key),0,4096),'攻击距离/速度无效')
+    for key in ['duration','recovery']:require(number(attack.get(key),0.05,60),'攻击时间无效')
+    require(number(attack.get('time_penalty'),0,90) and number(attack.get('slow_seconds'),0,60) and number(attack.get('slow_multiplier'),0.05,1),'攻击效果无效')
+def validate_item(data):
+    require(isinstance(data,dict) and ID.fullmatch(data.get('id','')) and isinstance(data.get('name'),str) and data['name'],'物品ID或名称无效')
+    require(integer(data.get('width'),1,8) and integer(data.get('height'),1,8),'物品占格必须为1～8')
+    require(number(data.get('price'),0,1000000) and integer(data.get('rarity'),0,3) and data.get('category') in CATEGORIES|{'none'},'物品价格、稀有度或类别无效')
+    validate_texture(data.get('texture',''))
+def validate_points(building):
+    points=building.get('loot_points',[]);require(isinstance(points,list) and len(points)<=32,'每栋建筑最多32个柜子点位')
+    ids=set()
+    for point in points:
+        require(ID.fullmatch(point.get('id','')) and point['id'] not in ids,'柜子ID无效或重复');ids.add(point['id'])
+        require(number(point.get('x'),0,building['width']) and integer(point.get('floor'),0,building['floors']-1),'柜子位置/楼层无效')
+        require(number(point.get('chance'),0,1) and integer(point.get('rolls'),1,8),'生成概率或抽取次数无效')
+        choices=point.get('choices',[])
+        require(isinstance(choices,list) and 0<len(choices)<=100 and all(c.get('kind') in item_ids() and number(c.get('weight'),0,100000) for c in choices) and sum(c['weight'] for c in choices)>0,'掉落物品或权重无效')
+def migrate_level(data):
+    data=copy.deepcopy(data)
+    for i,point in enumerate(data.get('loot',[])):
+        owner=next((b for b in data['buildings'] if b['id']==point.get('building')),None)
+        if owner is None:
+            candidates=[b for b in data['buildings'] if b['row']==point['row']]
+            if candidates:owner=min(candidates,key=lambda b:abs(b['x']+b['width']/2-point['x']))
+            else:
+                starts=data.get('street_starts',[0]*len(data['cell_names']));lo=starts[point['row']];hi=lo+data['segment']*len(data['cell_names'][point['row']])
+                owner={'id':'cache_house_'+str(i),'name':'储物间','row':point['row'],'x':max(lo+24,min(hi-124,point['x']-50)),'width':100,'floors':1,'wall':'#625957'};data['buildings'].append(owner)
+        kind=point.get('kind','')
+        choices=[{'kind':kind,'weight':1}] if kind else [{'kind':'book','weight':45},{'kind':'copper','weight':35},{'kind':'water','weight':20}]
+        owner.setdefault('loot_points',[]).append({'id':'legacy_'+str(i),'x':max(12,min(owner['width']-12,point['x']-owner['x'])),'floor':min(point.get('floor',0),owner['floors']-1),'chance':1,'rolls':1,'choices':choices,'legacy_slot':i})
+    data['loot']=[]
+    data.setdefault('monsters',[])
+    data.setdefault('street_starts',[0]*len(data['cell_names']))
+    return data
+
 def conditions(value):
     require(isinstance(value,dict),'条件必须是对象')
     allowed={'stations','day_min','day_max','account_min','account_max','debt_min','debt_max','completed_min','has_items','flags_all','flags_none','blackout','affection_min','affection_max','trust_min','trust_max','events_all'}
@@ -52,7 +116,7 @@ def conditions(value):
     for key,term in value.items():
         if key=='stations': require(isinstance(term,list) and set(term)<=set(read(GAME/'content/stations.json')),'条件站点无效')
         elif key in ['flags_all','flags_none','events_all']: require(isinstance(term,list) and all(isinstance(x,str) and 0<len(x)<=128 for x in term),'标记条件须为字符串数组')
-        elif key=='has_items': require(isinstance(term,dict) and all(k in ITEMS and integer(v,1,1000) for k,v in term.items()),'物品条件无效')
+        elif key=='has_items': require(isinstance(term,dict) and all(k in item_ids() and integer(v,1,1000) for k,v in term.items()),'物品条件无效')
         elif key=='blackout': require(isinstance(term,bool),'停电条件须为布尔值')
         else: require(number(term,-100 if key.startswith(('affection','trust')) else 0,1000000),'数值条件超出范围')
 
@@ -117,14 +181,17 @@ def validate_level(station,data):
     require(isinstance(cells,list) and 1<=len(cells)<=8 and all(isinstance(r,list) and 1<=len(r)<=8 for r in cells),'地图须为1–8条街道、每条1–8个分段')
     require(all(isinstance(n,str) and n for r in cells for n in r),'地图格名称无效')
     width=data['segment']*max(map(len,cells))
-    def row_width(row): return data['segment']*len(cells[int(row)])
+    starts=data.get('street_starts',[0]*len(cells))
+    require(isinstance(starts,list) and len(starts)==len(cells) and all(number(x,0,8000) for x in starts),'街道起点须为0～8000，数量须与街道一致')
+    def row_start(row):return starts[int(row)]
+    def row_width(row): return row_start(row)+data['segment']*len(cells[int(row)])
     require(data.get('loot_station') in read(GAME/'content/stations.json'),'战利品来源站无效')
     for key in ['stations','buildings','junctions','loot','vehicles']:
         require(isinstance(data.get(key),list) and len(data[key])<=200,'地图对象列表无效')
         for entry in data[key]:
             require(isinstance(entry,dict) and integer(entry.get('row'),0,len(cells)-2 if key=='junctions' else len(cells)-1),'对象街道无效')
             limit=min(row_width(entry['row']),row_width(entry['row']+1)) if key=='junctions' else row_width(entry['row'])
-            require(number(entry.get('x'),24,limit-24),'对象横坐标超出所在街道；巷口必须位于相邻街道共同范围')
+            require(number(entry.get('x'),(max(row_start(entry['row']),row_start(entry['row']+1)) if key=='junctions' else row_start(entry['row']))+24,limit-24),'对象横坐标超出所在街道；巷口必须位于相邻街道共同范围')
     require(any(s.get('name')==station for s in data['stations']),'关卡必须有本站入口/撤离口')
     require(all(s.get('name') in read(GAME/'content/stations.json') for s in data['stations']),'撤离站点名称无效')
     require(number(data.get('grid_size',20),5,200),'栅格大小须在5～200')
@@ -134,25 +201,38 @@ def validate_level(station,data):
     placed=set()
     for npc in npcs:
         require(isinstance(npc,dict) and npc.get('npc') in known and npc['npc'] not in placed,'NPC不存在或在关卡内重复'); placed.add(npc['npc'])
-        require(integer(npc.get('row'),0,len(cells)-1) and number(npc.get('x'),24,row_width(npc['row'])-24),'NPC位置无效')
+        require(integer(npc.get('row'),0,len(cells)-1) and number(npc.get('x'),row_start(npc['row'])+24,row_width(npc['row'])-24),'NPC位置无效')
     buildings={}
     for building in data['buildings']:
         require(ID.fullmatch(building.get('id','')) and building['id'] not in buildings,'建筑ID无效或重复')
         require(isinstance(building.get('name'),str) and building['name'] and number(building.get('width'),100,width) and building['x']+building['width']<=row_width(building['row']),'建筑名称、宽度或边界无效')
         require(integer(building.get('floors'),1,2) and building['floors']*data['floor_height']<=data['ground'],'建筑楼层超出画面')
         require(re.fullmatch(r'#[0-9a-fA-F]{6}',building.get('wall','')),'墙体颜色须为#RRGGBB')
+        validate_texture(building.get('texture',''),True)
+        validate_points(building)
+        collision=building.get('collision',{})
+        if collision:require(all(number(collision.get(k),-4096 if k in ['x','y'] else 1,4096) for k in ['x','y','width','height']),'建筑碰撞箱无效')
         buildings[building['id']]=building
     vehicle_ids=set()
     for vehicle in data['vehicles']:
         require(ID.fullmatch(vehicle.get('id','')) and vehicle['id'] not in vehicle_ids,'汽车ID无效或重复'); vehicle_ids.add(vehicle['id'])
         require(re.fullmatch(r'#[0-9a-fA-F]{6}',vehicle.get('color','')),'汽车颜色须为#RRGGBB')
     for point in data['loot']:
-        require(point.get('kind','') in ITEMS|{''},'物资种类无效')
+        require(point.get('kind','') in item_ids()|{''},'物资种类无效')
         building=point.get('building','')
         require(not building or building in buildings,'物资引用的建筑不存在')
         require(integer(point.get('floor'),0,buildings[building]['floors']-1 if building else 0),'物资楼层无效')
         if building:
             b=buildings[building]; require(point['row']==b['row'] and b['x']<=point['x']<=b['x']+b['width'],'室内物资必须在对应建筑内')
+    definitions={e['id']:e for e in catalog('enemies','enemies')}
+    monsters=data.get('monsters',[]);require(isinstance(monsters,list) and len(monsters)<=200,'怪物布置无效')
+    ids=set()
+    for monster in monsters:
+        require(ID.fullmatch(monster.get('id','')) and monster['id'] not in ids and monster.get('enemy') in definitions,'怪物布置ID重复或类型不存在');ids.add(monster['id'])
+        require(integer(monster.get('row'),0,len(cells)-1) and monster.get('facing',-1) in [-1,1],'怪物街道或朝向无效')
+        half=definitions[monster['enemy']]['sprite']['collision_width']/2
+        require(number(monster.get('x'),row_start(monster['row'])+half,row_width(monster['row'])-half),'怪物碰撞箱超出所在街道')
+
 
 def save_customer(data):
     data=copy.deepcopy(data); create=data.pop('_create',False)
@@ -165,6 +245,8 @@ def save_customer(data):
     atomic(GAME/'content/customers.json',document)
 
 def save_level(station,data):
+    validate_level(station,data)
+    data=migrate_level(data)
     validate_level(station,data)
     slug='station_'+hashlib.sha256(station.encode()).hexdigest()[:12]
     scene=f'res://scenes/exploration/stations/{slug}.tscn'
@@ -216,14 +298,14 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         route=urlparse(self.path)
         try:
-            if route.path=='/api/project': return self.respond({'station_map':station_map(),'building_templates':read(GAME/'content/building_templates.json' if (GAME/'content/building_templates.json').exists() else ROOT/'Game/content/building_templates.json')['templates'],'settings':editor_settings(),'token':self.token,'stations':read(GAME/'content/stations.json'),'customers':read(GAME/'content/customers.json')['customers'],'registry':read(GAME/'content/registry.json'),'categories':{'supplies':'生活补给','power':'电力用品','materials':'工业材料','documents':'文书旧物'}})
+            if route.path=='/api/project': return self.respond({'enemies':catalog('enemies','enemies'),'items':catalog('items','items'),'art':read(ROOT/'Game/assets/source/temp/manifest.json')['sprites'],'station_map':station_map(),'building_templates':read(GAME/'content/building_templates.json' if (GAME/'content/building_templates.json').exists() else ROOT/'Game/content/building_templates.json')['templates'],'settings':editor_settings(),'token':self.token,'stations':read(GAME/'content/stations.json'),'customers':read(GAME/'content/customers.json')['customers'],'registry':read(GAME/'content/registry.json'),'categories':{'supplies':'生活补给','power':'电力用品','materials':'工业材料','documents':'文书旧物'}})
             if route.path=='/api/level':
                 station=parse_qs(route.query).get('station',['邮电新村'])[0]; entry=read(GAME/'content/registry.json')['stations'].get(station)
-                return self.respond({'definition':read(resource(entry['level'])) if entry else None,'template':read(GAME/'content/levels/postal.json')})
+                return self.respond({'definition':migrate_level(read(resource(entry['level']))) if entry else None,'template':migrate_level(read(GAME/'content/levels/postal.json'))})
             if route.path=='/asset':
                 path=resource(parse_qs(route.query).get('path',[''])[0]); require(path.suffix.lower()=='.png','只能预览PNG'); data=path.read_bytes(); mime='image/png'
             else:
-                file={'/':'index.html','/editor.js':'editor.js','/style.css':'style.css','/enhancements.js':'enhancements.js','/models.js':'models.js','/workspace.js':'workspace.js'}.get(route.path)
+                file={'/':'index.html','/editor.js':'editor.js','/style.css':'style.css','/enhancements.js':'enhancements.js','/models.js':'models.js','/workspace.js':'workspace.js','/catalogs.js':'catalogs.js'}.get(route.path)
                 if not file: return self.respond({'error':'未找到'},404)
                 path=WEB/file; data=path.read_bytes(); mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'}[path.suffix]
             self.send_response(200); self.send_header('Content-Type',mime); self.end_headers(); self.wfile.write(data)
@@ -233,13 +315,29 @@ class Handler(BaseHTTPRequestHandler):
             require(self.headers.get('X-Editor-Token')==self.token,'编辑令牌无效，请刷新页面')
             length=int(self.headers.get('Content-Length','0')); require(0<length<=16*1024*1024,'请求体过大或为空')
             data=json.loads(self.rfile.read(length))
+            if self.path=='/api/enemy':validate_enemy(data);upsert_catalog('enemies','enemies',data);return self.respond({'ok':True})
+            if self.path=='/api/item':validate_item(data);upsert_catalog('items','items',data);return self.respond({'ok':True})
+            if self.path=='/api/catalog/archive':
+                name=data.get('catalog');require(name in ['customers','items','enemies','building_templates'],'目录无效')
+                key={'building_templates':'templates'}.get(name,name);entries=catalog(name,key)
+                target=next((v for v in entries if v['id']==data.get('id')),None);require(target is not None,'条目不存在')
+                target['deleted']=bool(data.get('deleted',True));target['enabled']=not target['deleted']
+                atomic(GAME/'content'/(name+'.json'),{'version':1,key:entries});return self.respond({'ok':True})
+            if self.path=='/api/content-image':
+                require(ID.fullmatch(data.get('id','')) and data.get('kind') in ['enemies','items','buildings'],'素材ID/类型无效')
+                image=Image.open(io.BytesIO(base64.b64decode(data['data'].split(',')[-1],validate=True))).convert('RGBA')
+                require(image.width*image.height<=16*1024*1024 and image.getchannel('A').getbbox() is not None,'图片过大或完全透明')
+                suffix=data['kind']+'/'+data['id']+'.png';source=GAME/'assets/source/temp/custom'/suffix;runtime=GAME/'assets/textures/temp/custom'/suffix
+                source.parent.mkdir(parents=True,exist_ok=True);runtime.parent.mkdir(parents=True,exist_ok=True);image.save(source);image.save(runtime)
+                return self.respond({'ok':True,'texture':'res://assets/textures/temp/custom/'+suffix})
             if self.path=='/api/building-template':
                 require(ID.fullmatch(data.get('id','')) and isinstance(data.get('name'),str) and 0<len(data['name'])<=80,'建筑素材ID或名称无效')
                 require(number(data.get('width'),100,1600) and integer(data.get('floors'),1,2) and re.fullmatch(r'#[0-9a-fA-F]{6}',data.get('wall','')),'建筑素材尺寸、楼层或颜色无效')
+                validate_texture(data.get('texture',''),True);validate_points(data)
                 path=GAME/'content/building_templates.json'
-                catalog=read(path if path.exists() else ROOT/'Game/content/building_templates.json')
-                catalog['templates']=[t for t in catalog['templates'] if t['id']!=data['id']]+[data]
-                atomic(path,catalog)
+                template_document=read(path if path.exists() else ROOT/'Game/content/building_templates.json')
+                template_document['templates']=[t for t in template_document['templates'] if t['id']!=data['id']]+[data]
+                atomic(path,template_document)
                 return self.respond({'ok':True})
             if self.path=='/api/settings':
                 require(isinstance(data.get('godot_executable'),str) and len(data['godot_executable'])<=1024,'Godot路径无效')
