@@ -2,8 +2,8 @@
   "version": 1,
   "stations": {
     "邮电新村": {
-      "level": "res://content/levels/postal.json",
-      "scene": "res://scenes/game/exploration.tscn"
+      "level": "res://content/levels/station_d092589a2a11.json",
+      "scene": "res://scenes/exploration/stations/station_d092589a2a11.tscn"
     },
     "四平路": {
       "level": "res://content/levels/postal.json",

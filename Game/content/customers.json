@@ -6,13 +6,12 @@
       "name": "拾荒老人",
       "texture": "res://assets/textures/customers/scavenger.png",
       "base_budget": 120,
-      "weight": 1.0,
+      "weight": 1,
       "enabled": true,
       "buy_categories": [
         "supplies",
         "power",
-        "materials",
-        "documents"
+        "materials"
       ],
       "sell_categories": [
         "supplies",
@@ -33,19 +32,33 @@
           "nodes": {
             "greeting": {
               "speaker": "拾荒老人",
-              "text": "这里终于有点生气了。想听听附近的消息吗？",
+              "text": "破烂可能不值钱，但是消息可没法随便找。想听听吗？",
               "choices": [
                 {
                   "text": "愿闻其详",
                   "next": "rumour",
-                  "conditions": {}
+                  "conditions": {},
+                  "effects": {
+                    "affection": 0,
+                    "trust": 0
+                  }
                 },
                 {
                   "text": "先做生意吧",
                   "next": "trade",
-                  "conditions": {}
+                  "conditions": {},
+                  "effects": {
+                    "affection": 0,
+                    "trust": 0
+                  }
                 }
-              ]
+              ],
+              "set_flags": [],
+              "next": "",
+              "effects": {
+                "affection": 0,
+                "trust": 0
+              }
             },
             "rumour": {
               "speaker": "拾荒老人",
@@ -63,9 +76,14 @@
               ],
               "choices": []
             }
-          }
+          },
+          "contexts": [
+            "trade"
+          ]
         }
-      ]
+      ],
+      "faction": "none",
+      "trade_enabled": true
     },
     {
       "id": "mechanic",
