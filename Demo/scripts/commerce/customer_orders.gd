@@ -24,12 +24,12 @@ static func category_of(kind: String) -> String:
 	return ""
 
 static func record(state: RefCounted) -> Dictionary:
-	return state.customer_visits.get(state.station,{"arrived":0,"completed":0,"active":{}})
+	return state.customer_visits.get(state.station,{"arrived":0,"completed":0,"dismissed":0,"active":{}})
 
 static func ensure(state: RefCounted) -> Dictionary:
 	if not state.can_edit_home(): return {}
 	if not state.customer_visits.has(state.station):
-		state.customer_visits[state.station] = {"arrived":0,"completed":0,"active":{}}
+		state.customer_visits[state.station] = {"arrived":0,"completed":0,"dismissed":0,"active":{}}
 	var visits: Dictionary = state.customer_visits[state.station]
 	if not visits.active.is_empty() or visits.arrived >= daily_limit(state.station): return visits.active
 	var index := int(visits.arrived)
@@ -48,9 +48,17 @@ static func ensure(state: RefCounted) -> Dictionary:
 
 static func next(state: RefCounted) -> Dictionary:
 	var visits := record(state)
-	if visits.active.is_empty() or visits.active.status != "completed": return visits.active
+	if visits.active.is_empty() or visits.active.status not in ["completed","dismissed"]: return visits.active
 	visits.active = {}
 	return ensure(state)
+
+static func dismiss(state: RefCounted) -> String:
+	var visits := record(state)
+	if visits.active.is_empty() or visits.active.status != "open": return "当前没有可送别的顾客。"
+	visits.active.status = "dismissed"
+	visits.active.total = 0.0
+	visits.dismissed += 1
+	return ""
 
 static func price(state: RefCounted, order: Dictionary, kind: String, charge: int = 100) -> float:
 	var offer: Dictionary = state.market_offer("demand" if order.side == "buy" else "stock",kind,state.station,charge)
@@ -134,22 +142,24 @@ static func confirm(state: RefCounted, selection: Array) -> String:
 	visits.completed += 1
 	return ""
 
-static func valid_saved(raw: Variant) -> bool:
+static func valid_saved(raw: Variant, legacy: bool = false) -> bool:
 	if not raw is Dictionary: return false
 	for station in raw:
 		if not station is String: return false
 		var r: Variant = raw[station]
-		if not r is Dictionary or r.size() != 3 or not r.has_all(["arrived","completed","active"]): return false
+		if not r is Dictionary or r.size() != (3 if legacy else 4) or not r.has_all(["arrived","completed","active"]): return false
+		var dismissed: Variant = 0 if legacy else r.get("dismissed")
+		if not (dismissed is int or dismissed is float) or not is_finite(dismissed) or dismissed != floor(dismissed) or dismissed < 0: return false
 		for key in ["arrived","completed"]:
 			if not (r[key] is int or r[key] is float) or not is_finite(r[key]) or r[key] != floor(r[key]): return false
-		if r.arrived < 0 or r.arrived > daily_limit(station) or r.completed < 0 or r.completed > r.arrived: return false
+		if r.arrived < 0 or r.arrived > daily_limit(station) or r.completed < 0 or r.completed + dismissed > r.arrived: return false
 		var o: Variant = r.active
 		if not o is Dictionary: return false
 		if o.is_empty():
-			if r.arrived != r.completed: return false
+			if r.arrived != r.completed + dismissed: return false
 			continue
 		if o.size() != 8 or not o.has_all(["id","visitor","side","category","budget","status","stock","total"]): return false
-		if not o.id is String or o.side not in ["buy","sell"] or not CATEGORIES.has(o.category) or o.status not in ["open","completed"]: return false
+		if not o.id is String or o.side not in ["buy","sell"] or not CATEGORIES.has(o.category) or o.status not in (["open","completed"] if legacy else ["open","completed","dismissed"]): return false
 		if not (o.visitor is int or o.visitor is float) or not is_finite(o.visitor) or o.visitor != floor(o.visitor) or o.visitor < 0 or o.visitor >= Visitors.ENTRIES.size(): return false
 		for key in ["budget","total"]:
 			if not (o[key] is int or o[key] is float) or not is_finite(o[key]) or o[key] < 0 or o[key] > 1000000: return false
@@ -157,5 +167,5 @@ static func valid_saved(raw: Variant) -> bool:
 		for kind in o.stock:
 			var quantity: Variant = o.stock[kind]
 			if not kind is String or category_of(kind) != o.category or not (quantity is int or quantity is float) or not is_finite(quantity) or quantity != floor(quantity) or quantity < 0 or quantity > 2: return false
-		if r.arrived < 1 or r.completed != r.arrived - (1 if o.status == "open" else 0): return false
+		if r.arrived < 1 or r.completed + dismissed != r.arrived - (1 if o.status == "open" else 0): return false
 	return true

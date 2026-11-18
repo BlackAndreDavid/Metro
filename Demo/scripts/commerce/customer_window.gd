@@ -9,6 +9,7 @@ var customer_index := 0
 var elapsed := 0.0
 var phase := "empty"
 var progress := 0.0
+var departure_start := 0.0
 var textures: Array[Texture2D] = []
 @onready var portrait: TextureRect = $Customer
 
@@ -28,6 +29,7 @@ func set_customer(index: int) -> void:
 
 func show_customer(index: int, completed: bool = false) -> void:
 	set_customer(index)
+	departure_start = (size.x-portrait.size.x)/2
 	phase = "depart" if completed else "approach"
 	elapsed = 0
 	portrait.show()
@@ -41,6 +43,7 @@ func hide_customer() -> void:
 
 func finish_order() -> void:
 	if phase == "empty" or phase == "depart": return
+	departure_start = portrait.position.x
 	phase = "depart"
 	elapsed = 0
 	apply_progress(0)
@@ -48,7 +51,7 @@ func finish_order() -> void:
 func apply_progress(value: float) -> void:
 	progress = clampf(value,0,1)
 	var center := (size.x-portrait.size.x)/2
-	portrait.position.x = lerpf(-portrait.size.x,center,progress) if phase == "approach" else lerpf(center,size.x,progress)
+	portrait.position.x = lerpf(-portrait.size.x,center,progress) if phase == "approach" else lerpf(departure_start,size.x,progress)
 	var visibility := progress if phase == "approach" else 1-progress
 	var light := lerpf(0.5,1.0,visibility)
 	portrait.modulate = Color(light,light,light,lerpf(0.15,1.0,visibility))

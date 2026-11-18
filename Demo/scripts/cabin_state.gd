@@ -29,7 +29,7 @@ const RARITY := {
 const RARITY_NAMES := ["普通", "少见", "稀有", "珍稀"]
 const RARITY_COLORS := [Color("bfc3ce"), Color("e4be76"), Color("ffa271"), Color("ff7873")]
 const EPOCH := "2026-07-11T00:00:00"
-const CABIN_SAVE_VERSION := 12
+const CABIN_SAVE_VERSION := 13
 const CustomerOrders = preload("res://scripts/commerce/customer_orders.gd")
 const ITEM_DEFINITIONS := {"computer": preload("res://resources/items/computer.tres")}
 const Furniture = preload("res://scripts/items/furniture_catalog.gd")
@@ -716,9 +716,9 @@ func load_cabin(path: String, known_stations: Array) -> bool:
 	if not data is Dictionary:
 		return false
 	var version: Variant = data.get("version")
-	if version != 1 and version != 2 and version != 3 and version != 4 and version != 5 and version != 6 and version != 7 and version != 8 and version != 9 and version != 10 and version != 11 and version != CABIN_SAVE_VERSION:
+	if version != 1 and version != 2 and version != 3 and version != 4 and version != 5 and version != 6 and version != 7 and version != 8 and version != 9 and version != 10 and version != 11 and version != 12 and version != CABIN_SAVE_VERSION:
 		return false
-	if version == 12 and not CustomerOrders.valid_saved(data.get("customer_visits")):
+	if version >= 12 and not CustomerOrders.valid_saved(data.get("customer_visits"),version == 12):
 		return false
 	if version >= 3 and not valid_car_state(data):
 		return false
@@ -775,7 +775,9 @@ func load_cabin(path: String, known_stations: Array) -> bool:
 	end_trip()
 	collected.clear()
 	market_usage.clear()
-	customer_visits = data.customer_visits.duplicate(true) if version == 12 else {}
+	customer_visits = data.customer_visits.duplicate(true) if version >= 12 else {}
+	if version == 12:
+		for visits in customer_visits.values(): visits.dismissed = 0
 	flashlight_drain = 0.0
 	restore_vitals({} if needs_upgrade else data)
 	if needs_upgrade:
@@ -925,7 +927,7 @@ func valid_home_layout(data: Dictionary, version: int = CABIN_SAVE_VERSION) -> b
 	return true
 
 func migrate_furniture(data: Dictionary, version: int) -> Dictionary:
-	if version == 11:
+	if version in [11,12]:
 		return Furniture.copy_layout(data.furniture_layout)
 	if version in [6, 7, 8, 9, 10]:
 		return Furniture.migrate_grid_layout(data.furniture_layout, version)

@@ -12,11 +12,12 @@ func configure(owner_home: Control) -> void:
 	$Panel/Close.pressed.connect(home.show_cabin.bind(""))
 	$Panel/Map.pressed.connect(home.open_market_map.bind(state.station))
 	$Panel/Confirm.pressed.connect(confirm_order)
+	$Panel/Dismiss.pressed.connect(dismiss_customer)
 	$Panel/Basket.controller = self
 	window.arrived.connect(on_customer_arrived)
 	window.departed.connect(next_customer)
 	var order := Orders.ensure(state)
-	if not order.is_empty(): window.show_customer(int(order.visitor),order.status == "completed")
+	if not order.is_empty(): window.show_customer(int(order.visitor),order.status != "open")
 
 func on_customer_arrived() -> void:
 	# Arrival only changes readiness; keep native drag sources alive mid-drag.
@@ -41,12 +42,13 @@ func refresh(message: String = "") -> void:
 	var order: Dictionary = visits.active
 	$Panel/Title.text = "%s · %s" % [market.name,state.station]
 	$Panel/Account.text = "账户 %s 度 · 欠费 %s 度" % [home.energy_text(state.account),home.energy_text(state.debt)]
-	$Panel/Order.text = "今日到访 %d / %d · 已完成 %d 单" % [visits.arrived,Orders.daily_limit(state.station),visits.completed]
+	$Panel/Order.text = "今日到访 %d / %d · 已完成 %d 单" % [visits.arrived,Orders.daily_limit(state.station),visits.completed] + " · 送客 %d 位" % visits.dismissed
 	if order.is_empty():
 		$Panel/Order.text += "\n今日顾客已全部接待，明日再来。"
 	else:
 		$Panel/Order.text += "\n顾客%s：%s类商品\n顾客预算 %s 度" % ["购买" if order.side == "buy" else "出售",Orders.CATEGORIES[order.category].name,home.energy_text(order.budget)]
 		if order.status == "completed": $Panel/Order.text += "\n订单完成 · 顾客正在离开"
+		elif order.status == "dismissed": $Panel/Order.text += "\n已送客 · 顾客正在离开"
 	clear_column($Panel/Bag)
 	clear_column($Panel/Stock)
 	show_items($Panel/Bag,"玩家背包",false,order)
@@ -57,6 +59,7 @@ func refresh(message: String = "") -> void:
 	if not order.is_empty() and order.status == "open":
 		$Panel/Quote.text += "\n顾客交易后预算 %s 度" % home.energy_text(order.budget + quote.total * (-1 if order.side == "buy" else 1))
 	$Panel/Confirm.disabled = not quote.problem.is_empty() or window.phase != "stay"
+	$Panel/Dismiss.disabled = order.is_empty() or order.get("status") != "open" or window.phase in ["empty","depart"]
 	home.status = $Panel/Status
 	var feedback: String = message if not message.is_empty() else quote.problem
 	if feedback.is_empty() and not order.is_empty() and order.side == "sell" and state.credit_shortfall(quote.total) > 0:
@@ -141,3 +144,12 @@ func confirm_order() -> void:
 	selection.clear()
 	window.finish_order()
 	refresh("交易完成，顾客正在向右离开。")
+
+func dismiss_customer() -> void:
+	var problem := Orders.dismiss(state)
+	if not problem.is_empty():
+		refresh(problem)
+		return
+	selection.clear()
+	window.finish_order()
+	refresh("已送客，本次未结算，顾客正在向右离开。")

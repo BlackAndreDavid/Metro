@@ -115,6 +115,12 @@ offset_right = 1192.0
 offset_bottom = 557.0
 mouse_filter = 2
 theme_override_font_sizes/font_size = 17
+[node name="Dismiss" type="Button" parent="Panel"]
+offset_left = 1000.0
+offset_top = 532.0
+offset_right = 1192.0
+offset_bottom = 562.0
+text = "送客"
 [node name="Map" type="Button" parent="Panel"]
 offset_left = 24.0
 offset_top = 574.0

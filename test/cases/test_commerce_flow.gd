@@ -120,8 +120,19 @@ func run() -> void:
 	quote = Orders.preview(home.state,scene.selection)
 	await click(scene.get_node("Panel/Confirm"))
 	check(home.state.supply_count(kind) == count+1 and is_equal_approx(order.budget,budget+quote.total), "customer sale via drag and confirm increases customer budget")
+	window.advance(window.depart_seconds)
+	window.advance(window.approach_seconds/2)
+	var unfinished := Orders.ensure(home.state)
+	var untouched: Array = home.state.inventory.duplicate(true)
+	var money: float = home.state.account
+	var visitor_budget: float = unfinished.budget
+	var position_before: float = window.portrait.position.x
+	await click(scene.get_node("Panel/Dismiss"))
+	check(unfinished.status == "dismissed" and window.phase == "depart" and window.portrait.position.x == position_before, "dismiss button ends order and exits right without teleporting")
+	check(home.state.inventory == untouched and home.state.account == money and unfinished.budget == visitor_budget and scene.selection.is_empty(), "dismiss clears selection without settlement")
+	check(Orders.record(home.state).dismissed == 1 and Orders.record(home.state).completed == 2 and Orders.record(home.state).arrived == 3, "UI dismissal preserves daily visit accounting")
 	await click(scene.get_node("Panel/Close"))
-	home.state.customer_visits[home.state.station] = {"arrived":Orders.daily_limit(home.state.station),"completed":Orders.daily_limit(home.state.station),"active":{}}
+	home.state.customer_visits[home.state.station] = {"arrived":Orders.daily_limit(home.state.station),"completed":Orders.daily_limit(home.state.station),"dismissed":0,"active":{}}
 	await click(home.home_backdrop.get_node("Carriage/Fixtures/TradeWindow0"))
 	scene = home.view
 	check("今日顾客已全部接待" in scene.get_node("Panel/Order").text and scene.get_node("Panel/Confirm").disabled and scene.window.phase == "empty", "daily cap displays empty window and blocks additional trades")
