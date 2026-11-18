@@ -4,7 +4,7 @@
 
 ```text
 Metro/
-├─ Demo/
+├─ Game/
 │  ├─ project.godot
 │  ├─ scenes/
 │  │  ├─ ui/     main_menu.tscn、save_select.tscn、settings_panel.tscn
@@ -213,7 +213,7 @@ Root
 
 装修扩建最多至3节；每次消耗钢板×2、螺丝×4、工具×1，每节新增35×12地面格和4个挂点。行车基础30度／站，每新增一节+10；每日基础2度，每新增一节+2。材料不足、外出或游戏结束时不可扩建，失败不扣料。
 
-存档版本 **13** 保存家具 `{car,x,y}`（挂点另有 `mount`）、独立储物物品与朝向。兼容版本1–12；旧槽位迁移到新格位，保留原车厢及收纳状态。读取前完整校验位置、尺寸、重叠、挂点和电脑数量，非法布局不部分覆盖当前状态。旧档收纳中的电脑补入储物格，空间全满则恢复默认摆放以保留物品。布置、扩建通过床铺休息保存，返回菜单不自动保存。
+存档版本 **14** 保存家具 `{car,x,y}`（挂点另有 `mount`）、独立储物物品与朝向。兼容版本1–13；旧槽位迁移到新格位，保留原车厢及收纳状态。读取前完整校验位置、尺寸、重叠、挂点和电脑数量，非法布局不部分覆盖当前状态。旧档收纳中的电脑补入储物格，空间全满则恢复默认摆放以保留物品。布置、扩建通过床铺休息保存，返回菜单不自动保存。
 
 ## 美术修改与导出
 
@@ -223,7 +223,7 @@ Root
 # 需要 Python 3 + Pillow；导出七张素材的第一个帧，保留透明度。
 python3 tools/export_home_art.py
 # 如将来又添加了透明边缘，可对单帧 RGBA 文件原生裁剪；像素验证通过才覆盖。
-python3 tools/trim_aseprite.py Demo/assets/source/Carriage.aseprite
+python3 tools/trim_aseprite.py Game/assets/source/Carriage.aseprite
 ```
 
 可同样用裁剪工具处理 Bed、LapTop、Door、Locker、Screen 等 Aseprite 文件。源图裁剪偏移变化时，需要同步 `.tres` 的 source_origin。
@@ -293,8 +293,21 @@ Home
 - 用原生鼠标拖放把 Bag/Stock 卡片放入 Basket；不会立即扣款或移动库存。“移除”可撤回选择，“确认交易”再次校验类别、唯一物品ID、顾客库存、背包空间与预算，全部成功后一次性结算。
 - 顾客购买时预算减少、玩家收入先还欠费；总价超过顾客预算显示“买不起”，确认按钮禁用，库存和余额不变。顾客出售时预算增加，玩家按原账户/欠费规则付款；若需赊购，确认前明确提示。
 - 顾客出售的每种同类商品初始2件。当地已有报价沿用，新增同类商品用 BASE_PRICES、行情倍率及买入折扣定价；电池回收还考虑电量。旧的逐件即时购买/出售按钮已从交易界面移除。
-- 初始顾客预算为45–200度，按世界种子、日期、站点与到访序号确定；不会因关闭窗口重抽。站点每日上限：邮电新村4、四平路6、同济大学5；其他站按设施继承3–8位。配置位于 `customer_orders.gd → STATION_LIMITS/GROUP_LIMITS`。
+- 初始顾客预算取 content/customers.json 的 base_budget，出现按权重及世界种子、日期、站点与到访序号确定；不会因关闭窗口重抽。站点每日上限：邮电新村4、四平路6、同济大学5；其他站按设施继承3–8位。配置位于 `customer_orders.gd → STATION_LIMITS/GROUP_LIMITS`。
 - 到访即占用一个当日名额，未完成订单不会自动跳过。关闭交易或切站后回来，保留同一站点的订单、预算和人数；日结清空各站当日记录。达到上限后窗口空置，显示明日再来。
 - 存档版本12保存 `customer_visits`，每站含 arrived/completed/active；读取先校验预算、类别、计数和库存，非法数据不部分覆盖游戏状态。版本1–11读取时建立空的顾客记录。
 
 “送客”将当前未完成订单标记为 dismissed，不结算商品或预算，清空选择并向右离场；单独记录 dismissed 人数，不增加 completed，仍占 arrived 名额。版本13为各站记录增加 dismissed，版本12记录迁移时补零。
+
+## 内容编辑拓展
+
+游戏工程目录由 Demo 更名为 Game，`res://` 内部路径不变。可视化工具代码在 `tools/editors/`，编辑的数据在 `Game/content/`；用法与条件字段见 [编辑工具说明](../tools/editors/README.md)。
+
+- `content/customers.json`：角色名称、独立贴图、基础预算、权重、买卖类别、条件剧情与分支节点。目录追加保存，旧角色以停用代替删除，维持存档索引稳定。
+- `scripts/commerce/customer_catalog.gd`：读取客户配置，支持新 PNG 在未导入时直接加载；`customer_orders.gd` 按有效候选权重选择顾客，用定义中的基础预算和类别生成订单。
+- `scripts/commerce/customer_dialogue.gd`：条件、优先级、节点、分支和标记；交易层先展示符合条件的对话，规则层也阻止剧情未完成时确认交易。版本14增加 content_flags/dialogue_progress，兼容旧存档。
+- `content/registry.json`：站点到地图配置及 tscn 的映射。`content/levels/postal.json` 保存现有邮电街区作为模板，默认三站共用。
+- `scripts/content/content_registry.gd`：读取登记和场景路径；Home 按站点加载具体探索场景。SurfaceBlock 的建筑、物资、汽车、站口和街道名称改为实例数据，保留原默认值作兼容；小地图使用当前实例的数据。
+- 编辑站点时生成 `scenes/exploration/stations/station_<hash>.tscn`，继承已有探索场景；配置写入 content/levels，注册后即可从对应站点出站。导出预设显式包含 content JSON，避免打包后找不到定义。
+
+“打开编辑器.cmd”仅负责启动 Godot 工程编辑器并记录日志；`tools/editors/启动内容编辑器.cmd` 负责启动专用内容编辑工具，两者不互相替代。

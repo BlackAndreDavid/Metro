@@ -139,3 +139,9 @@ Home 把 E 键转给 `SurfaceBlock.interact()`，把1键转给手电开关。`in
 | 未来独立角色贴图或建筑美术 | `surface_block.gd` 的 `draw_player/draw_facade/draw_interior` |
 
 新增街区内容时，世界位置定义、互动判断、物资槽数量和小地图连接需要同步修改；只增加一个绘图矩形不会自动得到可进入建筑或可搜刽物品。
+
+## 内容编辑后的补充
+
+当前关卡结构已数据化：`content/registry.json` 决定站点使用哪个场景，`content/levels/*.json` 定义地图。此前文中列出的 BUILDINGS/LOOT/VEHICLES 等现在是 SurfaceBlock 实例字段；DEFAULT_* 保留原模板值。Home、移动、互动、绘图和小地图都读取同一份实例数据，已不要求所有站点共享硬编码表。原三站仍默认共用邮电模板，其他站未登记时保留简化探索，编辑器登记后加载生成的独立 tscn。
+
+关卡编辑可配置固定掉落 kind；未指定时沿用原规则，增加物资槽时自动补足战利品数组。自定义地图车辆加关卡 ID 前缀，不与其他地图共享已拆零件记录。完整操作见 [tools/editors/README.md](../tools/editors/README.md)。

@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "customers": [
+    {
+      "id": "scavenger",
+      "name": "拾荒老人",
+      "texture": "res://assets/textures/customers/scavenger.png",
+      "base_budget": 120,
+      "weight": 1.0,
+      "enabled": true,
+      "buy_categories": [
+        "supplies",
+        "power",
+        "materials",
+        "documents"
+      ],
+      "sell_categories": [
+        "supplies",
+        "power",
+        "materials",
+        "documents"
+      ],
+      "stories": [
+        {
+          "id": "first_meeting",
+          "name": "拾荒老人的问候",
+          "priority": 10,
+          "once": true,
+          "conditions": {
+            "day_min": 2
+          },
+          "start": "greeting",
+          "nodes": {
+            "greeting": {
+              "speaker": "拾荒老人",
+              "text": "这里终于有点生气了。想听听附近的消息吗？",
+              "choices": [
+                {
+                  "text": "愿闻其详",
+                  "next": "rumour",
+                  "conditions": {}
+                },
+                {
+                  "text": "先做生意吧",
+                  "next": "trade",
+                  "conditions": {}
+                }
+              ]
+            },
+            "rumour": {
+              "speaker": "拾荒老人",
+              "text": "四平路有维修站，同济大学可以学习汽修。准备好照明，再到地表走走。",
+              "set_flags": [
+                "scavenger_greeting_done"
+              ],
+              "choices": []
+            },
+            "trade": {
+              "speaker": "拾荒老人",
+              "text": "好，先看看今天的货。",
+              "set_flags": [
+                "scavenger_greeting_done"
+              ],
+              "choices": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "mechanic",
+      "name": "维修工",
+      "texture": "res://assets/textures/customers/mechanic.png",
+      "base_budget": 160,
+      "weight": 1.0,
+      "enabled": true,
+      "buy_categories": [
+        "supplies",
+        "power",
+        "materials",
+        "documents"
+      ],
+      "sell_categories": [
+        "supplies",
+        "power",
+        "materials",
+        "documents"
+      ],
+      "stories": []
+    },
+    {
+      "id": "commuter",
+      "name": "通勤旅客",
+      "texture": "res://assets/textures/customers/commuter.png",
+      "base_budget": 100,
+      "weight": 1.0,
+      "enabled": true,
+      "buy_categories": [
+        "supplies",
+        "power",
+        "materials",
+        "documents"
+      ],
+      "sell_categories": [
+        "supplies",
+        "power",
+        "materials",
+        "documents"
+      ],
+      "stories": []
+    },
+    {
+      "id": "medic",
+      "name": "医护人员",
+      "texture": "res://assets/textures/customers/medic.png",
+      "base_budget": 180,
+      "weight": 1.0,
+      "enabled": true,
+      "buy_categories": [
+        "supplies",
+        "power",
+        "materials",
+        "documents"
+      ],
+      "sell_categories": [
+        "supplies",
+        "power",
+        "materials",
+        "documents"
+      ],
+      "stories": []
+    }
+  ]
+}

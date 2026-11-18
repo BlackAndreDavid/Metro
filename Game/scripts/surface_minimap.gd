@@ -15,7 +15,7 @@ var links: Array[Array] = []
 func setup(block: Block, ui_font: Font) -> void:
 	street = block
 	font = ui_font
-	links = Block.map_connections()
+	links = street.map_connections()
 	mouse_filter = MOUSE_FILTER_IGNORE
 	street.moved.connect(update_location)
 	update_location()
@@ -27,7 +27,7 @@ func update_location() -> void:
 		queue_redraw()
 
 func center(point: Vector2i) -> Vector2:
-	var span := Vector2(Block.CELL_NAMES[0].size() - 1, Block.CELL_NAMES.size() - 1) * SPACING
+	var span := Vector2(street.CELL_NAMES[0].size() - 1, street.CELL_NAMES.size() - 1) * SPACING
 	return (size - span) * 0.5 + Vector2(point) * SPACING
 
 func _draw() -> void:
@@ -37,8 +37,8 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color("72617a"), false)
 	for link in links:
 		draw_line(center(link[0]), center(link[1]), Color("897991"), 5.0)
-	for row in range(Block.CELL_NAMES.size()):
-		for column in range(Block.CELL_NAMES[row].size()):
+	for row in range(street.CELL_NAMES.size()):
+		for column in range(street.CELL_NAMES[row].size()):
 			var point := Vector2i(column, row)
 			var fill := UNVISITED_COLOR
 			if point == current:
@@ -48,8 +48,8 @@ func _draw() -> void:
 			var bounds := Rect2(center(point) - CELL_SIZE * 0.5, CELL_SIZE)
 			draw_rect(bounds, fill)
 			draw_rect(bounds, fill.lightened(0.28), false)
-	for station in Block.STATIONS:
-		var point := Vector2i(Block.street_column(station.x), station.row)
+	for station in street.STATIONS:
+		var point := Vector2i(street.street_column(station.x), station.row)
 		var at := center(point)
 		var label_y := at.y + 28.0 if point.y == Block.SOUTH else at.y - 18.0
 		var ink := Color("f2eadd") if point == current else VISITED_COLOR

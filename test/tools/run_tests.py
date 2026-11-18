@@ -23,14 +23,14 @@ def main():
     output = root / 'results' / run_id
     output.mkdir(parents=True)
     env = os.environ.copy()
-    env.update(METRO_TEST_ROOT=str(root), METRO_TEST_RESULTS=str(output),
+    env.update(METRO_GODOT=executable, METRO_TEST_ROOT=str(root), METRO_TEST_RESULTS=str(output),
                UV_OFFLINE='1', UV_PYTHON_DOWNLOADS='never', GODOT_AI_DISABLE_TELEMETRY='true')
     # Isolate settings, saves and caches from normal gameplay and local editors.
     for name, directory in [('XDG_CONFIG_HOME', 'config'), ('XDG_DATA_HOME', 'data'), ('XDG_CACHE_HOME', 'cache')]:
         path = output / directory
         path.mkdir()
         env[name] = str(path)
-    base = [executable, '--headless', '--path', str(root.parent / 'Demo')]
+    base = [executable, '--headless', '--path', str(root.parent / 'Game')]
     results = []
 
     def run(name, arguments, expected=(), command_override=None):
@@ -88,7 +88,9 @@ def main():
         run('customer_orders', ['--script', str(root / 'cases/test_customer_orders.gd')], ['CUSTOMER_ORDERS_OK'])
     run('art_tools', [], ['OK'], command_override=[sys.executable, '-m', 'unittest', 'discover',
         '-s', str(root / 'cases'), '-p', 'test_art_tools.py'])
-    passed = len(results) == 12 and all(item['passed'] for item in results)
+    run('content_editors', [], ['OK'], command_override=[sys.executable, '-m', 'unittest', 'discover',
+        '-s', str(root / 'cases'), '-p', 'test_content_editors.py'])
+    passed = len(results) == 13 and all(item['passed'] for item in results)
     summary = dict(run_id=run_id, passed=passed, results=results)
     (output / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print(f'Results: {output}')

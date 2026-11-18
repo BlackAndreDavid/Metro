@@ -1,6 +1,6 @@
 # 测试
 
-测试用例、运行工具和结果统一存放于此目录，与 `Demo/` 游戏工程分离。
+测试用例、运行工具和结果统一存放于此目录，与 `Game/` 游戏工程分离。
 
 ```text
 test/
@@ -52,11 +52,11 @@ Windows 示例：
 python test/tools/run_tests.py --godot "C:\Godot\Godot_v4.7.2-stable_win64.exe"
 ```
 
-支持 `GODOT_EXE` 环境变量；未指定时使用 PATH 中的 `godot`。运行工具也可以从其他工作目录调用，它自动定位 `Demo/`。所有步骤成功才返回退出码 0；失败或超时返回非零，检查对应结果目录中的日志。导入失败时不执行依赖该步骤的测试，汇总中仅记录已执行步骤，整体判为失败。
+支持 `GODOT_EXE` 环境变量；未指定时使用 PATH 中的 `godot`。运行工具也可以从其他工作目录调用，它自动定位 `Game/`。所有步骤成功才返回退出码 0；失败或超时返回非零，检查对应结果目录中的日志。导入失败时不执行依赖该步骤的测试，汇总中仅记录已执行步骤，整体判为失败。
 
 工具注入 `METRO_TEST_ROOT` 和 `METRO_TEST_RESULTS`，以绝对路径加载工程外的用例。独立运行 GDScript 用例时也必须提供这两个目录；推荐始终使用统一入口。测试隔离用户配置与游戏存档，结果目录不会提交到 Git。每次运行保留独立结果，便于对比；可在不需要时删除。
 
-Godot AI 第三方插件内置的测试框架仍位于 `Demo/addons/godot_ai/testing/`，状态用例依赖其断言与结果统计；不移动或复制第三方实现。工程外用例不再由 MCP 默认的 `res://tests/` 自动发现。
+Godot AI 第三方插件内置的测试框架仍位于 `Game/addons/godot_ai/testing/`，状态用例依赖其断言与结果统计；不移动或复制第三方实现。工程外用例不再由 MCP 默认的 `res://tests/` 自动发现。
 
 验证范围为无界面的场景、状态和存档流程，不包含人工图形、音频体验。
 
@@ -65,7 +65,7 @@ Godot AI 第三方插件内置的测试框架仍位于 `Demo/addons/godot_ai/tes
 存在 X11 显示时，可用 `tools/capture_home.gd` 生成空槽、家具、描边、扩建、设置真实渲染截图（包括门、柜子、屏幕的独立描边、四个挂点、统一建造选择与仓库）。设置 `DISPLAY`、`METRO_TEST_RESULTS` 和独立的 `--save-file` 路径，随后执行：
 
 ```sh
-Godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path Demo --script /absolute/path/to/test/tools/capture_home.gd -- --save-file=/path/to/test/results/visual/capture_save.json
+Godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path Game --script /absolute/path/to/test/tools/capture_home.gd -- --save-file=/path/to/test/results/visual/capture_save.json
 ```
 
 此步骤需要图形驱动，不能加 `--headless`；目录须位于测试结果目录。`METRO_TEST_RESULTS` 指向截图输出目录。常规自动测试仍支持无界面运行。
@@ -73,3 +73,5 @@ Godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Du
 按钮回归使用 `InputEventMouseButton` 注入视口，验证实际 GUI 命中与状态变化，防止 `pressed.emit()` 绕过输入遮挡。旧问题的复现记录可保存在 results 中；图形捕获包含无 Home UI 的独立建造场景。
 
 美术工具测试需要 Pillow；统一入口现包含11组Godot导入/流程与1组美术工具检查，结果均写入 results。文生图 API 使用本地模拟响应验证请求与文件生命周期，实际客户素材来自聊天中的文生图工具。
+
+内容编辑检查新增 `test_content_editors.py`（API、校验、生成）与 `test_content_runtime.gd`（隔离 Game 副本中的客户权重、条件对话、存档节点和自定义站点运行）。统一入口自动运行，当前共13组检查；隔离导入和运行日志分别为 editor_content_import.log / editor_content_runtime.log。

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "stations": {
+    "邮电新村": {
+      "level": "res://content/levels/postal.json",
+      "scene": "res://scenes/game/exploration.tscn"
+    },
+    "四平路": {
+      "level": "res://content/levels/postal.json",
+      "scene": "res://scenes/game/exploration.tscn"
+    },
+    "同济大学": {
+      "level": "res://content/levels/postal.json",
+      "scene": "res://scenes/game/exploration.tscn"
+    }
+  }
+}

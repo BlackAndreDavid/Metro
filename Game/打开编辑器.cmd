@@ -1,6 +1,6 @@
 @echo off
 setlocal
-set "GODOT_EXE=Z:\soft\Godot_v4.7.2-stable_win64.exe\Godot_v4.7.2-stable_win64.exe"
+if not defined GODOT_EXE set "GODOT_EXE=Z:\soft\Godot_v4.7.2-stable_win64.exe\Godot_v4.7.2-stable_win64.exe"
 if not exist "%GODOT_EXE%" (
   echo Godot 4.7.2 was not found at:
   echo %GODOT_EXE%

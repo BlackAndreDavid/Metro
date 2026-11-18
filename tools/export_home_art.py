@@ -59,6 +59,6 @@ def export(source, target):
 
 
 if __name__ == '__main__':
-    assets = Path(__file__).resolve().parents[1] / 'Demo/assets'
+    assets = Path(__file__).resolve().parents[1] / 'Game/assets'
     for name in ('Carriage', 'BG_Afternoon', 'Bed', 'LapTop', 'Door', 'Locker', 'Screen'):
         export(assets / 'source' / (name + '.aseprite'), assets / 'textures' / (name + '.png'))

@@ -14,28 +14,28 @@ const MIDDLE := 1
 const SOUTH := 2
 const SIPING := "四平路"
 const TONGJI := AutoRepair.STATION
-const SEGMENT := 560.0
-const CELL_NAMES := [
+const DEFAULT_SEGMENT := 560.0
+const DEFAULT_CELL_NAMES := [
 	["校园西街", "教学楼", TONGJI],
 	["文具店", SIPING, "办公街"],
 	["邮电新村", "学生宿舍", "沿街商铺"],
 ]
-const WIDTH := SEGMENT * 3
-const GROUND := 416.0
-const FLOOR_HEIGHT := 110.0
+const DEFAULT_WIDTH := DEFAULT_SEGMENT * 3
+const DEFAULT_GROUND := 416.0
+const DEFAULT_FLOOR_HEIGHT := 110.0
 const SPEED := 235.0
 const REACH := 43.0
 ## Each alley joins its row to the next row at the same horizontal position.
-const JUNCTIONS := [
+const DEFAULT_JUNCTIONS := [
 	{"row": NORTH, "x": 478.0}, {"row": NORTH, "x": 1364.0},
 	{"row": MIDDLE, "x": 324.0}, {"row": MIDDLE, "x": 908.0},
 ]
-const STATIONS := [
+const DEFAULT_STATIONS := [
 	{"name": TONGJI, "row": NORTH, "x": 1542.0},
 	{"name": SIPING, "row": MIDDLE, "x": 1042.0},
 	{"name": "邮电新村", "row": SOUTH, "x": 88.0},
 ]
-const BUILDINGS := [
+const DEFAULT_BUILDINGS := [
 	{"id": "lab", "row": NORTH, "name": "实习工坊", "x": 205.0, "width": 190.0, "floors": 1, "wall": Color("5e5a61")},
 	{"id": "school", "row": NORTH, "name": "教学楼", "x": 574.0, "width": 266.0, "floors": 2, "wall": Color("736163")},
 	{"id": "campus_shop", "row": NORTH, "name": "校门书店", "x": 1150.0, "width": 165.0, "floors": 1, "wall": Color("59576a")},
@@ -46,7 +46,7 @@ const BUILDINGS := [
 	{"id": "dorm", "row": SOUTH, "name": "学生宿舍", "x": 600.0, "width": 267.0, "floors": 2, "wall": Color("655664")},
 	{"id": "repair", "row": SOUTH, "name": "沿街维修铺", "x": 1224.0, "width": 235.0, "floors": 1, "wall": Color("635552")},
 ]
-const LOOT := [
+const DEFAULT_LOOT := [
 	{"x": 217.0, "row": SOUTH, "building": "", "floor": 0},
 	{"x": 726.0, "row": SOUTH, "building": "dorm", "floor": 0},
 	{"x": 745.0, "row": SOUTH, "building": "dorm", "floor": 1},
@@ -58,12 +58,24 @@ const LOOT := [
 	{"x": 1265.0, "row": NORTH, "building": "campus_shop", "floor": 0},
 	{"x": 272.0, "row": SOUTH, "building": "", "floor": 0},
 ]
-const VEHICLES := [
+const DEFAULT_VEHICLES := [
 	{"id": "dorm_sedan", "row": SOUTH, "x": 535.0, "color": Color("846268")},
 	{"id": "repair_sedan", "row": SOUTH, "x": 1560.0, "color": Color("677378")},
 	{"id": "office_sedan", "row": MIDDLE, "x": 1184.0, "color": Color("79777e")},
 	{"id": "campus_sedan", "row": NORTH, "x": 1448.0, "color": Color("7d7562")},
 ]
+
+const Content = preload("res://scripts/content/content_registry.gd")
+var SEGMENT := DEFAULT_SEGMENT
+var CELL_NAMES := DEFAULT_CELL_NAMES.duplicate(true)
+var WIDTH := DEFAULT_WIDTH
+var GROUND := DEFAULT_GROUND
+var FLOOR_HEIGHT := DEFAULT_FLOOR_HEIGHT
+var JUNCTIONS := DEFAULT_JUNCTIONS.duplicate(true)
+var STATIONS := DEFAULT_STATIONS.duplicate(true)
+var BUILDINGS := DEFAULT_BUILDINGS.duplicate(true)
+var LOOT := DEFAULT_LOOT.duplicate(true)
+var VEHICLES := DEFAULT_VEHICLES.duplicate(true)
 
 var state
 var font: Font
@@ -80,10 +92,11 @@ var lighting: ShaderMaterial
 var inspecting_vehicle := false
 
 static func supports(station: String) -> bool:
-	return STATIONS.any(func(entry: Dictionary) -> bool: return entry.name == station)
+	return not Content.entry(station).is_empty()
 
 func setup(owner_state: RefCounted, ui_font: Font) -> void:
 	state = owner_state
+	apply_level(Content.level(state.station))
 	font = ui_font
 	mouse_filter = MOUSE_FILTER_IGNORE
 	for station in STATIONS:
@@ -101,13 +114,31 @@ func setup(owner_state: RefCounted, ui_font: Font) -> void:
 	shade.hide()
 	add_child(shade)
 
+func apply_level(data: Dictionary) -> void:
+	if data.is_empty(): return
+	SEGMENT = float(data.get("segment",DEFAULT_SEGMENT))
+	GROUND = float(data.get("ground",DEFAULT_GROUND))
+	FLOOR_HEIGHT = float(data.get("floor_height",DEFAULT_FLOOR_HEIGHT))
+	CELL_NAMES = data.get("cell_names",DEFAULT_CELL_NAMES).duplicate(true)
+	WIDTH = SEGMENT * CELL_NAMES[0].size()
+	STATIONS = data.get("stations",DEFAULT_STATIONS).duplicate(true)
+	BUILDINGS = data.get("buildings",DEFAULT_BUILDINGS).duplicate(true)
+	JUNCTIONS = data.get("junctions",DEFAULT_JUNCTIONS).duplicate(true)
+	LOOT = data.get("loot",DEFAULT_LOOT).duplicate(true)
+	VEHICLES = data.get("vehicles",DEFAULT_VEHICLES).duplicate(true)
+	for entry in BUILDINGS:
+		if entry.wall is String: entry.wall = Color(entry.wall)
+	for entry in VEHICLES:
+		if data.get("id","postal") != "postal": entry.id = data.id + "/" + entry.id
+		if entry.color is String: entry.color = Color(entry.color)
+
 func cell() -> Vector2i:
 	return Vector2i(street_column(player_x), row)
 
-static func street_column(x: float) -> int:
+func street_column(x: float) -> int:
 	return clampi(floori(x / SEGMENT), 0, CELL_NAMES[0].size() - 1)
 
-static func map_connections() -> Array[Array]:
+func map_connections() -> Array[Array]:
 	var connections: Array[Array] = []
 	for street in range(CELL_NAMES.size()):
 		for column in range(CELL_NAMES[street].size() - 1):

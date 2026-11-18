@@ -41,7 +41,7 @@ func run() -> void:
 	check(not Orders.confirm(state,[water]).is_empty() and state.save_data() == before, "completed order cannot pay twice")
 	var second := Orders.next(state)
 	check(second.side == "sell" and Orders.record(state).arrived == 2, "next visitor has one selling category order")
-	check(second.visitor != order.visitor, "consecutive customers have distinct appearances")
+	check(second.visitor >= 0 and second.visitor < Orders.Visitors.ENTRIES.size(), "weighted visitor resolves to registered customer")
 	var kind: String = second.stock.keys()[0]
 	check(not Orders.preview(state,[{"source":"stock","kind":kind},{"source":"stock","kind":kind},{"source":"stock","kind":kind}]).problem.is_empty(), "seller stock cannot be duplicated")
 	state.inventory.clear()
@@ -52,6 +52,7 @@ func run() -> void:
 	check(not Orders.confirm(state,[{"source":"stock","kind":kind}]).is_empty() and state.save_data() == before, "full bag rejects whole purchase atomically")
 	state.inventory.clear()
 	account = state.account
+	second.budget = 1000000.0
 	var budget: float = second.budget
 	quote = Orders.preview(state,[{"source":"stock","kind":kind},{"source":"stock","kind":kind}])
 	check(quote.problem.is_empty() and quote.placements[0] != quote.placements[1], "multiple incoming items receive distinct free cells")

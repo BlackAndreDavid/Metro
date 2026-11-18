@@ -1,6 +1,7 @@
 extends RefCounted
 ## Customer-facing directions: buy = customer buys from player; sell = customer sells to player.
 const Visitors = preload("res://scripts/commerce/customer_catalog.gd")
+const Dialogue = preload("res://scripts/commerce/customer_dialogue.gd")
 const Markets = preload("res://scripts/cabin_markets.gd")
 const CATEGORIES := {
 	"supplies":{"name":"生活补给","items":["water","ration","meds"]},
@@ -33,18 +34,38 @@ static func ensure(state: RefCounted) -> Dictionary:
 	var visits: Dictionary = state.customer_visits[state.station]
 	if not visits.active.is_empty() or visits.arrived >= daily_limit(state.station): return visits.active
 	var index := int(visits.arrived)
-	var pool: Array[String] = ["supplies"]
-	var profile := Markets.profile(state.station)
-	for kind in profile.stock.keys() + profile.demand.keys():
-		var category := category_of(kind)
-		if not category.is_empty() and category not in pool: pool.append(category)
-	var category: String = pool[index % pool.size()]
+	Visitors.reload()
+	var side := "buy" if index % 2 == 0 else "sell"
+	var visitor := pick_visitor(state,index,side)
+	if visitor < 0:
+		side = "sell" if side == "buy" else "buy"
+		visitor = pick_visitor(state,index,side)
+	if visitor < 0: return {}
+	var definition: Dictionary = Visitors.definition(visitor)
+	var allowed: Array = definition.get(side+"_categories",CATEGORIES.keys())
+	var category: String = allowed[index % allowed.size()]
 	var stock := {}
-	if index % 2 == 1:
+	if side == "sell":
 		for kind in CATEGORIES[category].items: stock[kind] = 2
-	visits.active = {"id":"%d/%s/%d" % [state.day,state.station,index],"visitor":posmod(state.station_roll(state.station,"visitor-base",Visitors.ENTRIES.size()-1)+index,Visitors.ENTRIES.size()),"side":"buy" if index % 2 == 0 else "sell","category":category,"budget":float(45 + state.station_roll(state.station,"budget/%d" % index,155)),"status":"open","stock":stock,"total":0.0}
+	visits.active = {"id":"%d/%s/%d" % [state.day,state.station,index],"visitor":visitor,"side":side,"category":category,"budget":float(definition.get("base_budget",120)),"status":"open","stock":stock,"total":0.0}
 	visits.arrived += 1
 	return visits.active
+
+static func pick_visitor(state: RefCounted, index: int, side: String) -> int:
+	var candidates: Array[int] = []
+	var total := 0.0
+	for i in range(Visitors.ENTRIES.size()):
+		var data: Dictionary = Visitors.definition(i)
+		if not data.get("enabled",true) or float(data.get("weight",1)) <= 0 or data.get(side+"_categories",CATEGORIES.keys()).is_empty(): continue
+		if not data.get("stations",[]).is_empty() and state.station not in data.stations: continue
+		candidates.append(i)
+		total += float(data.get("weight",1))
+	if candidates.is_empty(): return -1
+	var roll: float = float(state.station_roll(state.station,"visitor/%d" % index,1000000))/1000001.0*total
+	for i in candidates:
+		roll -= float(Visitors.definition(i).get("weight",1))
+		if roll < 0: return i
+	return candidates.back()
 
 static func next(state: RefCounted) -> Dictionary:
 	var visits := record(state)
@@ -55,6 +76,7 @@ static func next(state: RefCounted) -> Dictionary:
 static func dismiss(state: RefCounted) -> String:
 	var visits := record(state)
 	if visits.active.is_empty() or visits.active.status != "open": return "当前没有可送别的顾客。"
+	state.dialogue_progress.erase(visits.active.id)
 	visits.active.status = "dismissed"
 	visits.active.total = 0.0
 	visits.dismissed += 1
@@ -73,6 +95,7 @@ static func preview(state: RefCounted, selection: Array) -> Dictionary:
 	if state.trip_active or not state.game_over_reason.is_empty(): result.problem = "当前不能交易。"
 	elif order.is_empty(): result.problem = "今日顾客已全部接待。"
 	elif order.status != "open": result.problem = "订单已完成，请等待顾客离开。"
+	elif not Dialogue.pending(state,order).is_empty(): result.problem = "请先完成顾客剧情。"
 	elif selection.is_empty(): result.problem = "请拖入订单类别的商品。"
 	elif selection.size() > 100: result.problem = "选择商品过多。"
 	if not result.problem.is_empty(): return result
@@ -162,7 +185,7 @@ static func valid_saved(raw: Variant, legacy: bool = false) -> bool:
 		if not o.id is String or o.side not in ["buy","sell"] or not CATEGORIES.has(o.category) or o.status not in (["open","completed"] if legacy else ["open","completed","dismissed"]): return false
 		if not (o.visitor is int or o.visitor is float) or not is_finite(o.visitor) or o.visitor != floor(o.visitor) or o.visitor < 0 or o.visitor >= Visitors.ENTRIES.size(): return false
 		for key in ["budget","total"]:
-			if not (o[key] is int or o[key] is float) or not is_finite(o[key]) or o[key] < 0 or o[key] > 1000000: return false
+			if not (o[key] is int or o[key] is float) or not is_finite(o[key]) or o[key] < 0 or o[key] > 1000000000: return false
 		if not o.stock is Dictionary or (o.side == "buy" and not o.stock.is_empty()): return false
 		for kind in o.stock:
 			var quantity: Variant = o.stock[kind]

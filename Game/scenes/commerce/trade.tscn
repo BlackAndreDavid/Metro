@@ -135,3 +135,50 @@ offset_bottom = 604.0
 mouse_filter = 2
 autowrap_mode = 2
 theme_override_font_sizes/font_size = 15
+
+[node name="DialogueOverlay" type="ColorRect" parent="."]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.04,0.03,0.08,0.88)
+[node name="Card" type="Panel" parent="DialogueOverlay"]
+offset_left = 220.0
+offset_top = 150.0
+offset_right = 1060.0
+offset_bottom = 620.0
+theme_override_styles/panel = SubResource("PanelStyle")
+[node name="Speaker" type="Label" parent="DialogueOverlay/Card"]
+offset_left = 28.0
+offset_top = 20.0
+offset_right = 650.0
+offset_bottom = 65.0
+theme_override_font_sizes/font_size = 25
+mouse_filter = 2
+[node name="TextScroll" type="ScrollContainer" parent="DialogueOverlay/Card"]
+offset_left = 28.0
+offset_top = 85.0
+offset_right = 810.0
+offset_bottom = 245.0
+horizontal_scroll_mode = 0
+[node name="Text" type="RichTextLabel" parent="DialogueOverlay/Card/TextScroll"]
+custom_minimum_size = Vector2(760,160)
+size_flags_horizontal = 3
+fit_content = true
+scroll_active = false
+theme_override_font_sizes/normal_font_size = 20
+mouse_filter = 2
+[node name="Scroll" type="ScrollContainer" parent="DialogueOverlay/Card"]
+offset_left = 28.0
+offset_top = 266.0
+offset_right = 810.0
+offset_bottom = 400.0
+horizontal_scroll_mode = 0
+[node name="Choices" type="VBoxContainer" parent="DialogueOverlay/Card/Scroll"]
+size_flags_horizontal = 3
+[node name="Dismiss" type="Button" parent="DialogueOverlay/Card"]
+offset_left = 652.0
+offset_top = 420.0
+offset_right = 810.0
+offset_bottom = 456.0
+text = "送客"

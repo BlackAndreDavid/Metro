@@ -14,9 +14,10 @@ var textures: Array[Texture2D] = []
 @onready var portrait: TextureRect = $Customer
 
 func _ready() -> void:
+	Catalog.reload()
 	for data in Catalog.ENTRIES:
 		var texture := AtlasTexture.new()
-		texture.atlas = load(data.texture)
+		texture.atlas = Catalog.load_texture(data.texture)
 		# Independent source sprites stay full-body; only the upper body is shown here.
 		texture.region = Rect2(0,0,48,44)
 		textures.append(texture)

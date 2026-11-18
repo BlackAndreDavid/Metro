@@ -3,6 +3,7 @@ extends "res://scripts/ui/ui_builder.gd"
 const State = preload("res://scripts/cabin_state.gd")
 const Rail = preload("res://scripts/cabin_map.gd")
 const CargoGrid = preload("res://scripts/cargo_grid.gd")
+const Content = preload("res://scripts/content/content_registry.gd")
 const SurfaceBlock = preload("res://scripts/surface_block.gd")
 const SurfaceMinimap = preload("res://scripts/surface_minimap.gd")
 const AutoRepair = preload("res://scripts/auto_repair.gd")
@@ -620,9 +621,16 @@ func choose_gear(key: String, enabled: bool) -> void:
 
 func confirm_departure() -> void:
 	var previous_debt := state.debt
-	var loot_station := State.START_STATION if SurfaceBlock.supports(state.station) else ""
+	var level := Content.level(state.station)
+	var loot_station: String = level.get("loot_station",state.station) if SurfaceBlock.supports(state.station) else ""
 	var problem := state.depart(loadout, Rail.station_info(state.station).radiation, loot_station)
 	if problem.is_empty():
+		if not level.is_empty():
+			var points: Array = level.get("loot",[])
+			while state.trip_loot.size() < points.size():
+				state.trip_loot.append(["copper","book","tools","aaa"][state.station_roll(state.station,"editor-loot/%d" % state.trip_loot.size(),3)])
+			for i in range(points.size()):
+				if not points[i].get("kind","").is_empty(): state.trip_loot[i] = points[i].kind
 		var debt_note := added_debt_note(previous_debt)
 		show_surface("防护服已租用" + debt_note if not debt_note.is_empty() else "")
 	else:
@@ -636,7 +644,8 @@ func show_surface(message: String = "") -> void:
 
 func show_exploration_block(message: String) -> void:
 	if not is_instance_valid(surface_block):
-		begin_page("surface", EXPLORATION)
+		var scene_path := Content.scene(state.station)
+		begin_page("surface",load(scene_path) if ResourceLoader.exists(scene_path) else EXPLORATION)
 		view.configure(self)
 	selection = {}
 	update_trip_clock()
@@ -705,7 +714,7 @@ func take_vehicle_part(vehicle_id: String, kind: String) -> void:
 
 func update_surface_position() -> void:
 	var cell: Vector2i = surface_block.cell()
-	var title: String = SurfaceBlock.CELL_NAMES[cell.y][cell.x]
+	var title: String = surface_block.CELL_NAMES[cell.y][cell.x]
 	var location: Dictionary = surface_block.active_building()
 	if not location.is_empty():
 		title = "%s · %d 楼" % [location.name, surface_block.floor_index + 1]

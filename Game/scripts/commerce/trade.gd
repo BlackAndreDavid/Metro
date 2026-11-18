@@ -1,4 +1,6 @@
 extends "res://scripts/ui/ui_builder.gd"
+const Dialogue = preload("res://scripts/commerce/customer_dialogue.gd")
+var active_story: Dictionary = {}
 const Orders = preload("res://scripts/commerce/customer_orders.gd")
 const DragItem = preload("res://scripts/commerce/trade_drag_item.gd")
 var home: Control
@@ -13,6 +15,7 @@ func configure(owner_home: Control) -> void:
 	$Panel/Map.pressed.connect(home.open_market_map.bind(state.station))
 	$Panel/Confirm.pressed.connect(confirm_order)
 	$Panel/Dismiss.pressed.connect(dismiss_customer)
+	$DialogueOverlay/Card/Dismiss.pressed.connect(dismiss_customer)
 	$Panel/Basket.controller = self
 	window.arrived.connect(on_customer_arrived)
 	window.departed.connect(next_customer)
@@ -20,6 +23,7 @@ func configure(owner_home: Control) -> void:
 	if not order.is_empty(): window.show_customer(int(order.visitor),order.status != "open")
 
 func on_customer_arrived() -> void:
+	if maybe_start_dialogue(): return
 	# Arrival only changes readiness; keep native drag sources alive mid-drag.
 	var quote := Orders.preview(state,selection)
 	$Panel/Confirm.disabled = not quote.problem.is_empty()
@@ -151,5 +155,49 @@ func dismiss_customer() -> void:
 		refresh(problem)
 		return
 	selection.clear()
+	active_story = {}
+	$DialogueOverlay.hide()
 	window.finish_order()
 	refresh("已送客，本次未结算，顾客正在向右离开。")
+
+func maybe_start_dialogue() -> bool:
+	var order: Dictionary = Orders.record(state).active
+	active_story = Dialogue.pending(state,order)
+	if active_story.is_empty():
+		$DialogueOverlay.hide()
+		return false
+	$Panel/Confirm.disabled = true
+	var saved: Dictionary = state.dialogue_progress.get(order.id,{})
+	show_dialogue_node(saved.get("node",active_story.start))
+	return true
+
+func show_dialogue_node(id: String) -> void:
+	var order: Dictionary = Orders.record(state).active
+	var node: Dictionary = Dialogue.enter(state,order,active_story,id)
+	$DialogueOverlay.show()
+	$DialogueOverlay/Card/Speaker.text = node.get("speaker",window.Catalog.definition(int(order.visitor)).name)
+	$DialogueOverlay/Card/TextScroll/Text.text = node.text
+	clear_column($DialogueOverlay/Card/Scroll/Choices)
+	var options: Array = node.get("choices",[])
+	var shown := 0
+	for choice in options:
+		if not Dialogue.matches(state,choice.get("conditions",{})): continue
+		var button := Button.new()
+		button.text = choice.text
+		button.pressed.connect(choose_dialogue.bind(choice.get("next","")))
+		$DialogueOverlay/Card/Scroll/Choices.add_child(button)
+		shown += 1
+	if shown == 0:
+		var button := Button.new()
+		button.text = "继续" if not node.get("next","").is_empty() else "结束对话"
+		button.pressed.connect(choose_dialogue.bind(node.get("next","")))
+		$DialogueOverlay/Card/Scroll/Choices.add_child(button)
+
+func choose_dialogue(next: String) -> void:
+	if not next.is_empty():
+		show_dialogue_node(next)
+		return
+	Dialogue.finish(state,Orders.record(state).active,active_story)
+	active_story = {}
+	$DialogueOverlay.hide()
+	if not maybe_start_dialogue(): refresh("")
