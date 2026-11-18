@@ -16,6 +16,10 @@
     "五角场": {
       "level": "res://content/levels/station_47f7d95b2745.json",
       "scene": "res://scenes/exploration/stations/station_47f7d95b2745.tscn"
+    },
+    "四川北路": {
+      "level": "res://content/levels/station_16b4c2b60108.json",
+      "scene": "res://scenes/exploration/stations/station_16b4c2b60108.tscn"
     }
   }
 }

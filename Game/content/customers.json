@@ -62,11 +62,16 @@
             },
             "rumour": {
               "speaker": "拾荒老人",
-              "text": "四平路有维修站，同济大学可以学习汽修。准备好照明，再到地表走走。",
+              "text": "现在核乌云还没完全散开，记得准备好照明，再到地表探索。",
               "set_flags": [
                 "scavenger_greeting_done"
               ],
-              "choices": []
+              "choices": [],
+              "next": "node_1",
+              "effects": {
+                "affection": 0,
+                "trust": 0
+              }
             },
             "trade": {
               "speaker": "拾荒老人",
@@ -75,6 +80,17 @@
                 "scavenger_greeting_done"
               ],
               "choices": []
+            },
+            "node_1": {
+              "speaker": "拾荒老人",
+              "text": "但是注意光亮可能会吸引怪物，如果遇到了要及时关灯，找地方藏起来或者赶快跑！",
+              "choices": [],
+              "next": "",
+              "set_flags": [],
+              "effects": {
+                "affection": 0,
+                "trust": 0
+              }
             }
           },
           "contexts": [
