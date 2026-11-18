@@ -1,0 +1,44 @@
+{
+	"account": 10.0,
+	"ate_today": false,
+	"auto_repair_level": 0,
+	"bag": [
+		{
+			"charge": 100,
+			"id": 1,
+			"kind": "aaa",
+			"rotated": false,
+			"x": 0,
+			"y": 0
+		},
+		{
+			"id": 2,
+			"kind": "water",
+			"rotated": false,
+			"x": 1,
+			"y": 0
+		},
+		{
+			"id": 3,
+			"kind": "ration",
+			"rotated": false,
+			"x": 2,
+			"y": 0
+		}
+	],
+	"car_power": 8.0,
+	"charger_used": {},
+	"day": 2,
+	"days_in_debt": 0,
+	"days_without_food": 1,
+	"days_without_water": 1,
+	"debt": 0.0,
+	"drank_today": false,
+	"game_over_reason": "",
+	"installed_charge": 43,
+	"locker": [],
+	"station": "四平路",
+	"version": 3,
+	"wide": false,
+	"world_seed": 255596488
+}
