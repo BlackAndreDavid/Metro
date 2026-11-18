@@ -12,7 +12,7 @@ test/
 │  ├─ test_build_flow.gd     家具、材料、扩建、耗电、存档迁移和多车厢回正
 │  ├─ test_fixture_flow.gd   五类占格、边界、四挂点、前景层和统一高亮
 │  ├─ test_art_tools.py      区域中位数、块多数色、帧对齐、筛选清理、文生图API离线契约
-│  ├─ test_commerce_flow.gd  独立客户素材、远近动画阶段及交易窗口真实点击
+│  ├─ test_commerce_flow.gd  Home 原窗像素与无顾客、交易场景客户动画、真实购买、刷新保留动画及返回清理
 │  ├─ test_settings_input.gd  Home 下静态设置按钮、真实鼠标命中、多个页面打开与关闭
 │  ├─ test_item_map_flow.gd  电脑旋转与收纳、满格保护、地图往返 Home
 │  └─ test_construction_flow.gd  独立场景、状态共享、真实鼠标选择／按钮、1秒蓄力与真实拖放、无效落点、拆除、仓库及退出

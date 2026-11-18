@@ -151,4 +151,4 @@ F5 打开主菜单：开始 → 三栏位存档（创建时命名基地／读取
 
 电脑家具为3×2格，贴图保持比例居中；屏幕只显示当天信息，点击不再打开地图。装修工具栏已移除线路图入口。
 
-交易窗口新增4位独立客户素材与远近进退动画，素材目录和扩展方式见 `scripts/commerce/customer_catalog.gd`。临时美术工具保存于根目录 [tools/art/README.md](../tools/art/README.md)；探索的详细结构见 [EXPLORATION_ARCHITECTURE.md](EXPLORATION_ARCHITECTURE.md)。
+独立交易场景 `scenes/commerce/trade.tscn` 内新增窗口、4位独立客户素材与远近进退动画；Home 维持原窗口，不显示顾客，素材目录和扩展方式见 `scripts/commerce/customer_catalog.gd`。临时美术工具保存于根目录 [tools/art/README.md](../tools/art/README.md)；探索的详细结构见 [EXPLORATION_ARCHITECTURE.md](EXPLORATION_ARCHITECTURE.md)。

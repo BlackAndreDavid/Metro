@@ -35,7 +35,7 @@
 
 `prepare/run/select/simplify` 都支持 `--frames N`：输入/生成横向等宽帧条，统一角色、相机、灯光、尺寸和落脚点。精简时按所有帧共有包围盒对齐，统一调色板和最小像素块，导出总帧条及逐帧 PNG。需要人工确认动作连续性；不会把生成结果误称为已验证的连续动画。
 
-当前客户的远近变化使用 Godot 的变换和颜色插值，不需要烘焙逐帧图。每位角色在 `Demo/assets/textures/customers/` 下有独立 PNG；保留原图及候选评估记录在 `Demo/assets/source/customers/`。角色注册在 `Demo/scripts/commerce/customer_catalog.gd`，增加新角色只需添加独立图片和一条目录记录。
+客户只出现在独立交易场景 `Demo/scenes/commerce/trade.tscn` 内，Home 保持原窗户。当前客户的远近变化使用 Godot 的变换和颜色插值，不需要烘焙逐帧图。每位角色在 `Demo/assets/textures/customers/` 下有独立 PNG；保留原图及候选评估记录在 `Demo/assets/source/customers/`。角色注册在 `Demo/scripts/commerce/customer_catalog.gd`，增加新角色只需添加独立图片和一条目录记录。
 
 `tools/import_customer_candidates.py` 可将3行×4列的客户候选表拆为每位3张候选，选择一组，保存4张独立原图与4张48×80运行图；临时候选自动删除。当前选择第2组（`--row 1`），因为人物完整、职业轮廓清晰且比例统一。
 

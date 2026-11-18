@@ -1,0 +1,88 @@
+[gd_scene load_steps=4 format=3]
+[ext_resource type="Script" path="res://scripts/commerce/trade.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/commerce/customer_window.tscn" id="2"]
+[sub_resource type="StyleBoxFlat" id="PanelStyle"]
+bg_color = Color(0.13,0.12,0.19,1)
+border_width_left = 1
+border_width_right = 1
+border_width_top = 1
+border_width_bottom = 1
+border_color = Color(0.32,0.29,0.4,1)
+[node name="Trade" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("1")
+[node name="Background" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.08,0.07,0.12,1)
+[node name="Panel" type="Panel" parent="."]
+offset_left = 32.0
+offset_top = 80.0
+offset_right = 1248.0
+offset_bottom = 688.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("PanelStyle")
+[node name="Title" type="Label" parent="Panel"]
+offset_left = 24.0
+offset_top = 13.0
+offset_right = 1060.0
+offset_bottom = 57.0
+mouse_filter = 2
+theme_override_font_sizes/font_size = 28
+[node name="Close" type="Button" parent="Panel"]
+offset_left = 1128.0
+offset_top = 18.0
+offset_right = 1192.0
+offset_bottom = 52.0
+text = "关闭"
+[node name="CustomerWindow" parent="Panel" instance=ExtResource("2")]
+offset_left = 24.0
+offset_top = 88.0
+offset_right = 304.0
+offset_bottom = 408.0
+[node name="Facility" type="Label" parent="Panel"]
+offset_left = 24.0
+offset_top = 424.0
+offset_right = 304.0
+offset_bottom = 462.0
+horizontal_alignment = 1
+mouse_filter = 2
+theme_override_font_sizes/font_size = 17
+[node name="Stock" type="Control" parent="Panel"]
+offset_left = 330.0
+offset_top = 82.0
+offset_right = 750.0
+offset_bottom = 452.0
+mouse_filter = 2
+[node name="Sales" type="Control" parent="Panel"]
+offset_left = 770.0
+offset_top = 82.0
+offset_right = 1190.0
+offset_bottom = 452.0
+mouse_filter = 2
+[node name="Account" type="Label" parent="Panel"]
+offset_left = 330.0
+offset_top = 486.0
+offset_right = 966.0
+offset_bottom = 522.0
+mouse_filter = 2
+theme_override_font_sizes/font_size = 19
+[node name="Map" type="Button" parent="Panel"]
+offset_left = 977.0
+offset_top = 486.0
+offset_right = 1192.0
+offset_bottom = 523.0
+text = "去线路图查报价"
+[node name="Status" type="Label" parent="Panel"]
+offset_left = 330.0
+offset_top = 544.0
+offset_right = 1192.0
+offset_bottom = 594.0
+mouse_filter = 2
+autowrap_mode = 2
+theme_override_font_sizes/font_size = 16

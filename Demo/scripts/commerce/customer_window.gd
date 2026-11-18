@@ -1,6 +1,5 @@
 extends Control
 ## One reversible depth animation for all independently stored customer sprites.
-signal activated
 const Catalog = preload("res://scripts/commerce/customer_catalog.gd")
 @export var approach_seconds := 0.9
 @export var stay_seconds := 5.0
@@ -10,15 +9,12 @@ var customer_index := 0
 var elapsed := 0.0
 var phase := "approach"
 var depth := 0.0
-var drag_surface: Control
 var textures: Array[Texture2D] = []
 @onready var portrait: TextureRect = $Customer
 
 func _ready() -> void:
 	for data in Catalog.ENTRIES:
 		textures.append(load(data.texture))
-	mouse_entered.connect(func(): $Hint.show())
-	mouse_exited.connect(func(): $Hint.hide())
 	set_customer(customer_index)
 	apply_depth(0)
 
@@ -53,9 +49,3 @@ func advance(delta: float) -> void:
 		"gap": apply_depth(0)
 
 func _process(delta: float) -> void: advance(delta)
-func _gui_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		if is_instance_valid(drag_surface):
-			drag_surface.start_drag(event.global_position,func(): activated.emit())
-		else: activated.emit()
-		accept_event()

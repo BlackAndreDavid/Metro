@@ -4,6 +4,7 @@ extends Control
 @export_range(0.0, 1.0) var drag_sensitivity := 0.35
 @export_range(0.0, 1.0) var background_parallax := 0.25
 @export_range(1.0, 1000.0) var return_speed := 320.0
+const HIGHLIGHTABLE = preload("res://scenes/items/highlightable_item.tscn")
 const FURNITURE = preload("res://scenes/items/furniture.tscn")
 const Catalog = preload("res://scripts/items/furniture_catalog.gd")
 const DEFINITIONS = Catalog.DEFINITIONS
@@ -139,13 +140,15 @@ func configure_world(home: Control) -> void:
 	fixtures.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	carriage.add_child(fixtures)
 	for index in range(0 if home.construction.active else train_count):
-		var window = preload("res://scenes/commerce/customer_window.tscn").instantiate()
+		# The window remains part of the carriage art. Reuse the common item
+		# component over that exact region instead of an invisible tooltip button.
+		var image: Image = $Carriage/Texture.texture.get_image().get_region(Rect2i(137, 17, 101, 49))
+		var window = HIGHLIGHTABLE.instantiate()
 		window.name = "TradeWindow%d" % index
 		window.position = Vector2(694 + index * 972, 204)
 		window.size = Vector2(420, 212)
 		fixtures.add_child(window)
-		window.drag_surface = self
-		window.set_customer(home.state.day + index)
+		window.set_item(ImageTexture.create_from_image(image), "交易", self)
 		window.activated.connect(_open_trade)
 	if home.construction.active:
 		make_grid(carriage, false)

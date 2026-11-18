@@ -435,65 +435,10 @@ func restart_game() -> void:
 	show_cabin()
 
 func show_trade(message: String = "") -> void:
-	begin_page("trade")
-	var market := State.Markets.profile(state.station)
-	var panel := modal("%s · %s" % [market.name, state.station], Rect2(154, 93, 972, 534))
-	action(panel, "本站货物", Rect2(24, 82, 126, 34), set_trade_supplies.bind(false), not trade_supplies)
-	action(panel, "生活补给", Rect2(162, 82, 126, 34), set_trade_supplies.bind(true), trade_supplies)
-	label(panel, "出售背包物品", Rect2(487, 82, 450, 34), 21)
-	plate(panel, Rect2(463, 91, 1, 302), BORDER)
-	var row := 0
-	var stock: Dictionary = State.Markets.ESSENTIALS if trade_supplies else market.stock
-	for kind in stock:
-		var offer := state.market_offer("stock", kind)
-		var shape := state.footprint(kind)
-		var y := 129 + row * 59
-		label(panel, state.item_name(kind), Rect2(24, y, 255, 23), 17, state.rarity_color(kind))
-		var descriptor := "满电 · 停电涨价" if kind == "aaa" and state.is_blackout() else "满电" if kind == "aaa" else state.rarity_name(kind)
-		var detail := "%s · %d×%d 格 · 库存 %d" % [descriptor, shape.x, shape.y, offer.remaining]
-		label(panel, detail, Rect2(24, y + 23, 255, 21), 13, MUTED)
-		var shortfall := state.credit_shortfall(offer.price)
-		var method := "赊购" if shortfall > 0.0 else "购买"
-		var caption := "%s  %s 度" % [method, energy_text(offer.price)] if offer.remaining > 0 else "今日售罄"
-		var buy := action(panel, caption, Rect2(274, y + 2, 162, 42), buy_item.bind(kind))
-		buy.disabled = offer.remaining == 0
-		if shortfall > 0.0 and not buy.disabled:
-			buy.tooltip_text = "本次记入欠费 %s 度" % energy_text(shortfall)
-		row += 1
-	plate(panel, Rect2(24, 400, 924, 1), BORDER)
-	label(panel, "账户余额 %s 度    待还欠费 %s 度" % [energy_text(state.account), energy_text(state.debt)],
-		Rect2(24, 419, 680, 36), 19, AMBER)
-	action(panel, "去线路图查报价", Rect2(765, 419, 183, 37), open_market_map.bind(state.station))
-	status = label(panel, "", Rect2(24, 473, 924, 32), 16, AMBER)
-	report(message)
-	if state.inventory.is_empty():
-		label(panel, "背包里没有可出售物品。", Rect2(487, 126, 435, 36), 16, MUTED)
-		return
-	var scroll := ScrollContainer.new()
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	put(panel, scroll, Rect2(487, 123, 461, 271))
-	var rows := VBoxContainer.new()
-	rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(rows)
-	for entry in state.inventory:
-		var kind: String = entry.kind
-		var offer := state.market_offer("demand", kind, state.station, int(entry.get("charge", State.FULL_CHARGE)))
-		var item_row := Control.new()
-		item_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		item_row.custom_minimum_size.y = 57
-		rows.add_child(item_row)
-		label(item_row, state.item_name(kind), Rect2(0, 6, 255, 23), 17, state.rarity_color(kind))
-		var detail := "本站不收" if offer.is_empty() else "今日已满额"
-		if not offer.is_empty() and offer.remaining > 0:
-			detail = "今日还能收 %d 件" % offer.remaining
-			action(item_row, "出售  %s 度" % energy_text(offer.price), Rect2(267, 7, 174, 40), sell_item.bind(entry.id))
-		elif kind == "aaa" or not State.Markets.ESSENTIALS.has(kind):
-			action(item_row, "查附近买家", Rect2(267, 7, 174, 40), find_buyer.bind(kind))
-		else:
-			detail = "每日补给"
-		if kind == "aaa":
-			detail = "电量 %d%% · %s" % [entry.charge, detail]
-		label(item_row, "%s · %s" % [state.rarity_name(kind), detail], Rect2(0, 28, 255, 20), 13, MUTED)
+	if screen != "trade" or not is_instance_valid(view) or view.scene_file_path != "res://scenes/commerce/trade.tscn":
+		begin_page("trade", preload("res://scenes/commerce/trade.tscn"))
+		view.configure(self)
+	view.refresh(message)
 
 func set_trade_supplies(enabled: bool) -> void:
 	trade_supplies = enabled

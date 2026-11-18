@@ -259,9 +259,27 @@ python3 test/tools/run_tests.py --godot /path/to/Godot_v4.7.2-stable_linux.x86_6
 
 - 电脑的**家具占格3×2**，储物物品仍为2×2，两个用途独立。`fill_grid=false` 配合 `FurnitureCatalog.visual_rect()` 保持电脑原图比例，在占格中央显示；装修预览复用相同算法。
 - “装修”移除了线路图按钮及控制器入口。屏幕的 `action=none`，仅提供当天信息悬浮提示和常驻站名/日期/天气，不再用点击或键盘打开线路图；正常模式仍可经过屏幕轻拖视角。电脑是线路图入口。
-- 交易窗口为独立 `scenes/commerce/customer_window.tscn`，由 HomeBackdrop 放在原窗口位置，点击仍打开原交易页面。`customer_window.gd` 用 approach/stay/depart/gap 四阶段循环，统一插值缩放、透明度和亮度，不修改交易价格、库存或账户规则。
+- 交易页面为独立 `scenes/commerce/trade.tscn`，其 `Panel/CustomerWindow` 实例化 `customer_window.tscn`；顾客和新增窗口仅存在于交易页面。HomeBackdrop 保持原车厢窗口素材和原交易热点，Home 不显示顾客。`customer_window.gd` 用 approach/stay/depart/gap 四阶段循环，统一插值缩放、透明度和亮度，不修改交易价格、库存或账户规则。
 - 四位客户分别保存在 `assets/textures/customers/{scavenger,mechanic,commuter,medic}.png`。`customer_catalog.gd` 注册目录；增加角色只添加独立 PNG 和目录记录。原图与生成筛选记录在 `assets/source/customers/`，不会把未选候选提交进仓库。
 - 美术工具为根目录 `tools/art_asset_tool.py`，预设与说明位于 [tools/art/README.md](../tools/art/README.md)。支持描述、2–3候选、选择、区域中位数、像素块多数色及动画帧条；当前四位客户通过聊天文生图生成，再经工具精简为48×80、18种可见颜色以内的透明图片。
 - 详细探索结构、事件流、数据与修改入口见 [探索模块详细架构](EXPLORATION_ARCHITECTURE.md)。
 
 版本10的电脑占格由2×2迁移到3×2，保留原车厢、储物状态和挂点，冲突时同车厢就近安放。
+
+## 交易场景与 Home 的边界
+
+`Home.show_trade()` 只负责加载 `scenes/commerce/trade.tscn` 并转发购买、出售、地图查询和关闭操作。`scripts/commerce/trade.gd` 管理交易列表、余额和结果文本。交易窗口、客户形象与远近动画属于该交易场景，不挂在 HomeBackdrop 上。
+
+```text
+Home
+├─ SettingsButton
+└─ Trade（交易时加载；返回 Home 后销毁）
+   ├─ Background
+   └─ Panel
+      ├─ CustomerWindow        顾客进退动画
+      ├─ Stock / Sales         购买和出售列表
+      ├─ Account / Status      余额与操作结果
+      └─ Map / Close           查报价、返回 Home
+```
+
+购买、出售或切换货物标签时只重建 Stock/Sales，保留 CustomerWindow 的当前客户、动画阶段和计时。关闭交易后整个 Trade 子场景释放，Home 恢复原窗口，不残留顾客节点。新增窗口及顾客视觉不更换 Home 的车厢窗户贴图。
