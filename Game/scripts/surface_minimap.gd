@@ -26,11 +26,16 @@ func update_location() -> void:
 		current = point
 		queue_redraw()
 
+func columns() -> int:
+	var count := 1
+	for street_row in street.CELL_NAMES: count = maxi(count,street_row.size())
+	return count
+
 func spacing() -> Vector2:
-	return Vector2(minf(SPACING.x,(size.x-64)/maxi(1,street.CELL_NAMES[0].size()-1)),minf(SPACING.y,(size.y-60)/maxi(1,street.CELL_NAMES.size()-1)))
+	return Vector2(minf(SPACING.x,(size.x-64)/maxi(1,columns()-1)),minf(SPACING.y,(size.y-60)/maxi(1,street.CELL_NAMES.size()-1)))
 
 func center(point: Vector2i) -> Vector2:
-	var span := Vector2(street.CELL_NAMES[0].size() - 1, street.CELL_NAMES.size() - 1) * spacing()
+	var span := Vector2(columns() - 1, street.CELL_NAMES.size() - 1) * spacing()
 	return (size - span) * 0.5 + Vector2(point) * spacing()
 
 func _draw() -> void:
@@ -53,7 +58,7 @@ func _draw() -> void:
 			draw_rect(bounds, fill)
 			draw_rect(bounds, fill.lightened(0.28), false)
 	for station in street.STATIONS:
-		var point := Vector2i(street.street_column(station.x), station.row)
+		var point := Vector2i(street.street_column(station.x,station.row), station.row)
 		var at := center(point)
 		var label_y := at.y + 28.0 if point.y == Block.SOUTH else at.y - 18.0
 		var ink := Color("f2eadd") if point == current else VISITED_COLOR

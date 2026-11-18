@@ -61,7 +61,7 @@ func show_node(id: String) -> void:
 		choices.remove_child(child)
 		child.queue_free()
 	var index := 0
-	for choice in node.get("choices",[]):
+	for choice in Dialogue.Meeting.new(story).replies(id):
 		if Dialogue.matches(state,choice.get("conditions",{}),npc.id):
 			var button := Button.new()
 			button.text = choice.text

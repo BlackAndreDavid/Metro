@@ -1,4 +1,5 @@
 extends RefCounted
+const Meeting = preload("res://scripts/commerce/meeting_dialogue.gd")
 const Customers = preload("res://scripts/commerce/customer_catalog.gd")
 
 static func matches(state: RefCounted, conditions: Dictionary, npc_id: String = "") -> bool:
@@ -55,7 +56,7 @@ static func pending(state: RefCounted, order: Dictionary) -> Dictionary:
 static func enter(state: RefCounted, order: Dictionary, story: Dictionary, node: String) -> Dictionary:
 	if not story.nodes.has(node): node = story.start
 	state.dialogue_progress[order.id] = {"story":story.id,"node":node}
-	var content: Dictionary = story.nodes[node]
+	var content: Dictionary = Meeting.new(story).turn(node)
 	for flag in content.get("set_flags",[]): state.content_flags[flag] = true
 	apply_effects(state,order,story,node,content.get("effects",{}))
 	return content

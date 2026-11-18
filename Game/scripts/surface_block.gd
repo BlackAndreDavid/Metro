@@ -1,6 +1,7 @@
 extends Control
 ## A side-view street block. Buildings use the same placements in the foreground and parallax layer.
 
+const Building = preload("res://scripts/content/exploration_building.gd")
 const InteriorLight = preload("res://assets/shaders/surface_light.gdshader")
 const AutoRepair = preload("res://scripts/auto_repair.gd")
 
@@ -80,6 +81,7 @@ var VEHICLES := DEFAULT_VEHICLES.duplicate(true)
 
 var state
 var font: Font
+var building_instances: Dictionary = {}
 var NPCS: Array = []
 var npc_textures: Dictionary = {}
 var interacting_npc := false
@@ -132,13 +134,16 @@ func apply_level(data: Dictionary) -> void:
 	GROUND = float(data.get("ground",DEFAULT_GROUND))
 	FLOOR_HEIGHT = float(data.get("floor_height",DEFAULT_FLOOR_HEIGHT))
 	CELL_NAMES = data.get("cell_names",DEFAULT_CELL_NAMES).duplicate(true)
-	WIDTH = SEGMENT * CELL_NAMES[0].size()
+	WIDTH = 0.0
+	for street in CELL_NAMES: WIDTH = maxf(WIDTH,SEGMENT*street.size())
 	STATIONS = data.get("stations",DEFAULT_STATIONS).duplicate(true)
 	BUILDINGS = data.get("buildings",DEFAULT_BUILDINGS).duplicate(true)
 	JUNCTIONS = data.get("junctions",DEFAULT_JUNCTIONS).duplicate(true)
 	LOOT = data.get("loot",DEFAULT_LOOT).duplicate(true)
 	VEHICLES = data.get("vehicles",DEFAULT_VEHICLES).duplicate(true)
+	building_instances.clear()
 	for entry in BUILDINGS:
+		building_instances[entry.id] = Building.new(entry)
 		if entry.wall is String: entry.wall = Color(entry.wall)
 	for entry in VEHICLES:
 		if data.get("id","postal") != "postal": entry.id = data.id + "/" + entry.id
@@ -147,8 +152,11 @@ func apply_level(data: Dictionary) -> void:
 func cell() -> Vector2i:
 	return Vector2i(street_column(player_x), row)
 
-func street_column(x: float) -> int:
-	return clampi(floori(x / SEGMENT), 0, CELL_NAMES[0].size() - 1)
+func street_width(street: int = -1) -> float:
+	return SEGMENT * CELL_NAMES[row if street < 0 else street].size()
+
+func street_column(x: float, street: int = -1) -> int:
+	return clampi(floori(x / SEGMENT), 0, CELL_NAMES[row if street < 0 else street].size() - 1)
 
 func map_connections() -> Array[Array]:
 	var connections: Array[Array] = []
@@ -156,13 +164,15 @@ func map_connections() -> Array[Array]:
 		for column in range(CELL_NAMES[street].size() - 1):
 			connections.append([Vector2i(column, street), Vector2i(column + 1, street)])
 	for junction in JUNCTIONS:
-		var column := street_column(junction.x)
+		if junction.x > minf(street_width(junction.row),street_width(junction.row+1))-24: continue
+		var column := street_column(junction.x,junction.row)
 		var alley := [Vector2i(column, junction.row), Vector2i(column, junction.row + 1)]
 		if not connections.has(alley):
 			connections.append(alley)
 	return connections
 
 func junction_destination(junction: Dictionary) -> int:
+	if junction.x > minf(street_width(junction.row),street_width(junction.row+1))-24: return -1
 	if row == junction.row:
 		return row + 1
 	if row == junction.row + 1:
@@ -187,7 +197,7 @@ func move_horizontal(axis: float, delta: float) -> void:
 		return
 	var location := active_building()
 	var minimum := 24.0
-	var maximum := WIDTH - 24.0
+	var maximum := street_width() - 24.0
 	if not location.is_empty():
 		minimum = location.x + 12.0
 		maximum = location.x + location.width - 12.0
@@ -281,13 +291,13 @@ func interact() -> void:
 			position_changed()
 
 func door_x(entry: Dictionary) -> float:
-	return entry.x + 27.0
+	return (building_instances[entry.id] if building_instances.has(entry.id) else Building.new(entry)).door_x()
 
 func stair_x(entry: Dictionary) -> float:
-	return entry.x + entry.width - 34.0
+	return (building_instances[entry.id] if building_instances.has(entry.id) else Building.new(entry)).stair_x()
 
 func camera_offset() -> float:
-	return clampf(player_x - size.x * 0.5, 0.0, maxf(0.0, WIDTH - size.x))
+	return clampf(player_x - size.x * 0.5, 0.0, maxf(0.0, street_width() - size.x))
 
 func update_lighting() -> void:
 	var location := active_building()
@@ -324,10 +334,10 @@ func _draw() -> void:
 		draw_rect(Rect2(0, 323, size.x, 28), Color("514452"))
 		draw_line(Vector2(0, 323), Vector2(size.x, 323), Color("746172"), 2.0)
 	draw_set_transform(Vector2(-camera_x, 0))
-	draw_rect(Rect2(0, GROUND, WIDTH, size.y - GROUND), Color("292738"))
-	draw_rect(Rect2(0, GROUND, WIDTH, 13), Color("6d5b69"))
-	draw_rect(Rect2(0, GROUND + 13, WIDTH, 16), Color("423b51"))
-	for x in range(0, int(WIDTH), 96):
+	draw_rect(Rect2(0, GROUND, street_width(), size.y - GROUND), Color("292738"))
+	draw_rect(Rect2(0, GROUND, street_width(), 13), Color("6d5b69"))
+	draw_rect(Rect2(0, GROUND + 13, street_width(), 16), Color("423b51"))
+	for x in range(0, int(street_width()), 96):
 		draw_rect(Rect2(x, GROUND + 59, 46, 2), Color("665367"))
 	for junction in JUNCTIONS:
 		var destination := junction_destination(junction)

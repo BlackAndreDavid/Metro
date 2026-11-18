@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Local customer and station editor. Binds only to loopback; writes validated game content."""
 import argparse
+import ast
 import base64
 import copy
 import hashlib
@@ -114,12 +115,16 @@ def validate_level(station,data):
     require(number(data.get('segment'),256,1600) and number(data.get('ground'),200,480) and number(data.get('floor_height'),50,130),'地图尺寸无效')
     cells=data.get('cell_names',[])
     require(isinstance(cells,list) and 1<=len(cells)<=8 and all(isinstance(r,list) and 1<=len(r)<=8 for r in cells),'地图须为1–8条街道、每条1–8个分段')
-    require(len({len(r) for r in cells})==1 and all(isinstance(n,str) and n for r in cells for n in r),'地图分段数量与名称无效')
-    width=data['segment']*len(cells[0])
+    require(all(isinstance(n,str) and n for r in cells for n in r),'地图格名称无效')
+    width=data['segment']*max(map(len,cells))
+    def row_width(row): return data['segment']*len(cells[int(row)])
     require(data.get('loot_station') in read(GAME/'content/stations.json'),'战利品来源站无效')
     for key in ['stations','buildings','junctions','loot','vehicles']:
         require(isinstance(data.get(key),list) and len(data[key])<=200,'地图对象列表无效')
-        for entry in data[key]: require(isinstance(entry,dict) and integer(entry.get('row'),0,len(cells)-2 if key=='junctions' else len(cells)-1) and number(entry.get('x'),24,width-24),'对象行号或横坐标无效')
+        for entry in data[key]:
+            require(isinstance(entry,dict) and integer(entry.get('row'),0,len(cells)-2 if key=='junctions' else len(cells)-1),'对象街道无效')
+            limit=min(row_width(entry['row']),row_width(entry['row']+1)) if key=='junctions' else row_width(entry['row'])
+            require(number(entry.get('x'),24,limit-24),'对象横坐标超出所在街道；巷口必须位于相邻街道共同范围')
     require(any(s.get('name')==station for s in data['stations']),'关卡必须有本站入口/撤离口')
     require(all(s.get('name') in read(GAME/'content/stations.json') for s in data['stations']),'撤离站点名称无效')
     require(number(data.get('grid_size',20),5,200),'栅格大小须在5～200')
@@ -129,11 +134,11 @@ def validate_level(station,data):
     placed=set()
     for npc in npcs:
         require(isinstance(npc,dict) and npc.get('npc') in known and npc['npc'] not in placed,'NPC不存在或在关卡内重复'); placed.add(npc['npc'])
-        require(integer(npc.get('row'),0,len(cells)-1) and number(npc.get('x'),24,width-24),'NPC位置无效')
+        require(integer(npc.get('row'),0,len(cells)-1) and number(npc.get('x'),24,row_width(npc['row'])-24),'NPC位置无效')
     buildings={}
     for building in data['buildings']:
         require(ID.fullmatch(building.get('id','')) and building['id'] not in buildings,'建筑ID无效或重复')
-        require(isinstance(building.get('name'),str) and building['name'] and number(building.get('width'),100,width) and building['x']+building['width']<=width,'建筑名称、宽度或边界无效')
+        require(isinstance(building.get('name'),str) and building['name'] and number(building.get('width'),100,width) and building['x']+building['width']<=row_width(building['row']),'建筑名称、宽度或边界无效')
         require(integer(building.get('floors'),1,2) and building['floors']*data['floor_height']<=data['ground'],'建筑楼层超出画面')
         require(re.fullmatch(r'#[0-9a-fA-F]{6}',building.get('wall','')),'墙体颜色须为#RRGGBB')
         buildings[building['id']]=building
@@ -171,6 +176,16 @@ def save_level(station,data):
     atomic(GAME/'content/registry.json',registry)
     return registry['stations'][station]
 
+def station_map():
+    # Reuse the game's diagram geometry; no separate station coordinate table to drift.
+    source=(GAME/'scripts/cabin_map.gd')
+    if not source.exists(): source=ROOT/'Game/scripts/cabin_map.gd'
+    text=source.read_text(encoding='utf-8')
+    stations={name:{'position':[int(x),int(y)],'label':[int(dx),int(dy)]} for name,x,y,dx,dy in re.findall(r'"([^"\n]+)": \[Vector2\((-?\d+), (-?\d+)\), Vector2\((-?\d+), (-?\d+)\)\]',text)}
+    section=text.split('const LINES := ',1)[1].split('const OTHER_LINES',1)[0].strip()
+    lines=ast.literal_eval(re.sub(r'Vector2\(([^)]+)\)',r'[\1]',section))
+    return {'stations':stations,'lines':lines}
+
 def editor_settings():
     path=GAME/'content/editor-settings.local.json'
     return read(path) if path.exists() else {'godot_executable':shutil.which('godot') or shutil.which('godot4') or '', 'project':str(GAME)}
@@ -201,14 +216,14 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         route=urlparse(self.path)
         try:
-            if route.path=='/api/project': return self.respond({'settings':editor_settings(),'token':self.token,'stations':read(GAME/'content/stations.json'),'customers':read(GAME/'content/customers.json')['customers'],'registry':read(GAME/'content/registry.json'),'categories':{'supplies':'生活补给','power':'电力用品','materials':'工业材料','documents':'文书旧物'}})
+            if route.path=='/api/project': return self.respond({'station_map':station_map(),'building_templates':read(GAME/'content/building_templates.json' if (GAME/'content/building_templates.json').exists() else ROOT/'Game/content/building_templates.json')['templates'],'settings':editor_settings(),'token':self.token,'stations':read(GAME/'content/stations.json'),'customers':read(GAME/'content/customers.json')['customers'],'registry':read(GAME/'content/registry.json'),'categories':{'supplies':'生活补给','power':'电力用品','materials':'工业材料','documents':'文书旧物'}})
             if route.path=='/api/level':
                 station=parse_qs(route.query).get('station',['邮电新村'])[0]; entry=read(GAME/'content/registry.json')['stations'].get(station)
                 return self.respond({'definition':read(resource(entry['level'])) if entry else None,'template':read(GAME/'content/levels/postal.json')})
             if route.path=='/asset':
                 path=resource(parse_qs(route.query).get('path',[''])[0]); require(path.suffix.lower()=='.png','只能预览PNG'); data=path.read_bytes(); mime='image/png'
             else:
-                file={'/':'index.html','/editor.js':'editor.js','/style.css':'style.css','/enhancements.js':'enhancements.js'}.get(route.path)
+                file={'/':'index.html','/editor.js':'editor.js','/style.css':'style.css','/enhancements.js':'enhancements.js','/models.js':'models.js','/workspace.js':'workspace.js'}.get(route.path)
                 if not file: return self.respond({'error':'未找到'},404)
                 path=WEB/file; data=path.read_bytes(); mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'}[path.suffix]
             self.send_response(200); self.send_header('Content-Type',mime); self.end_headers(); self.wfile.write(data)
@@ -218,6 +233,14 @@ class Handler(BaseHTTPRequestHandler):
             require(self.headers.get('X-Editor-Token')==self.token,'编辑令牌无效，请刷新页面')
             length=int(self.headers.get('Content-Length','0')); require(0<length<=16*1024*1024,'请求体过大或为空')
             data=json.loads(self.rfile.read(length))
+            if self.path=='/api/building-template':
+                require(ID.fullmatch(data.get('id','')) and isinstance(data.get('name'),str) and 0<len(data['name'])<=80,'建筑素材ID或名称无效')
+                require(number(data.get('width'),100,1600) and integer(data.get('floors'),1,2) and re.fullmatch(r'#[0-9a-fA-F]{6}',data.get('wall','')),'建筑素材尺寸、楼层或颜色无效')
+                path=GAME/'content/building_templates.json'
+                catalog=read(path if path.exists() else ROOT/'Game/content/building_templates.json')
+                catalog['templates']=[t for t in catalog['templates'] if t['id']!=data['id']]+[data]
+                atomic(path,catalog)
+                return self.respond({'ok':True})
             if self.path=='/api/settings':
                 require(isinstance(data.get('godot_executable'),str) and len(data['godot_executable'])<=1024,'Godot路径无效')
                 atomic(GAME/'content/editor-settings.local.json',{'godot_executable':data['godot_executable'],'project':str(GAME)})

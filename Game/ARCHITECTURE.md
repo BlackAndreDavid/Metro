@@ -53,6 +53,8 @@ Game/
 | `commerce/customer_catalog.gd`、`customer_window.gd` | 读取角色定义、即时加载头像、上半身裁取和进退动画 |
 | `commerce/customer_dialogue.gd` | 条件、优先级、节点、效果去重、关系与跨日事件 |
 | `commerce/trade_drag_item.gd`、`order_drop_zone.gd` | 原生商品拖放与订单接收区域 |
+| `content/exploration_building.gd` | 建筑实例类，封装门、楼梯和占用边界几何 |
+| `commerce/meeting_dialogue.gd` | 封装一次见面中的 NPC 轮次和玩家回答，供交易/探索共用 |
 | `content/content_registry.gd` | JSON 读取、站点到关卡和场景的映射 |
 | `content/npc_interaction.gd`、`preview_level.gd` | 探索 NPC 对话窗口、隔离的关卡预览会话 |
 | `ui/exploration_setup.gd`、`exploration.gd` | 整备界面和探索场景接线 |
@@ -147,6 +149,7 @@ HomeBackdrop 仍使用原窗户热点，不显示客户。客户窗口448×360�
 
 | 数据文件 | 职责 |
 | --- | --- |
+| `content/building_templates.json` | 可在各站拖入复用的建筑素材类定义 |
 | `content/customers.json` | 稳定角色目录、独立贴图、预算、权重、阵营与剧情 |
 | `content/stations.json` | 内容编辑器可选的地铁站列表 |
 | `content/registry.json` | 站点到关卡 JSON 及 tscn 的映射 |
@@ -154,7 +157,7 @@ HomeBackdrop 仍使用原窗户热点，不显示客户。客户窗口448×360�
 | `content/levels/station_<hash>.json` | 独立站点地图；包含建筑、物资、汽车和 NPC 位置 |
 | `scenes/exploration/stations/station_<hash>.tscn` | 编辑器生成的基础探索场景实例 |
 
-`content_registry.gd` 读取映射，Home 加载对应场景，SurfaceBlock.apply_level() 将 JSON 转为实例数据；绘图、交互和小地图共用同一数据。未登记站点继续简化搜刮。作者操作与接口参数见 [编辑器 README](../tools/editors/README.md)。
+`content_registry.gd` 读取映射，Home 加载对应场景，SurfaceBlock.apply_level() 将 JSON 转为实例数据；绘图、交互和小地图共用同一数据。各街道长度独立，移动边界按当前街道限制，小地图不生成缺失格子的连接。未登记站点继续简化搜刮。作者操作与接口参数见 [编辑器 README](../tools/editors/README.md)。
 
 ## 存档与验证
 

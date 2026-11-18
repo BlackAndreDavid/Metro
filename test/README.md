@@ -35,7 +35,7 @@ python test/tools/run_tests.py --godot "C:\Godot\Godot_v4.7.2-stable_win64.exe"
 | `cases/test_content_editors.py` | 编辑 API、输入/引用校验、稳定 ID、Godot 接口及场景导出 |
 | `cases/test_content_runtime.gd` | 由上述 Python 用例调用：新增头像、剧情恢复、关系去重、跨日事件、地图和 NPC |
 | `tools/run_tests.py` | 统一运行、隔离环境、超时控制及结果汇总 |
-| `tools/check_editors_browser.py` | 可选真实浏览器编辑流程 |
+| `tools/check_editors_browser.py` | 可选真实浏览器的卡片/地图/对话编辑流程 |
 | `tools/capture_home.gd`、`capture_content_story.gd` | 可选 Home/装修与剧情渲染截图 |
 
 按钮回归通过视口注入鼠标事件，验证真实 GUI 命中。原生商品拖放也使用真实输入路径。Godot AI 插件测试框架位于 `Game/addons/godot_ai/testing/`，状态用例依赖它；不移动第三方实现。
@@ -60,7 +60,7 @@ python -m pip install playwright
 python test/tools/check_editors_browser.py
 ```
 
-工具启动临时项目与本地服务，验证客户上传/保存、阵营、对话、跨日依赖、地图拖动/扩展、NPC 放置及 Godot 连接。当前脚本使用云环境的 Godot 绝对路径，迁移机器时一并调整。截图在 `results/editor-ui/`，不修改正在编辑的工程。
+工具启动临时项目与本地服务，验证头像卡选择、客户保存、多轮对话与拖拽连线、事件选择、线路图选站、不等长街道增减/撤销、原生建筑及 NPC 拖入、素材复用和 Godot 连接。当前脚本使用云环境的 Godot 绝对路径，迁移机器时一并调整。截图在 `results/editor-ui/`，不修改正在编辑的工程。
 
 ## 可选图形捕获
 

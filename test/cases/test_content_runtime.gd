@@ -71,6 +71,10 @@ func run() -> void:
 	check(home.state.npc_affection.get("editor_test") == 10 and home.state.faction_trust.get("red") == 11,"resuming a node does not replay additive effects")
 	check("谢谢" in scene.get_node("DialogueOverlay/Card/TextScroll/Text").text, "reopened trade resumes authored branch")
 	await click(scene.get_node("DialogueOverlay/Card/Scroll/Choices").get_child(0))
+	check("第二个问题" in scene.get_node("DialogueOverlay/Card/TextScroll/Text").text,"one meeting continues through multiple NPC turns")
+	await click(scene.get_node("DialogueOverlay/Card/Scroll/Choices").get_child(0))
+	check("本次见面结束" in scene.get_node("DialogueOverlay/Card/TextScroll/Text").text,"player can answer a second time within the same encounter")
+	await click(scene.get_node("DialogueOverlay/Card/Scroll/Choices").get_child(0))
 	check(not scene.get_node("DialogueOverlay").visible and Dialogue.pending(home.state,Orders.ensure(home.state)).is_empty(), "story finishes and enables order")
 	check(Orders.preview(home.state,[water]).problem.is_empty(), "transaction unlocked after dialogue")
 	check(Dialogue.matches(home.state,{"flags_all":["editor_story_done"],"day_min":1,"has_items":{"water":1}}) and not Dialogue.matches(home.state,{"account_min":100000}), "editor condition grammar checks state")
@@ -93,7 +97,7 @@ func run() -> void:
 	var x: float = home.surface_block.player_x
 	home.surface_block.move_horizontal(1,0.1)
 	check(home.surface_block.player_x > x and not home.view.get_node("Minimap").links.is_empty(), "custom level movement and minimap functional")
-	check(home.surface_block.CELL_NAMES.size() == 4 and home.surface_block.CELL_NAMES[0].size() == 4,"expanded map cells load in runtime")
+	check(home.surface_block.CELL_NAMES.size() == 4 and home.surface_block.CELL_NAMES[0].size() == 1,"expanded map cells load in runtime")
 	home.surface_block.row = 3
 	home.surface_block.player_x = 330
 	check(home.surface_block.interaction().get("kind") == "npc","authored exploration NPC is interactable")
@@ -106,6 +110,22 @@ func run() -> void:
 	panel.finish_interaction()
 	await process_frame
 	check(not home.surface_block.interacting_npc and home.state.narrative_history.has("editor_test/explore_followup"),"exploration dialogue completes persistent event")
+	var street = home.surface_block
+	street.row = 0
+	street.player_x = 500
+	street.move_horizontal(1,20)
+	check(street.player_x == 536 and street.street_column(street.player_x) == 0,"short street movement stops at its own endpoint")
+	street.row = 1
+	street.player_x = 2100
+	street.move_horizontal(1,20)
+	check(street.player_x == 2216 and street.street_column(street.player_x) == 3,"longer streets retain their extra cells")
+	var links_valid := true
+	for link in street.map_connections():
+		for point in link:
+			if point.x >= street.CELL_NAMES[point.y].size(): links_valid = false
+	check(links_valid and street.street_column(1500,0) == 0,"ragged minimap connections never reference missing cells")
+	var building: Dictionary = street.BUILDINGS[0]
+	check(street.building_instances.has(building.id) and is_equal_approx(street.door_x(building),building.x+27),"building instances encapsulate shared geometry")
 	home.queue_free()
 	await process_frame
 	print("CONTENT_RUNTIME: %d checks, %d failures" % [checks,failures])

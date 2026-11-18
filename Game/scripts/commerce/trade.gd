@@ -178,7 +178,7 @@ func show_dialogue_node(id: String) -> void:
 	$DialogueOverlay/Card/Speaker.text = node.get("speaker",window.Catalog.definition(int(order.visitor)).name)
 	$DialogueOverlay/Card/TextScroll/Text.text = node.text
 	clear_column($DialogueOverlay/Card/Scroll/Choices)
-	var options: Array = node.get("choices",[])
+	var options: Array = Dialogue.Meeting.new(active_story).replies(id)
 	var shown := 0
 	for choice in options:
 		if not Dialogue.matches(state,choice.get("conditions",{}),window.Catalog.definition(int(order.visitor)).id): continue

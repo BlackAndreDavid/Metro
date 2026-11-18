@@ -33,7 +33,9 @@ class ContentEditors(unittest.TestCase):
         customer.update(faction='red',id='editor_test',name='编辑器客户',base_budget=77,weight=1000,buy_categories=['supplies'],sell_categories=['documents'])
         customer['stories']=[dict(id='test_story',name='分支测试',priority=20,once=True,conditions={'day_min':1,'has_items':{'water':1}},start='greeting',nodes={
             'greeting':dict(speaker='编辑器客户',text='先聊聊再交易。',choices=[dict(text='听消息',next='thanks',conditions={},effects={'affection':3,'trust':5}),dict(text='先告别',next='',conditions={})]),
-            'thanks':dict(effects={'affection':7,'trust':6},speaker='编辑器客户',text='谢谢你听我说。',set_flags=['editor_story_done'],choices=[])})]
+            'thanks':dict(effects={'affection':7,'trust':6},speaker='编辑器客户',text='谢谢你听我说。',set_flags=['editor_story_done'],next='more',choices=[]),
+            'more':dict(speaker='编辑器客户',text='还有第二个问题。',choices=[dict(text='继续聊',next='last',conditions={}),dict(text='暂时告别',next='',conditions={})]),
+            'last':dict(speaker='编辑器客户',text='本次见面结束。',choices=[])})]
         customer['stories'].append(dict(id='explore_followup',name='跨日探索后续',contexts=['exploration'],after=[dict(npc='editor_test',story='test_story',days=1)],conditions={'affection_min':10,'trust_min':11},once=True,start='hello',nodes={'hello':dict(text='昨天的消息有了后续。',effects={'affection':2,'trust':3})}))
         return customer
     def level(self):
@@ -41,8 +43,12 @@ class ContentEditors(unittest.TestCase):
         level.update(loot_station='南京东路',stations=[{'name':'南京东路','row':2,'x':88}])
         level['buildings'][0]['name']='编辑建筑';level['loot'][0]['kind']='book'
         level['npcs']=[dict(npc='editor_test',row=3,x=330)]
-        for row in level['cell_names']: row.append('新增地图格')
-        level['cell_names'].append(['第四街'+str(i) for i in range(4)])
+        level['cell_names']=[['短街'],['中街'+str(i) for i in range(4)],['南街'+str(i) for i in range(3)],['第四街'+str(i) for i in range(2)]]
+        level['buildings']=[b for b in level['buildings'] if b['x']+b['width']<=level['segment']*len(level['cell_names'][b['row']])]
+        ids={b['id'] for b in level['buildings']}
+        level['loot']=[p for p in level['loot'] if not p['building'] or p['building'] in ids]
+        level['vehicles']=[v for v in level['vehicles'] if v['x']<=level['segment']*len(level['cell_names'][v['row']])-24]
+        level['junctions']=[j for j in level['junctions'] if j['x']<=min(level['segment']*len(level['cell_names'][j['row']]),level['segment']*len(level['cell_names'][j['row']+1]))-24]
         level['junctions'].append(dict(row=2,x=330))
         return level
     def test_customer_fields_branch_validation_and_stable_order(self):
@@ -84,13 +90,55 @@ class ContentEditors(unittest.TestCase):
             editor.atomic(self.game/'content/editor-settings.local.json',{'godot_executable':godot})
             self.assertIn('4.7',editor.godot_action({'action':'probe'})['version'])
 
+    def test_ragged_streets_validate_each_row_and_junction_overlap(self):
+        editor.save_customer(self.customer());level=self.level();editor.validate_level('南京东路',level)
+        self.assertEqual([len(r) for r in level['cell_names']],[1,4,3,2])
+        bad=copy.deepcopy(level);bad['vehicles'].append(dict(id='outside',row=0,x=700,color='#677378'))
+        with self.assertRaises(ValueError):editor.validate_level('南京东路',bad)
+        bad=copy.deepcopy(level);bad['junctions'].append(dict(row=0,x=700))
+        with self.assertRaises(ValueError):editor.validate_level('南京东路',bad)
+        bad=copy.deepcopy(level);bad['buildings'][0]['width']=500
+        with self.assertRaises(ValueError):editor.validate_level('南京东路',bad)
+        geometry=editor.station_map()
+        self.assertEqual(set(geometry['stations']),set(editor.read(self.game/'content/stations.json')))
+        self.assertEqual(geometry['stations']['邮电新村']['position'],[794,235])
+
+    def test_building_and_meeting_models_preserve_instances_and_answers(self):
+        node=shutil.which('node')
+        if not node:self.skipTest('Node.js required for editor model checks')
+        source=(ROOT/'tools/editors/models.js').read_text()
+        checks="""
+const check=(ok,message)=>{if(!ok)throw Error(message)};
+const level={segment:560,cell_names:[['short'],['a','b','c']],buildings:[],loot:[]};
+const template={id:'shop',name:'shop',width:200,floors:1,wall:'#736163'};
+const model=new BuildingDefinition(template),first=model.instantiate(level,0,500,20);level.buildings.push(first);
+const second=model.instantiate(level,1,900,20);check(first.id!==second.id,'unique building instances');
+check(first.x+first.width<=560&&template.id==='shop','row bounds and immutable template');
+level.loot.push({building:first.id,x:first.x+20,row:0});BuildingDefinition.move(level,first,1,900);
+check(level.loot[0].x===920&&level.loot[0].row===1,'contained loot follows building');
+const story={start:'a',nodes:{a:{text:'question',next:'end',choices:[{text:'answer',next:'end',effects:{trust:3}}]},end:{text:'end',choices:[]}}};
+const conversation=new MeetingDialogue(story),speech=conversation.appendSpeech('a','NPC');
+check(story.nodes.a.next===speech&&story.nodes.a.choices.length===0,'continuous speech inserted before answers');
+check(story.nodes[speech].choices[0].effects.trust===3,'existing answers and effects preserved');
+const reply=conversation.appendReply(speech,'NPC','second answer');
+check(story.nodes[speech].choices.length===2&&story.nodes[reply].text,'multiple answers lead to independent turns');
+console.log('EDITOR_MODELS_OK');
+"""
+        result=subprocess.run([node,'-e',source+checks],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stderr);self.assertIn('EDITOR_MODELS_OK',result.stdout)
+
     def test_http_api_requires_token_and_writes_validated_content(self):
         editor.Handler.token='test-token'
         server=editor.ThreadingHTTPServer(('127.0.0.1',0),editor.Handler)
         thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
         url=f'http://127.0.0.1:{server.server_port}'
         try:
-            with urllib.request.urlopen(url+'/api/project') as response:self.assertEqual(json.load(response)['token'],'test-token')
+            with urllib.request.urlopen(url+'/api/project') as response:
+                project=json.load(response);self.assertEqual(project['token'],'test-token');self.assertEqual(len(project['station_map']['stations']),74);self.assertGreater(len(project['building_templates']),0)
+            template={'id':'test_shop','name':'新商店','width':160,'floors':1,'wall':'#736163'}
+            request=urllib.request.Request(url+'/api/building-template',data=json.dumps(template).encode(),headers={'Content-Type':'application/json','X-Editor-Token':'test-token'})
+            with urllib.request.urlopen(request) as response:self.assertTrue(json.load(response)['ok'])
+            self.assertEqual(editor.read(self.game/'content/building_templates.json')['templates'][-1],template)
             request=urllib.request.Request(url+'/api/customer',data=json.dumps(self.customer()).encode(),headers={'Content-Type':'application/json'})
             with self.assertRaises(urllib.error.HTTPError):urllib.request.urlopen(request)
             request.add_header('X-Editor-Token','test-token')

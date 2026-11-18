@@ -89,7 +89,7 @@ func run() -> void:
 	home.confirm_departure()
 	await process_frame
 	check(home.state.trip_active and home.screen == "surface", "departure enters exploration")
-	check(home.view.scene_file_path == "res://scenes/game/exploration.tscn", "independent exploration scene")
+	check(home.view.scene_file_path == preload("res://scripts/content/content_registry.gd").scene(home.state.station), "independent exploration scene")
 	check(home.surface_block == home.view.get_node("StreetFrame/SurfaceBlock"), "editable street node")
 	check(home.surface_pack.get_parent() == home.view.get_node("PackAnchor"), "pack anchored by scene")
 	var street = home.surface_block

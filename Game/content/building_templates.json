@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "templates": [
+    {"id":"small_shop","name":"沿街商店","width":160,"floors":1,"wall":"#736163"},
+    {"id":"residence","name":"居民楼","width":240,"floors":2,"wall":"#655664"},
+    {"id":"workshop","name":"维修工坊","width":200,"floors":1,"wall":"#5e5a61"},
+    {"id":"office","name":"办公楼","width":260,"floors":2,"wall":"#4d6061"}
+  ]
+}
