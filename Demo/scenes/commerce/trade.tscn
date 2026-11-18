@@ -1,6 +1,7 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 [ext_resource type="Script" path="res://scripts/commerce/trade.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/commerce/customer_window.tscn" id="2"]
+[ext_resource type="Script" path="res://scripts/commerce/order_drop_zone.gd" id="3"]
 [sub_resource type="StyleBoxFlat" id="PanelStyle"]
 bg_color = Color(0.13,0.12,0.19,1)
 border_width_left = 1
@@ -22,7 +23,7 @@ anchor_bottom = 1.0
 color = Color(0.08,0.07,0.12,1)
 [node name="Panel" type="Panel" parent="."]
 offset_left = 32.0
-offset_top = 80.0
+offset_top = 76.0
 offset_right = 1248.0
 offset_bottom = 688.0
 mouse_filter = 2
@@ -42,47 +43,89 @@ offset_bottom = 52.0
 text = "关闭"
 [node name="CustomerWindow" parent="Panel" instance=ExtResource("2")]
 offset_left = 24.0
-offset_top = 88.0
-offset_right = 304.0
-offset_bottom = 408.0
-[node name="Facility" type="Label" parent="Panel"]
+offset_top = 72.0
+offset_right = 472.0
+offset_bottom = 432.0
+[node name="Order" type="Label" parent="Panel"]
 offset_left = 24.0
-offset_top = 424.0
-offset_right = 304.0
-offset_bottom = 462.0
-horizontal_alignment = 1
-mouse_filter = 2
-theme_override_font_sizes/font_size = 17
-[node name="Stock" type="Control" parent="Panel"]
-offset_left = 330.0
-offset_top = 82.0
-offset_right = 750.0
-offset_bottom = 452.0
-mouse_filter = 2
-[node name="Sales" type="Control" parent="Panel"]
-offset_left = 770.0
-offset_top = 82.0
-offset_right = 1190.0
-offset_bottom = 452.0
-mouse_filter = 2
-[node name="Account" type="Label" parent="Panel"]
-offset_left = 330.0
-offset_top = 486.0
-offset_right = 966.0
-offset_bottom = 522.0
-mouse_filter = 2
-theme_override_font_sizes/font_size = 19
-[node name="Map" type="Button" parent="Panel"]
-offset_left = 977.0
-offset_top = 486.0
-offset_right = 1192.0
-offset_bottom = 523.0
-text = "去线路图查报价"
-[node name="Status" type="Label" parent="Panel"]
-offset_left = 330.0
-offset_top = 544.0
-offset_right = 1192.0
-offset_bottom = 594.0
+offset_top = 446.0
+offset_right = 472.0
+offset_bottom = 560.0
 mouse_filter = 2
 autowrap_mode = 2
+theme_override_font_sizes/font_size = 17
+[node name="Bag" type="Control" parent="Panel"]
+offset_left = 496.0
+offset_top = 72.0
+offset_right = 832.0
+offset_bottom = 312.0
+mouse_filter = 2
+[node name="Stock" type="Control" parent="Panel"]
+offset_left = 856.0
+offset_top = 72.0
+offset_right = 1192.0
+offset_bottom = 312.0
+mouse_filter = 2
+[node name="Basket" type="Panel" parent="Panel"]
+offset_left = 496.0
+offset_top = 326.0
+offset_right = 1192.0
+offset_bottom = 460.0
+theme_override_styles/panel = SubResource("PanelStyle")
+script = ExtResource("3")
+[node name="Scroll" type="ScrollContainer" parent="Panel/Basket"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = 8.0
+offset_right = -8.0
+offset_bottom = -8.0
+mouse_filter = 1
+horizontal_scroll_mode = 0
+[node name="Items" type="VBoxContainer" parent="Panel/Basket/Scroll"]
+size_flags_horizontal = 3
+mouse_filter = 1
+[node name="Empty" type="Label" parent="Panel/Basket"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+horizontal_alignment = 1
+vertical_alignment = 1
+mouse_filter = 2
+text = "将同类商品拖入订单，再确认交易"
+theme_override_font_sizes/font_size = 18
+[node name="Quote" type="Label" parent="Panel"]
+offset_left = 496.0
+offset_top = 472.0
+offset_right = 982.0
+offset_bottom = 520.0
+mouse_filter = 2
 theme_override_font_sizes/font_size = 16
+[node name="Confirm" type="Button" parent="Panel"]
+offset_left = 1000.0
+offset_top = 480.0
+offset_right = 1192.0
+offset_bottom = 522.0
+text = "确认交易"
+[node name="Account" type="Label" parent="Panel"]
+offset_left = 496.0
+offset_top = 532.0
+offset_right = 1192.0
+offset_bottom = 557.0
+mouse_filter = 2
+theme_override_font_sizes/font_size = 17
+[node name="Map" type="Button" parent="Panel"]
+offset_left = 24.0
+offset_top = 574.0
+offset_right = 230.0
+offset_bottom = 601.0
+text = "去线路图查报价"
+[node name="Status" type="Label" parent="Panel"]
+offset_left = 250.0
+offset_top = 574.0
+offset_right = 1192.0
+offset_bottom = 604.0
+mouse_filter = 2
+autowrap_mode = 2
+theme_override_font_sizes/font_size = 15

@@ -30,11 +30,24 @@ func run() -> void:
 	home.show_cabin()
 	await capture("home_furnished")
 	home.show_trade()
-	var customers = home.view.get_node("Panel/CustomerWindow")
+	var trade = home.view
+	var customers = trade.get_node("Panel/CustomerWindow")
 	customers.set_process(false)
-	for depth in [0.15,0.5,1.0]:
-		customers.apply_depth(depth)
-		await capture("customer_depth_" + str(int(depth*100)))
+	for progress in [0.0,0.5,1.0]:
+		customers.show_customer(customers.customer_index)
+		customers.advance(customers.approach_seconds*progress)
+		await capture("customer_entry_" + str(int(progress*100)))
+	for entry in home.state.inventory:
+		if entry.kind == "water":
+			trade.queue_item({"source":"bag","id":entry.id})
+			break
+	await capture("order_selection")
+	trade.confirm_order()
+	customers.advance(customers.depart_seconds/2)
+	await capture("customer_exit_right")
+	customers.advance(customers.depart_seconds/2)
+	customers.advance(customers.approach_seconds)
+	await capture("customer_sell_order")
 	home.show_cabin()
 	home.home_backdrop.get_node("Carriage/FurnitureSlots/Bed").set_highlighted(true)
 	await capture("home_bed_outline")

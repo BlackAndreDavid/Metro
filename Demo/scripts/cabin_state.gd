@@ -29,7 +29,8 @@ const RARITY := {
 const RARITY_NAMES := ["普通", "少见", "稀有", "珍稀"]
 const RARITY_COLORS := [Color("bfc3ce"), Color("e4be76"), Color("ffa271"), Color("ff7873")]
 const EPOCH := "2026-07-11T00:00:00"
-const CABIN_SAVE_VERSION := 11
+const CABIN_SAVE_VERSION := 12
+const CustomerOrders = preload("res://scripts/commerce/customer_orders.gd")
 const ITEM_DEFINITIONS := {"computer": preload("res://resources/items/computer.tres")}
 const Furniture = preload("res://scripts/items/furniture_catalog.gd")
 const MAX_CARRIAGES := 3
@@ -60,6 +61,7 @@ var collected: Dictionary = {}
 var gear: Dictionary = {}
 var next_id := 1
 var market_usage: Dictionary = {}
+var customer_visits: Dictionary = {}
 var installed_charge := FULL_CHARGE
 var flashlight_on := false
 var flashlight_drain := 0.0
@@ -531,6 +533,7 @@ func recharge_battery(id: int) -> String:
 	return ""
 
 func next_day() -> void:
+	customer_visits.clear()
 	super.next_day()
 	market_usage.clear()
 	charger_used.clear()
@@ -644,6 +647,7 @@ func save_data() -> Dictionary:
 		"ate_today": ate_today, "game_over_reason": game_over_reason,
 		"car_power": car_power, "world_seed": world_seed, "charger_used": charger_used,
 		"auto_repair_level": auto_repair_level,
+		"customer_visits": customer_visits.duplicate(true),
 		"carriage_count": carriage_count, "furniture_layout": furniture_layout.duplicate(true),
 	}
 
@@ -712,7 +716,9 @@ func load_cabin(path: String, known_stations: Array) -> bool:
 	if not data is Dictionary:
 		return false
 	var version: Variant = data.get("version")
-	if version != 1 and version != 2 and version != 3 and version != 4 and version != 5 and version != 6 and version != 7 and version != 8 and version != 9 and version != 10 and version != CABIN_SAVE_VERSION:
+	if version != 1 and version != 2 and version != 3 and version != 4 and version != 5 and version != 6 and version != 7 and version != 8 and version != 9 and version != 10 and version != 11 and version != CABIN_SAVE_VERSION:
+		return false
+	if version == 12 and not CustomerOrders.valid_saved(data.get("customer_visits")):
 		return false
 	if version >= 3 and not valid_car_state(data):
 		return false
@@ -769,6 +775,7 @@ func load_cabin(path: String, known_stations: Array) -> bool:
 	end_trip()
 	collected.clear()
 	market_usage.clear()
+	customer_visits = data.customer_visits.duplicate(true) if version == 12 else {}
 	flashlight_drain = 0.0
 	restore_vitals({} if needs_upgrade else data)
 	if needs_upgrade:
@@ -918,6 +925,8 @@ func valid_home_layout(data: Dictionary, version: int = CABIN_SAVE_VERSION) -> b
 	return true
 
 func migrate_furniture(data: Dictionary, version: int) -> Dictionary:
+	if version == 11:
+		return Furniture.copy_layout(data.furniture_layout)
 	if version in [6, 7, 8, 9, 10]:
 		return Furniture.migrate_grid_layout(data.furniture_layout, version)
 	var layout := Furniture.initial_layout()

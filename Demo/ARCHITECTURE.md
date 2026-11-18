@@ -213,7 +213,7 @@ Root
 
 装修扩建最多至3节；每次消耗钢板×2、螺丝×4、工具×1，每节新增35×12地面格和4个挂点。行车基础30度／站，每新增一节+10；每日基础2度，每新增一节+2。材料不足、外出或游戏结束时不可扩建，失败不扣料。
 
-存档版本 **11** 保存家具 `{car,x,y}`（挂点另有 `mount`）、独立储物物品与朝向。兼容版本1–10；旧槽位迁移到新格位，保留原车厢及收纳状态。读取前完整校验位置、尺寸、重叠、挂点和电脑数量，非法布局不部分覆盖当前状态。旧档收纳中的电脑补入储物格，空间全满则恢复默认摆放以保留物品。布置、扩建通过床铺休息保存，返回菜单不自动保存。
+存档版本 **12** 保存家具 `{car,x,y}`（挂点另有 `mount`）、独立储物物品与朝向。兼容版本1–11；旧槽位迁移到新格位，保留原车厢及收纳状态。读取前完整校验位置、尺寸、重叠、挂点和电脑数量，非法布局不部分覆盖当前状态。旧档收纳中的电脑补入储物格，空间全满则恢复默认摆放以保留物品。布置、扩建通过床铺休息保存，返回菜单不自动保存。
 
 ## 美术修改与导出
 
@@ -259,7 +259,7 @@ python3 test/tools/run_tests.py --godot /path/to/Godot_v4.7.2-stable_linux.x86_6
 
 - 电脑的**家具占格3×2**，储物物品仍为2×2，两个用途独立。`fill_grid=false` 配合 `FurnitureCatalog.visual_rect()` 保持电脑原图比例，在占格中央显示；装修预览复用相同算法。
 - “装修”移除了线路图按钮及控制器入口。屏幕的 `action=none`，仅提供当天信息悬浮提示和常驻站名/日期/天气，不再用点击或键盘打开线路图；正常模式仍可经过屏幕轻拖视角。电脑是线路图入口。
-- 交易页面为独立 `scenes/commerce/trade.tscn`，其 `Panel/CustomerWindow` 实例化 `customer_window.tscn`；顾客和新增窗口仅存在于交易页面。HomeBackdrop 保持原车厢窗口素材和原交易热点，Home 不显示顾客。`customer_window.gd` 用 approach/stay/depart/gap 四阶段循环，统一插值缩放、透明度和亮度，不修改交易价格、库存或账户规则。
+- 交易页面为独立 `scenes/commerce/trade.tscn`，其 `Panel/CustomerWindow` 实例化 `customer_window.tscn`；顾客和新增窗口仅存在于交易页面。HomeBackdrop 保持原车厢窗口素材和原交易热点，Home 不显示顾客。`customer_window.gd` 从左入场，在中央等待订单完成，再向右退场；不再定时循环换客。窗口只显示独立全身素材的上半身。
 - 四位客户分别保存在 `assets/textures/customers/{scavenger,mechanic,commuter,medic}.png`。`customer_catalog.gd` 注册目录；增加角色只添加独立 PNG 和目录记录。原图与生成筛选记录在 `assets/source/customers/`，不会把未选候选提交进仓库。
 - 美术工具为根目录 `tools/art_asset_tool.py`，预设与说明位于 [tools/art/README.md](../tools/art/README.md)。支持描述、2–3候选、选择、区域中位数、像素块多数色及动画帧条；当前四位客户通过聊天文生图生成，再经工具精简为48×80、18种可见颜色以内的透明图片。
 - 详细探索结构、事件流、数据与修改入口见 [探索模块详细架构](EXPLORATION_ARCHITECTURE.md)。
@@ -268,7 +268,7 @@ python3 test/tools/run_tests.py --godot /path/to/Godot_v4.7.2-stable_linux.x86_6
 
 ## 交易场景与 Home 的边界
 
-`Home.show_trade()` 只负责加载 `scenes/commerce/trade.tscn` 并转发购买、出售、地图查询和关闭操作。`scripts/commerce/trade.gd` 管理交易列表、余额和结果文本。交易窗口、客户形象与远近动画属于该交易场景，不挂在 HomeBackdrop 上。
+`Home.show_trade()` 只负责加载 `scenes/commerce/trade.tscn` 并转发地图查询和关闭操作。`scripts/commerce/trade.gd` 管理商品拖拽、待确认清单和结果文本，`customer_orders.gd` 管理订单、预算、名额与原子结算。交易窗口、客户形象与进退动画属于该交易场景，不挂在 HomeBackdrop 上。
 
 ```text
 Home
@@ -277,9 +277,22 @@ Home
    ├─ Background
    └─ Panel
       ├─ CustomerWindow        顾客进退动画
-      ├─ Stock / Sales         购买和出售列表
+      ├─ Bag / Stock           玩家背包与顾客商品拖拽卡片
+      ├─ Basket / Confirm       待确认清单及确认交易按钮
+      ├─ Order / Quote          类别需求、预算、每日人数和报价
       ├─ Account / Status      余额与操作结果
       └─ Map / Close           查报价、返回 Home
 ```
 
-购买、出售或切换货物标签时只重建 Stock/Sales，保留 CustomerWindow 的当前客户、动画阶段和计时。关闭交易后整个 Trade 子场景释放，Home 恢复原窗口，不残留顾客节点。新增窗口及顾客视觉不更换 Home 的车厢窗户贴图。
+拖入或移除商品时只刷新卡片和清单，保留当前客户。确认交易成功才进入退场动画，退场结束才创建下一张订单。关闭交易后整个 Trade 子场景释放，Home 恢复原窗口，不残留顾客节点。新增窗口及顾客视觉不更换 Home 的车厢窗户贴图。
+
+## 每日顾客订单与预算
+
+- 交易窗口从280×320增至448×360逻辑像素，`CustomerWindow/Customer` 使用 AtlasTexture 从48×80独立原图裁取上方48×44区域，不修改源素材。入场由左侧移到中央，订单未完成时一直等待，完成后向右离开。
+- 每位顾客一张订单，以顾客为方向：`buy`＝顾客从玩家购买，`sell`＝顾客向玩家出售。订单只指定生活补给、电力用品、工业材料或文书旧物类别，允许同类不同商品组合，至少选择一件。
+- 用原生鼠标拖放把 Bag/Stock 卡片放入 Basket；不会立即扣款或移动库存。“移除”可撤回选择，“确认交易”再次校验类别、唯一物品ID、顾客库存、背包空间与预算，全部成功后一次性结算。
+- 顾客购买时预算减少、玩家收入先还欠费；总价超过顾客预算显示“买不起”，确认按钮禁用，库存和余额不变。顾客出售时预算增加，玩家按原账户/欠费规则付款；若需赊购，确认前明确提示。
+- 顾客出售的每种同类商品初始2件。当地已有报价沿用，新增同类商品用 BASE_PRICES、行情倍率及买入折扣定价；电池回收还考虑电量。旧的逐件即时购买/出售按钮已从交易界面移除。
+- 初始顾客预算为45–200度，按世界种子、日期、站点与到访序号确定；不会因关闭窗口重抽。站点每日上限：邮电新村4、四平路6、同济大学5；其他站按设施继承3–8位。配置位于 `customer_orders.gd → STATION_LIMITS/GROUP_LIMITS`。
+- 到访即占用一个当日名额，未完成订单不会自动跳过。关闭交易或切站后回来，保留同一站点的订单、预算和人数；日结清空各站当日记录。达到上限后窗口空置，显示明日再来。
+- 存档版本12保存 `customer_visits`，每站含 arrived/completed/active；读取先校验预算、类别、计数和库存，非法数据不部分覆盖游戏状态。版本1–11读取时建立空的顾客记录。

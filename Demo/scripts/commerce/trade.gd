@@ -1,80 +1,143 @@
 extends "res://scripts/ui/ui_builder.gd"
-## Transaction scene owns the animated customer window; Home only routes actions.
+const Orders = preload("res://scripts/commerce/customer_orders.gd")
+const DragItem = preload("res://scripts/commerce/trade_drag_item.gd")
 var home: Control
 var state: RefCounted
+var selection: Array = []
+@onready var window: Control = $Panel/CustomerWindow
 
 func configure(owner_home: Control) -> void:
 	home = owner_home
 	state = home.state
 	$Panel/Close.pressed.connect(home.show_cabin.bind(""))
 	$Panel/Map.pressed.connect(home.open_market_map.bind(state.station))
-	$Panel/CustomerWindow.set_customer(state.day)
+	$Panel/Confirm.pressed.connect(confirm_order)
+	$Panel/Basket.controller = self
+	window.arrived.connect(on_customer_arrived)
+	window.departed.connect(next_customer)
+	var order := Orders.ensure(state)
+	if not order.is_empty(): window.show_customer(int(order.visitor),order.status == "completed")
+
+func on_customer_arrived() -> void:
+	# Arrival only changes readiness; keep native drag sources alive mid-drag.
+	var quote := Orders.preview(state,selection)
+	$Panel/Confirm.disabled = not quote.problem.is_empty()
+	home.report(quote.problem)
 
 func clear_column(column: Control) -> void:
 	for node in column.get_children():
 		column.remove_child(node)
 		node.queue_free()
 
+func next_customer() -> void:
+	selection.clear()
+	var order := Orders.next(state)
+	if not order.is_empty(): window.show_customer(int(order.visitor))
+	refresh("")
+
 func refresh(message: String = "") -> void:
 	var market: Dictionary = state.Markets.profile(state.station)
+	var visits := Orders.record(state)
+	var order: Dictionary = visits.active
 	$Panel/Title.text = "%s · %s" % [market.name,state.station]
-	$Panel/Facility.text = market.facility
+	$Panel/Account.text = "账户 %s 度 · 欠费 %s 度" % [home.energy_text(state.account),home.energy_text(state.debt)]
+	$Panel/Order.text = "今日到访 %d / %d · 已完成 %d 单" % [visits.arrived,Orders.daily_limit(state.station),visits.completed]
+	if order.is_empty():
+		$Panel/Order.text += "\n今日顾客已全部接待，明日再来。"
+	else:
+		$Panel/Order.text += "\n顾客%s：%s类商品\n顾客预算 %s 度" % ["购买" if order.side == "buy" else "出售",Orders.CATEGORIES[order.category].name,home.energy_text(order.budget)]
+		if order.status == "completed": $Panel/Order.text += "\n订单完成 · 顾客正在离开"
+	clear_column($Panel/Bag)
 	clear_column($Panel/Stock)
-	clear_column($Panel/Sales)
-	show_stock($Panel/Stock,market)
-	show_sales($Panel/Sales)
-	$Panel/Account.text = "账户余额 %s 度    待还欠费 %s 度" % [home.energy_text(state.account),home.energy_text(state.debt)]
+	show_items($Panel/Bag,"玩家背包",false,order)
+	show_items($Panel/Stock,"顾客货物",true,order)
+	refresh_basket()
+	var quote := Orders.preview(state,selection)
+	$Panel/Quote.text = "商品 %d 件 · 合计 %s 度" % [selection.size(),home.energy_text(quote.total)]
+	if not order.is_empty() and order.status == "open":
+		$Panel/Quote.text += "\n顾客交易后预算 %s 度" % home.energy_text(order.budget + quote.total * (-1 if order.side == "buy" else 1))
+	$Panel/Confirm.disabled = not quote.problem.is_empty() or window.phase != "stay"
 	home.status = $Panel/Status
-	home.report(message)
+	var feedback: String = message if not message.is_empty() else quote.problem
+	if feedback.is_empty() and not order.is_empty() and order.side == "sell" and state.credit_shortfall(quote.total) > 0:
+		feedback = "本次需赊购 %s 度，确认后计入欠费。" % home.energy_text(state.credit_shortfall(quote.total))
+	home.report(feedback)
 
-func show_stock(parent: Control, market: Dictionary) -> void:
-	action(parent,"本站货物",Rect2(0,0,126,34),home.set_trade_supplies.bind(false),not home.trade_supplies)
-	action(parent,"生活补给",Rect2(138,0,126,34),home.set_trade_supplies.bind(true),home.trade_supplies)
-	var stock: Dictionary = state.Markets.ESSENTIALS if home.trade_supplies else market.stock
-	var row := 0
-	for kind in stock:
-		var offer: Dictionary = state.market_offer("stock",kind)
-		var shape: Vector2i = state.footprint(kind)
-		var y := 48 + row * 59
-		label(parent,state.item_name(kind),Rect2(0,y,230,23),17,state.rarity_color(kind))
-		var descriptor: String = "满电 · 停电涨价" if kind == "aaa" and state.is_blackout() else "满电" if kind == "aaa" else state.rarity_name(kind)
-		label(parent,"%s · %d×%d 格 · 库存 %d" % [descriptor,shape.x,shape.y,offer.remaining],Rect2(0,y+23,235,21),13,MUTED)
-		var shortfall: float = state.credit_shortfall(offer.price)
-		var method := "赊购" if shortfall > 0 else "购买"
-		var caption := "%s  %s 度" % [method,home.energy_text(offer.price)] if offer.remaining > 0 else "今日售罄"
-		var buy := action(parent,caption,Rect2(240,y+2,166,42),home.buy_item.bind(kind))
-		buy.name = "Buy_" + kind
-		buy.disabled = offer.remaining == 0
-		if shortfall > 0 and not buy.disabled:
-			buy.tooltip_text = "本次记入欠费 %s 度" % home.energy_text(shortfall)
-		row += 1
-
-func show_sales(parent: Control) -> void:
-	label(parent,"出售背包物品",Rect2(0,0,410,34),21)
-	if state.inventory.is_empty():
-		label(parent,"背包里没有可出售物品。",Rect2(0,45,410,36),16,MUTED)
-		return
+func show_items(parent: Control, title: String, stock: bool, order: Dictionary) -> void:
+	label(parent,title,Rect2(0,0,336,28),19)
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	put(parent,scroll,Rect2(0,41,420,316))
+	put(parent,scroll,Rect2(0,34,336,206))
 	var rows := VBoxContainer.new()
 	rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(rows)
-	for entry in state.inventory:
-		var kind: String = entry.kind
-		var offer: Dictionary = state.market_offer("demand",kind,state.station,int(entry.get("charge",state.FULL_CHARGE)))
-		var item_row := Control.new()
-		item_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		item_row.custom_minimum_size.y = 57
-		rows.add_child(item_row)
-		label(item_row,state.item_name(kind),Rect2(0,6,215,23),17,state.rarity_color(kind))
-		var detail := "本站不收" if offer.is_empty() else "今日已满额"
-		if not offer.is_empty() and offer.remaining > 0:
-			detail = "今日还能收 %d 件" % offer.remaining
-			var sell := action(item_row,"出售  %s 度" % home.energy_text(offer.price),Rect2(228,7,166,40),home.sell_item.bind(entry.id))
-			sell.name = "Sell_" + str(entry.id)
-		elif kind == "aaa" or not state.Markets.ESSENTIALS.has(kind):
-			action(item_row,"查附近买家",Rect2(228,7,166,40),home.find_buyer.bind(kind))
-		else: detail = "每日补给"
-		if kind == "aaa": detail = "电量 %d%% · %s" % [entry.charge,detail]
-		label(item_row,"%s · %s" % [state.rarity_name(kind),detail],Rect2(0,28,215,20),13,MUTED)
+	if stock:
+		if order.is_empty() or order.side != "sell" or order.status != "open":
+			label(rows,"本订单不提供出售商品",Rect2(0,0,310,40),14,MUTED)
+			return
+		for kind in order.stock:
+			if order.stock[kind] <= 0: continue
+			add_card(rows,{"source":"stock","kind":kind},kind,Orders.price(state,order,kind),"库存 %d" % order.stock[kind])
+	else:
+		for entry in state.inventory:
+			var value := Orders.price(state,order,entry.kind,int(entry.get("charge",100))) if not order.is_empty() and Orders.BASE_PRICES.has(entry.kind) else 0.0
+			add_card(rows,{"source":"bag","id":entry.id},entry.kind,value,"%s类" % Orders.CATEGORIES[Orders.category_of(entry.kind)].name if not Orders.category_of(entry.kind).is_empty() else "非订单商品")
+
+func add_card(parent: Control, payload: Dictionary, kind: String, value: float, detail: String) -> void:
+	var card := DragItem.new()
+	card.name = ("Stock_" + kind) if payload.source == "stock" else ("Bag_" + str(payload.id))
+	card.payload = payload
+	card.caption = "%s · %s 度" % [state.item_name(kind),home.energy_text(value)]
+	card.custom_minimum_size = Vector2(310,58)
+	card.mouse_default_cursor_shape = Control.CURSOR_DRAG
+	card.add_theme_stylebox_override("panel",style(Color("302b43"),BORDER))
+	parent.add_child(card)
+	var text := Label.new()
+	text.text = card.caption + "\n" + detail + " · 拖入下方订单"
+	text.mouse_filter = MOUSE_FILTER_IGNORE
+	text.add_theme_font_size_override("font_size",14)
+	card.add_child(text)
+
+func refresh_basket() -> void:
+	var list = $Panel/Basket/Scroll/Items
+	clear_column(list)
+	$Panel/Basket/Empty.visible = selection.is_empty()
+	for index in range(selection.size()):
+		var payload: Dictionary = selection[index]
+		var entry: Dictionary = state.find_entry("bag",int(payload.get("id",-1))) if payload.source == "bag" else payload
+		var row := HBoxContainer.new()
+		list.add_child(row)
+		var text := Label.new()
+		text.text = state.item_name(entry.get("kind","water"))
+		text.size_flags_horizontal = SIZE_EXPAND_FILL
+		text.mouse_filter = MOUSE_FILTER_IGNORE
+		row.add_child(text)
+		var remove := Button.new()
+		remove.name = "Remove_" + str(index)
+		remove.text = "移除"
+		remove.pressed.connect(remove_item.bind(index))
+		row.add_child(remove)
+
+func queue_item(payload: Dictionary) -> void:
+	var candidate := selection.duplicate(true)
+	candidate.append(payload.duplicate())
+	var quote := Orders.preview(state,candidate)
+	if not quote.problem.is_empty() and not quote.problem.begins_with("买不起") and quote.problem != "背包没有足够的空间。":
+		home.report(quote.problem)
+		return
+	selection = candidate
+	refresh("")
+
+func remove_item(index: int) -> void:
+	selection.remove_at(index)
+	refresh("")
+
+func confirm_order() -> void:
+	if window.phase != "stay": return
+	var problem := Orders.confirm(state,selection)
+	if not problem.is_empty():
+		refresh(problem)
+		return
+	selection.clear()
+	window.finish_order()
+	refresh("交易完成，顾客正在向右离开。")

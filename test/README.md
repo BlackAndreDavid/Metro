@@ -12,7 +12,8 @@ test/
 │  ├─ test_build_flow.gd     家具、材料、扩建、耗电、存档迁移和多车厢回正
 │  ├─ test_fixture_flow.gd   五类占格、边界、四挂点、前景层和统一高亮
 │  ├─ test_art_tools.py      区域中位数、块多数色、帧对齐、筛选清理、文生图API离线契约
-│  ├─ test_commerce_flow.gd  Home 原窗像素与无顾客、交易场景客户动画、真实购买、刷新保留动画及返回清理
+│  ├─ test_customer_orders.gd  类别订单、预算、原子结算、库存、读档、每日人数和次日刷新
+│  ├─ test_commerce_flow.gd  Home不变、左进右出、上半身、真实拖拽/移除/确认、预算提示与订单恢复
 │  ├─ test_settings_input.gd  Home 下静态设置按钮、真实鼠标命中、多个页面打开与关闭
 │  ├─ test_item_map_flow.gd  电脑旋转与收纳、满格保护、地图往返 Home
 │  └─ test_construction_flow.gd  独立场景、状态共享、真实鼠标选择／按钮、1秒蓄力与真实拖放、无效落点、拆除、仓库及退出
@@ -71,4 +72,4 @@ Godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Du
 
 按钮回归使用 `InputEventMouseButton` 注入视口，验证实际 GUI 命中与状态变化，防止 `pressed.emit()` 绕过输入遮挡。旧问题的复现记录可保存在 results 中；图形捕获包含无 Home UI 的独立建造场景。
 
-美术工具测试需要 Pillow；统一入口现包含10组Godot导入/流程与1组美术工具检查，结果均写入 results。文生图 API 使用本地模拟响应验证请求与文件生命周期，实际客户素材来自聊天中的文生图工具。
+美术工具测试需要 Pillow；统一入口现包含11组Godot导入/流程与1组美术工具检查，结果均写入 results。文生图 API 使用本地模拟响应验证请求与文件生命周期，实际客户素材来自聊天中的文生图工具。

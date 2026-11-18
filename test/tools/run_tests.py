@@ -84,9 +84,11 @@ def main():
         run('commerce_flow', ['--script', str(root / 'cases/test_commerce_flow.gd'), '--',
                               '--save-file=' + str(output / 'commerce_flow_save.json')],
             ['COMMERCE_FLOW_OK'])
+    if results[0]['passed']:
+        run('customer_orders', ['--script', str(root / 'cases/test_customer_orders.gd')], ['CUSTOMER_ORDERS_OK'])
     run('art_tools', [], ['OK'], command_override=[sys.executable, '-m', 'unittest', 'discover',
         '-s', str(root / 'cases'), '-p', 'test_art_tools.py'])
-    passed = len(results) == 11 and all(item['passed'] for item in results)
+    passed = len(results) == 12 and all(item['passed'] for item in results)
     summary = dict(run_id=run_id, passed=passed, results=results)
     (output / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print(f'Results: {output}')
