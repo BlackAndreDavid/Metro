@@ -9,9 +9,9 @@
         "texture": "res://assets/textures/temp/monsters/mutant_rat.png",
         "frames": 4,
         "fps": 8,
-        "width": 128,
+        "width": 64,
         "height": 32,
-        "collision_width": 128,
+        "collision_width": 64,
         "collision_height": 32,
         "faces_left": true
       },
