@@ -10,8 +10,10 @@ func run() -> void:
 	var home = load("res://scenes/game/home.tscn").instantiate();root.add_child(home);home.show_cabin();home.state.installed_charge = 100
 	home.loadout = {"light":true,"heavy":true,"wide":false,"crowbar":false,"wrench":false};home.confirm_departure();await process_frame
 	var street = home.surface_block;street.set_process(false)
+	home.state.inventory.clear();home.state.add_supply("meds","bag");home.state.equip_active(home.state.inventory[0].id);home.view.refresh_active()
 	for i in range(5):street.move_horizontal(1,0.1,true)
 	street.motion_updated.emit(street.motion.stamina,true,0);street.update_interaction_visuals();street.queue_redraw();await capture("suit-sprint-rat")
+	home.view.set_pack_open(true);await capture("backpack-active-overlay");home.view.set_pack_open(false)
 	var point: Dictionary = street.LOOT[0];street.row = int(point.row);street.player_x = point.x;street.building = point.building;street.floor_index = int(point.floor);home.state.flashlight_on = true
 	street.position_changed();street.update_interaction_visuals();await capture("cabinet-highlight")
 	street.interact();await capture("cabinet-contents")

@@ -1,8 +1,8 @@
 'use strict';
 // Scene canvas, reusable assets and encounter view. Exact values stay in the inspector.
 const W={row:2,col:0,undo:[],tool:null,ghost:null,pendingLink:null,chat:[],story:null};
-const entityTypes=['buildings','stations','junctions','loot','vehicles','npcs','monsters'];
-const names={buildings:'建筑',stations:'站口',junctions:'巷口',loot:'物资',vehicles:'汽车',npcs:'NPC',monsters:'怪物'};
+const entityTypes=['buildings','stations','junctions','loot','vehicles','npcs','monsters','spawn_points'];
+const names={buildings:'建筑',stations:'站口',junctions:'巷口',loot:'物资',vehicles:'汽车',npcs:'NPC',monsters:'怪物',spawn_points:'物资生成点'};
 function dirty(){ $('dirty').textContent='● 未保存' }
 function button(text,action,className=''){const b=document.createElement('button');b.textContent=text;b.className=className;b.onclick=run(action);return b}
 function syncCells(){ $('cells').value=S.level.cell_names.map(r=>r.join(',')).join('\n') }
@@ -20,7 +20,7 @@ function selectCell(row,col){W.row=row;W.col=Math.max(0,Math.min(S.level.cell_na
 function refreshMap(){syncCells();selectCell(Math.min(W.row,S.level.cell_names.length-1),W.col);listEntities();drawMap();dirty()}
 function keepEntrance(){if(!S.level.stations.some(s=>s.name===S.station))S.level.stations.push({name:S.station,row:Math.min(W.row,S.level.cell_names.length-1),x:rowStart(Math.min(W.row,S.level.cell_names.length-1))+48})}
 const workspaceShowLevel=showLevel;
-showLevel=function(data){data=clone(data);data.monsters??=[];data.street_starts??=data.cell_names.map(()=>0);workspaceShowLevel(data);W.undo=[];W.tool=null;W.ghost=null;W.row=Math.min(W.row,S.level.cell_names.length-1);selectCell(W.row,0);renderPalette();updateStationBanner();drawMap()};
+showLevel=function(data){data=clone(data);data.monsters??=[];data.spawn_points??=[];data.street_starts??=data.cell_names.map(()=>0);workspaceShowLevel(data);W.undo=[];W.tool=null;W.ghost=null;W.row=Math.min(W.row,S.level.cell_names.length-1);selectCell(W.row,0);renderPalette();updateStationBanner();drawMap()};
 $('addColumn').onclick=run(()=>{readLevel();const row=S.level.cell_names[W.row];if(row.length>=8)throw Error('每条街道最多8格');checkpoint();row.push('新地图格');selectCell(W.row,row.length-1);refreshMap()});
 $('removeCell').onclick=run(()=>{
   readLevel();const row=S.level.cell_names[W.row];if(row.length===1)throw Error('每条街道至少保留一个格子');checkpoint();
@@ -51,7 +51,7 @@ function assetCard(label,tool,swatch=null){const b=button(label,()=>{W.tool=tool
 function renderPalette(){
   if(!S.project)return;
   const box=$('objectPalette');box.replaceChildren();box.append(button('↖ 选择 / 移动',()=>{W.tool=null;renderPalette()},W.tool?'object-chip':'object-chip selected'));
-  for(const type of['stations','junctions','vehicles']){const card=assetCard(names[type],{type});card.className='object-chip'+(W.tool?.type===type?' selected':'');box.append(card)}
+  for(const type of['stations','junctions','vehicles','spawn_points']){const card=assetCard(names[type],{type});card.className='object-chip'+(W.tool?.type===type?' selected':'');box.append(card)}
   for(const npc of S.project.customers.filter(c=>!c.deleted)){const card=assetCard('♟ '+npc.name,{type:'npcs',npc:npc.id,key:npc.id});card.className='object-chip';box.append(card)}
   for(const enemy of (S.project.enemies||[]).filter(e=>e.enabled&&!e.deleted)){const card=assetCard('⚠ '+enemy.name,{type:'monsters',enemy:enemy.id,key:enemy.id});card.className='object-chip monster-chip';box.append(card)}
   const buildings=$('buildingPalette');buildings.replaceChildren();
@@ -67,7 +67,7 @@ function placeAsset(tool,at){
   checkpoint();let data;
   if(tool.type==='buildings')data=new BuildingDefinition(tool.template||S.project.building_templates[0]).instantiate(S.level,row,at.x,snap);
   else {const half=tool.type==='monsters'?S.project.enemies.find(e=>e.id===tool.enemy).sprite.collision_width/2:24;const x=Math.max(startFor(tool.type,row)+half,Math.min(limitFor(tool.type,row)-half,snap?Math.round(at.x/snap)*snap:at.x));let index=1;while(S.level.vehicles.some(e=>e.id===`vehicle_${index}`))index++;
-    data={stations:{name:S.station,row,x},junctions:{row,x},loot:{row,x,building:'',floor:0,kind:'book'},vehicles:{id:`vehicle_${index}`,row,x,color:'#677378'},npcs:{npc:tool.npc,row,x},monsters:{id:'monster_'+Date.now().toString(36),enemy:tool.enemy,row,x,facing:-1}}[tool.type]}
+    data={spawn_points:{id:'point_'+Date.now(),row,x,container:'loose',chance:1,rolls:1,choices:[{kind:'water',weight:1}]},stations:{name:S.station,row,x},junctions:{row,x},loot:{row,x,building:'',floor:0,kind:'book'},vehicles:{id:`vehicle_${index}`,row,x,color:'#677378'},npcs:{npc:tool.npc,row,x},monsters:{id:'monster_'+Date.now().toString(36),enemy:tool.enemy,row,x,facing:-1}}[tool.type]}
   S.level[tool.type].push(data);S.type=tool.type;S.entity=S.level[S.type].length-1;selectCell(row,Math.floor((data.x-rowStart(row))/S.level.segment));W.tool=null;W.ghost=null;$('entityType').value=S.type;listEntities();drawMap();renderPalette();dirty();
 }
 $('addEntity').onclick=run(()=>{if(!W.tool)W.tool=S.type==='buildings'?{type:'buildings',template:S.project.building_templates[0]}:S.type==='npcs'?{type:'npcs',npc:S.project.customers[0].id}:{type:S.type};status('点击地图上的目标格放置所选素材。')});
@@ -77,7 +77,7 @@ function entityRect(type,e){const scale=960/worldWidth(),x=20+e.x*scale,base=20+
 drawMap=function(){
   const c=$('map').getContext('2d');c.clearRect(0,0,1000,510);if(!S.level)return;const d=S.level,scale=960/worldWidth(),height=band(),grid=Math.max(3,(+$('gridSize').value||20)*scale);c.font='12px sans-serif';
   for(let row=0;row<d.cell_names.length;row++){const y=20+row*height,width=rowWidth(row)*scale;c.fillStyle='#342f45';c.fillRect(20+rowStart(row)*scale,y,width,height-6);c.strokeStyle='#494355';c.lineWidth=.5;for(let x=20+rowStart(row)*scale;x<20+rowEnd(row)*scale;x+=grid){c.beginPath();c.moveTo(x,y);c.lineTo(x,y+height-6);c.stroke()}for(let gy=y;gy<y+height-6;gy+=grid){c.beginPath();c.moveTo(20+rowStart(row)*scale,gy);c.lineTo(20+rowEnd(row)*scale,gy);c.stroke()}c.lineWidth=1;for(let col=0;col<d.cell_names[row].length;col++){const x=20+(rowStart(row)+col*d.segment)*scale;c.strokeStyle=row===W.row&&col===W.col?'#efc488':'#81758e';c.lineWidth=row===W.row&&col===W.col?2:1;c.strokeRect(x,y,d.segment*scale,height-6);c.fillStyle='#d1bdad';c.fillText(`${col===0?'↔ ':''}${row+1}.${col+1} ${d.cell_names[row][col]}`,x+7,y+17)}}
-  for(const type of entityTypes)(d[type]||[]).forEach((e,i)=>{const rect=entityRect(type,e);c.fillStyle=type==='buildings'?e.wall:{stations:'#a6dccc',junctions:'#a4b8e8',loot:'#f0cc91',vehicles:'#a98eac',npcs:'#ef9eae',monsters:'#ed8075'}[type];c.fillRect(...rect);if(type==='buildings'){c.fillStyle='#d5c8ab';for(let x=rect[0]+10;x<rect[0]+rect[2]-6;x+=20)c.fillRect(x,rect[1]+9,8,9)}if(type===S.type&&i===S.entity){c.strokeStyle='#fff';c.lineWidth=2;c.strokeRect(...rect)}c.fillStyle='#f2eadd';const npc=S.project.customers.find(n=>n.id===e.npc),enemy=S.project.enemies.find(n=>n.id===e.enemy);c.fillText((enemy?.name||npc?.name||e.name||e.id||names[type]).slice(0,16),rect[0],rect[1]-5)});
+  for(const type of entityTypes)(d[type]||[]).forEach((e,i)=>{const rect=entityRect(type,e);c.fillStyle=type==='buildings'?e.wall:{stations:'#a6dccc',junctions:'#a4b8e8',loot:'#f0cc91',vehicles:'#a98eac',npcs:'#ef9eae',monsters:'#ed8075',spawn_points:'#f0cc91'}[type];c.fillRect(...rect);if(type==='buildings'){c.fillStyle='#d5c8ab';for(let x=rect[0]+10;x<rect[0]+rect[2]-6;x+=20)c.fillRect(x,rect[1]+9,8,9)}if(type===S.type&&i===S.entity){c.strokeStyle='#fff';c.lineWidth=2;c.strokeRect(...rect)}c.fillStyle='#f2eadd';const npc=S.project.customers.find(n=>n.id===e.npc),enemy=S.project.enemies.find(n=>n.id===e.enemy);c.fillText((enemy?.name||npc?.name||e.name||e.id||names[type]).slice(0,16),rect[0],rect[1]-5)});
   if(W.ghost&&validLocation(W.ghost)){c.fillStyle='#a6dccc66';const x=20+W.ghost.x*scale,base=20+(W.ghost.row+1)*height-14;c.fillRect(x,base-45,Math.min(130,((W.tool?.template?.width)||160)*scale),45)}
   $('levelJson').value=JSON.stringify(d,null,2);
 };
@@ -203,3 +203,5 @@ function setStreetStart(row,value,snapshot=true){
 $('streetStart').onchange=()=>setStreetStart(W.row,+$('streetStart').value);
 $('startEarlier').onclick=()=>setStreetStart(W.row,rowStart(W.row)-(+$('gridSize').value||20));
 $('startLater').onclick=()=>setStreetStart(W.row,rowStart(W.row)+(+$('gridSize').value||20));
+
+const spawnInspector=entityForm;entityForm=function(){spawnInspector();if(S.type==='spawn_points'&&S.level?.spawn_points[S.entity]){for(const input of $('entityFields').querySelectorAll('input'))if(input.dataset.key==='choices')input.closest('label').remove();$('entityFields').append(button('编辑物资类型与权重',()=>{C.kind='building_templates';C.data={id:'outdoor_editor',name:'室外物资生成点',width:worldWidth(),floors:1,wall:'#736163',texture:'',collision:{x:0,y:0,width:1,height:1},loot_points:[clone(S.level.spawn_points[S.entity])]};C.instance=null;C.outdoor=S.entity;C.point=0;view('catalogView');renderCatalogForm()}))}};

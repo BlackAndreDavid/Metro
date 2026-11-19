@@ -418,5 +418,21 @@
     0,
     0,
     0
+  ],
+  "spawn_points": [
+    {
+      "id": "street_water",
+      "row": 2,
+      "x": 320,
+      "container": "loose",
+      "chance": 1,
+      "rolls": 1,
+      "choices": [
+        {
+          "kind": "water",
+          "weight": 1
+        }
+      ]
+    }
   ]
 }

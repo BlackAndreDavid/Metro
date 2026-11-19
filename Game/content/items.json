@@ -11,7 +11,11 @@
       "texture": "res://assets/textures/LapTop.png",
       "rarity": 0,
       "enabled": true,
-      "protected": true
+      "protected": true,
+      "active_use": {
+        "action": "none",
+        "amount": 1
+      }
     },
     {
       "id": "copper",
@@ -23,7 +27,11 @@
       "texture": "res://assets/textures/temp/items/scrap_metal.png",
       "rarity": 0,
       "enabled": true,
-      "protected": true
+      "protected": true,
+      "active_use": {
+        "action": "none",
+        "amount": 1
+      }
     },
     {
       "id": "tools",
@@ -35,7 +43,11 @@
       "texture": "res://assets/textures/temp/items/workbench.png",
       "rarity": 1,
       "enabled": true,
-      "protected": true
+      "protected": true,
+      "active_use": {
+        "action": "none",
+        "amount": 1
+      }
     },
     {
       "id": "book",
@@ -47,7 +59,11 @@
       "texture": "res://assets/textures/temp/items/credit_card.png",
       "rarity": 0,
       "enabled": true,
-      "protected": true
+      "protected": true,
+      "active_use": {
+        "action": "none",
+        "amount": 1
+      }
     },
     {
       "id": "meds",
@@ -59,7 +75,11 @@
       "texture": "res://assets/textures/temp/items/medkit.png",
       "rarity": 2,
       "enabled": true,
-      "protected": true
+      "protected": true,
+      "active_use": {
+        "action": "heal",
+        "amount": 25
+      }
     },
     {
       "id": "circuit",
@@ -71,7 +91,11 @@
       "texture": "res://assets/textures/temp/items/beacon.png",
       "rarity": 2,
       "enabled": true,
-      "protected": true
+      "protected": true,
+      "active_use": {
+        "action": "none",
+        "amount": 1
+      }
     },
     {
       "id": "powercore",
@@ -83,7 +107,11 @@
       "texture": "res://assets/textures/temp/items/battery_core.png",
       "rarity": 3,
       "enabled": true,
-      "protected": true
+      "protected": true,
+      "active_use": {
+        "action": "none",
+        "amount": 1
+      }
     },
     {
       "id": "relic",
@@ -95,7 +123,11 @@
       "texture": "res://assets/textures/temp/items/lens_device.png",
       "rarity": 2,
       "enabled": true,
-      "protected": true
+      "protected": true,
+      "active_use": {
+        "action": "none",
+        "amount": 1
+      }
     },
     {
       "id": "aaa",
@@ -107,7 +139,11 @@
       "texture": "res://assets/textures/temp/items/single_cell.png",
       "rarity": 0,
       "enabled": true,
-      "protected": true
+      "protected": true,
+      "active_use": {
+        "action": "none",
+        "amount": 1
+      }
     },
     {
       "id": "water",
@@ -119,7 +155,11 @@
       "texture": "res://assets/textures/temp/items/water_bottle.png",
       "rarity": 0,
       "enabled": true,
-      "protected": true
+      "protected": true,
+      "active_use": {
+        "action": "drink",
+        "amount": 1
+      }
     },
     {
       "id": "ration",
@@ -131,7 +171,11 @@
       "texture": "res://assets/textures/temp/items/ration.png",
       "rarity": 0,
       "enabled": true,
-      "protected": true
+      "protected": true,
+      "active_use": {
+        "action": "eat",
+        "amount": 1
+      }
     },
     {
       "id": "tire",
@@ -143,7 +187,11 @@
       "texture": "res://assets/textures/temp/items/lens_device.png",
       "rarity": 0,
       "enabled": true,
-      "protected": true
+      "protected": true,
+      "active_use": {
+        "action": "none",
+        "amount": 1
+      }
     },
     {
       "id": "bolts",
@@ -155,7 +203,11 @@
       "texture": "res://assets/textures/temp/items/green_ammo.png",
       "rarity": 0,
       "enabled": true,
-      "protected": true
+      "protected": true,
+      "active_use": {
+        "action": "none",
+        "amount": 1
+      }
     },
     {
       "id": "steel_plate",
@@ -167,7 +219,11 @@
       "texture": "res://assets/textures/temp/items/metal_plate.png",
       "rarity": 1,
       "enabled": true,
-      "protected": true
+      "protected": true,
+      "active_use": {
+        "action": "none",
+        "amount": 1
+      }
     },
     {
       "id": "car_battery",
@@ -179,7 +235,11 @@
       "texture": "res://assets/textures/temp/items/power_box.png",
       "rarity": 2,
       "enabled": true,
-      "protected": true
+      "protected": true,
+      "active_use": {
+        "action": "none",
+        "amount": 1
+      }
     },
     {
       "id": "engine",
@@ -191,7 +251,11 @@
       "texture": "res://assets/textures/temp/items/battery_pack.png",
       "rarity": 3,
       "enabled": true,
-      "protected": true
+      "protected": true,
+      "active_use": {
+        "action": "none",
+        "amount": 1
+      }
     },
     {
       "id": "controller",
@@ -203,7 +267,11 @@
       "texture": "res://assets/textures/temp/items/shield_emitter.png",
       "rarity": 3,
       "enabled": true,
-      "protected": true
+      "protected": true,
+      "active_use": {
+        "action": "none",
+        "amount": 1
+      }
     }
   ]
 }

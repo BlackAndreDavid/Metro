@@ -1,28 +1,30 @@
 extends Control
 ## Instanced by Home with its existing state. Edit the .tscn for page layout.
 var controller: Control
+var pack_open := false
 
 func configure(home: Control) -> void:
 	controller = home
-	home.surface_location = $Location
+	home.surface_location = null
 	home.time_label = $Timer
 	home.surface_prompt = $InteractionPrompt
 	home.status = $Status
 	home.surface_block = $StreetFrame/SurfaceBlock
-	$Departure.text = "%s站出发    /    车电 %s" % [home.state.station, home.car_power_text()]
+	$BackpackButton.pressed.connect(toggle_pack)
+	$ActiveSlot.configure(home)
 	$StreetFrame/SurfaceBlock.setup(home.state, home.font)
 	$StreetFrame/SurfaceBlock.pickup_requested.connect(home.pick_up_surface_item)
 	$StreetFrame/SurfaceBlock.extraction_requested.connect(home.extract_from_block)
 	$StreetFrame/SurfaceBlock.vehicle_requested.connect(home.show_vehicle)
 	$StreetFrame/SurfaceBlock.npc_requested.connect(show_npc)
 	$StreetFrame/SurfaceBlock.cabinet_requested.connect(show_cabinet)
+	$StreetFrame/SurfaceBlock.lighting_changed.connect(home.refresh_surface_light)
 	$StreetFrame/SurfaceBlock.motion_updated.connect(update_stamina)
 	$StreetFrame/SurfaceBlock.player_attacked.connect(on_player_attacked)
 	$StreetFrame/SurfaceBlock.moved.connect(home.update_surface_position)
 	$Minimap.setup($StreetFrame/SurfaceBlock, home.font)
-	for label in [$Departure, $Location, $Timer, $InteractionPrompt, $Status]:
+	for label in [$Timer, $InteractionPrompt, $Status]:
 		label.add_theme_color_override("font_color", home.TEXT)
-	$Departure.add_theme_color_override("font_color", home.MINT)
 	$InteractionPrompt.add_theme_color_override("font_color", home.AMBER)
 	$Status.add_theme_color_override("font_color", home.AMBER)
 
@@ -44,3 +46,31 @@ func show_cabinet(id: String) -> void:
 	var panel := preload("res://scripts/exploration/container_panel.gd").new()
 	add_child(panel)
 	panel.setup(controller.state,$StreetFrame/SurfaceBlock,controller,id)
+
+func toggle_pack() -> void:
+	set_pack_open(not pack_open)
+
+func set_pack_open(value: bool) -> void:
+	pack_open = value
+	$PackAnchor.visible = value
+	$StreetFrame/SurfaceBlock.inspecting_pack = value
+	$BackpackButton.text = "关闭背包 [B]" if value else "背包 [B]"
+	if not value:
+		controller.clear_selection()
+		controller.battery_slot_open = false
+
+func refresh_active() -> void:
+	$ActiveSlot.refresh()
+
+func configure_legacy(home: Control) -> void:
+	controller = home
+	home.surface_location = null
+	home.time_label = $Timer
+	home.status = $Status
+	$BackpackButton.pressed.connect(toggle_pack)
+	$ActiveSlot.configure(home)
+	$StreetFrame/SurfaceBlock.hide()
+	$Minimap.hide()
+	$InteractionPrompt.hide()
+	$Stamina.hide()
+	$StaminaLabel.hide()

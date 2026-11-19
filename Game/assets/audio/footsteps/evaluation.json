@@ -1,0 +1,70 @@
+{
+  "seed": 410,
+  "sample_rate": 22050,
+  "candidates": [
+    {
+      "walk": {
+        "duration": 1.6,
+        "rms": 0.024123,
+        "peak": 0.153248,
+        "seam": 0.0,
+        "roughness": 1.09445
+      },
+      "run": {
+        "duration": 0.96,
+        "rms": 0.037693,
+        "peak": 0.457114,
+        "seam": 0.0,
+        "roughness": 1.36479
+      }
+    },
+    {
+      "walk": {
+        "duration": 1.6,
+        "rms": 0.027249,
+        "peak": 0.187529,
+        "seam": 0.0,
+        "roughness": 1.07699
+      },
+      "run": {
+        "duration": 0.96,
+        "rms": 0.035785,
+        "peak": 0.433773,
+        "seam": 0.0,
+        "roughness": 1.35784
+      }
+    },
+    {
+      "walk": {
+        "duration": 1.6,
+        "rms": 0.029811,
+        "peak": 0.190802,
+        "seam": 0.0,
+        "roughness": 1.08886
+      },
+      "run": {
+        "duration": 0.96,
+        "rms": 0.033842,
+        "peak": 0.405234,
+        "seam": 0.0,
+        "roughness": 1.37302
+      }
+    }
+  ],
+  "selected": 3,
+  "selection": "Objective RMS targets: walk 0.047, run 0.044; all candidates checked for clipping and zero loop seam. Subjective listening remains available in game.",
+  "reference": {
+    "url": "https://github.com/KenneyNL/Starter-Kit-3D-Platformer",
+    "commit": "3fa8a04b1c01ab23db43123d4ce814a34c3fc7f0",
+    "asset": "sounds/walking.ogg",
+    "license": "CC0 (README assets license)",
+    "use": "Temporal/tail reference only; generated output contains no source samples.",
+    "analysis": {
+      "duration": 0.9009,
+      "rms": 0.005612,
+      "peak": 0.127838,
+      "seam": 0.000824,
+      "roughness": 0.59394
+    }
+  }
+}

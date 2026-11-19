@@ -10,6 +10,7 @@ signal extraction_requested(station: String)
 signal vehicle_requested(vehicle_id: String)
 signal npc_requested(id: String)
 signal cabinet_requested(id: String)
+signal lighting_changed
 signal motion_updated(stamina: float, running: bool, slowed: float)
 signal player_attacked(seconds: float)
 signal moved
@@ -85,7 +86,8 @@ var hero_view: TextureRect
 var hero_frame_key := ""
 var visual_prompt_key := ""
 var animation_time := 0.0
-var footstep_time := 0.0
+var footstep_mode := ""
+var footstep_streams: Dictionary = {}
 var footstep_audio: AudioStreamPlayer
 var GROUND := DEFAULT_GROUND
 var FLOOR_HEIGHT := DEFAULT_FLOOR_HEIGHT
@@ -113,6 +115,9 @@ var shade: ColorRect
 var lighting: ShaderMaterial
 var inspecting_vehicle := false
 var inspecting_container := false
+var inspecting_pack := false
+var enemy_layer: Control
+var enemy_views: Array[Control] = []
 var interaction_visuals: Dictionary = {}
 var building_textures: Dictionary = {}
 
@@ -133,14 +138,13 @@ func setup(owner_state: RefCounted, ui_font: Font) -> void:
 				enemies.append(Enemy.new(definition,placement))
 				enemy_textures[definition.id] = loader.load_texture(definition.sprite.texture)
 	footstep_audio = AudioStreamPlayer.new()
-	var stream := AudioStreamWAV.new()
-	stream.format = AudioStreamWAV.FORMAT_8_BITS
-	stream.mix_rate = 11025
-	var samples := PackedByteArray()
-	for i in range(660): samples.append(clampi(int(128+sin(i*1.71)*34*(1.0-float(i)/660)),0,255))
-	stream.data = samples
-	footstep_audio.stream = stream
 	add_child(footstep_audio)
+	for mode in ["walk","run"]:
+		var stream: AudioStreamWAV = load("res://assets/audio/footsteps/"+mode+"_loop.wav").duplicate()
+		stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		stream.loop_begin = 0
+		stream.loop_end = roundi(stream.get_length()*stream.mix_rate)
+		footstep_streams[mode] = stream
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	mouse_filter = MOUSE_FILTER_IGNORE
 	for station in STATIONS:
@@ -158,6 +162,15 @@ func setup(owner_state: RefCounted, ui_font: Font) -> void:
 	shade.hide()
 	add_child(shade)
 	setup_interaction_visuals()
+	enemy_layer = Control.new()
+	enemy_layer.name = "EnemyLayer"
+	enemy_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(enemy_layer)
+	for enemy in enemies:
+		var actor := preload("res://scripts/exploration/enemy_view.gd").new()
+		actor.enemy = enemy; actor.texture = enemy_textures.get(enemy.definition.id); actor.font = font
+		actor.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		enemy_layer.add_child(actor);enemy_views.append(actor)
 	hero_view = TextureRect.new()
 	hero_view.size = Vector2(32,64)
 	hero_view.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -240,7 +253,7 @@ func junction_caption(destination: int) -> String:
 func _process(delta: float) -> void:
 	if state == null or not state.trip_active: return
 	animation_time += delta
-	var blocked := inspecting_vehicle or interacting_npc or inspecting_container or get_viewport().gui_is_dragging()
+	var blocked := inspecting_vehicle or interacting_npc or inspecting_container or inspecting_pack or get_viewport().gui_is_dragging()
 	var left := Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)
 	var right := Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT)
 	move_horizontal(0.0 if blocked else float(right)-float(left),delta,not blocked and Input.is_physical_key_pressed(KEY_SHIFT))
@@ -253,6 +266,7 @@ func move_horizontal(axis: float, delta: float, sprint: bool = false) -> void:
 	var velocity := motion.step(delta,axis,sprint)
 	if is_zero_approx(axis):
 		pace = 0.0
+		update_footsteps()
 		return
 	var location := active_building()
 	var minimum := street_start()+24.0
@@ -266,13 +280,7 @@ func move_horizontal(axis: float, delta: float, sprint: bool = false) -> void:
 	motion.moving = not is_equal_approx(previous,player_x)
 	facing = signf(axis)
 	pace += delta*14.0*(1.5 if motion.running else 1.0)
-	if motion.moving:
-		footstep_time += delta
-		if footstep_time >= (0.24 if motion.running else 0.4):
-			footstep_time = 0
-			if is_instance_valid(footstep_audio):
-				footstep_audio.volume_db = -20 if motion.running else -28
-				footstep_audio.play()
+	update_footsteps()
 	position_changed()
 
 func update_enemies(delta: float) -> void:
@@ -285,6 +293,7 @@ func update_enemies(delta: float) -> void:
 			player_attacked.emit(float(hit.time_penalty))
 
 func position_changed() -> void:
+	auto_manage_flashlight()
 	update_hero_visual()
 	visited[cell()] = true
 	update_lighting()
@@ -298,7 +307,7 @@ func active_building() -> Dictionary:
 	return {}
 
 func can_take(slot: int) -> bool:
-	if slot < 0 or slot >= LOOT.size() or (not building.is_empty() and not state.flashlight_on):
+	if slot < 0 or slot >= LOOT.size():
 		return false
 	var point: Dictionary = LOOT[slot]
 	return point.row == row and point.building == building and point.floor == floor_index and absf(player_x - point.x) <= REACH
@@ -318,7 +327,6 @@ func interaction() -> Dictionary:
 	var location := active_building()
 	for point in LOOT:
 		if point.has("cabinet") and point.row == row and point.building == building and int(point.floor) == floor_index and absf(player_x-point.x) <= REACH:
-			if not building.is_empty() and not state.flashlight_on: continue
 			return {"kind":"cabinet","id":point.cabinet,"caption":"打开柜子"}
 	for slot in range(LOOT.size()):
 		if not can_take(slot):
@@ -385,29 +393,30 @@ func camera_offset() -> float:
 
 func update_lighting() -> void:
 	var location := active_building()
-	shade.visible = not location.is_empty()
+	shade.visible = not location.is_empty() and not is_bright()
 	if not shade.visible:
 		return
 	var height: float = location.floors * FLOOR_HEIGHT
-	shade.position = Vector2(location.x - camera_offset(), GROUND - height)
+	shade.position = Vector2(location.x-camera_offset(),GROUND-height+render_offset_y())
 	shade.size = Vector2(location.width, height)
 	lighting.set_shader_parameter("interior_size", shade.size)
 	lighting.set_shader_parameter("lamp_position", Vector2(player_x - location.x + 10.0 * facing, height - floor_index * FLOOR_HEIGHT - 29.0))
 	lighting.set_shader_parameter("facing", facing)
 	lighting.set_shader_parameter("lamp_on", state.flashlight_on)
+	lighting.set_shader_parameter("ambient_light",float(location.get("light_level",0.15)))
 
 func _draw() -> void:
 	if state == null:
 		return
 	var camera_x := camera_offset()
 	draw_rect(Rect2(Vector2.ZERO, size), Color("40394c"))
-	draw_rect(Rect2(0, 120, size.x, 176), Color("675161"))
-	draw_circle(Vector2(616 - camera_x * 0.09, 113), 29, Color("a97c76"))
+	draw_rect(Rect2(0,120+render_offset_y(),size.x,176), Color("675161"))
+	draw_circle(Vector2(616-camera_x*0.09,113+render_offset_y()*0.3), 29, Color("a97c76"))
 	for i in range(28):
 		var height := float(44 + (i * 57) % 119)
-		draw_rect(Rect2(i * 54 - camera_x * 0.16, 278 - height, 46, height), Color("524555"))
+		draw_rect(Rect2(i * 54 - camera_x * 0.16, 278-height+render_offset_y(),46,height), Color("524555"))
 	if row > NORTH:
-		draw_set_transform(Vector2(24 - camera_x * 0.53, 24), 0.0, Vector2.ONE * 0.73)
+		draw_set_transform(Vector2(24-camera_x*0.53,24+render_offset_y()), 0.0, Vector2.ONE * 0.73)
 		for entry in BUILDINGS:
 			if entry.row == row - 1:
 				draw_facade(entry, true)
@@ -415,9 +424,9 @@ func _draw() -> void:
 			if station.row == row - 1:
 				draw_station(station, true)
 		draw_set_transform(Vector2.ZERO)
-		draw_rect(Rect2(0, 323, size.x, 28), Color("514452"))
-		draw_line(Vector2(0, 323), Vector2(size.x, 323), Color("746172"), 2.0)
-	draw_set_transform(Vector2(-camera_x, 0))
+		draw_rect(Rect2(0,323+render_offset_y(),size.x,28), Color("514452"))
+		draw_line(Vector2(0,323+render_offset_y()),Vector2(size.x,323+render_offset_y()), Color("746172"), 2.0)
+	draw_set_transform(Vector2(-camera_x,render_offset_y()))
 	draw_rect(Rect2(street_start(), GROUND, street_width(), size.y - GROUND), Color("292738"))
 	draw_rect(Rect2(street_start(), GROUND, street_width(), 13), Color("6d5b69"))
 	draw_rect(Rect2(street_start(), GROUND + 13, street_width(), 16), Color("423b51"))
@@ -447,20 +456,19 @@ func _draw() -> void:
 	for slot in range(LOOT.size()):
 		var point: Dictionary = LOOT[slot]
 		var kind: String = state.ground_kind(slot)
-		if point.has("cabinet"): continue
-		if point.row == row and point.building == building and (building.is_empty() or state.flashlight_on) and not kind.is_empty():
+		if point.has("cabinet") or interaction_visuals.has("pickup/"+str(slot)): continue
+		if point.row == row and point.building == building and not kind.is_empty():
 			var tint: Color = state.rarity_color(kind)
 			draw_rect(Rect2(point.x - 9, GROUND - point.floor * FLOOR_HEIGHT - 12, 18, 10), tint.darkened(0.44))
 			draw_line(Vector2(point.x - 8, GROUND - point.floor * FLOOR_HEIGHT - 12), Vector2(point.x + 8, GROUND - point.floor * FLOOR_HEIGHT - 12), tint, 2.0)
 	for npc in NPCS:
 		if not interaction_visuals.has("npc/"+npc.npc) and npc.row == row and building.is_empty() and npc_textures.get(npc.npc) != null:
 			draw_texture_rect(npc_textures[npc.npc],Rect2(npc.x-24,GROUND-80,48,80),false)
-	draw_enemies()
 	if motion.moving:
 		draw_arc(Vector2(player_x,GROUND-floor_index*FLOOR_HEIGHT-32),motion.noise_radius(),0,TAU,48,Color(0.6,0.85,0.8,0.2),1.0)
 	draw_player(Vector2(player_x, GROUND - floor_index * FLOOR_HEIGHT))
 	draw_set_transform(Vector2.ZERO)
-	draw_rect(Rect2(Vector2.ZERO, size), Color("726176"), false, 2.0)
+
 
 func draw_vehicle(vehicle: Dictionary) -> void:
 	var x: float = vehicle.x
@@ -560,26 +568,6 @@ func draw_player(at: Vector2) -> void:
 	var width := texture.get_width()/4.0
 	draw_texture_rect_region(texture,Rect2(at-Vector2(16,64),Vector2(32,64)),Rect2(frame*width,0,width,texture.get_height()))
 
-func draw_enemies() -> void:
-	for enemy in enemies:
-		if enemy.row != row or not building.is_empty(): continue
-		var sprite: Dictionary = enemy.sprite()
-		var texture: Texture2D = enemy_textures.get(enemy.definition.id)
-		if texture != null:
-			var count := maxi(1,int(sprite.get("frames",1)))
-			var frame: int = int(enemy.animation_clock*float(sprite.get("fps",8)))%count if enemy.action.ends_with("move") or enemy.action == "pounce" else 0
-			var width := float(sprite.get("width",128))
-			var height := float(sprite.get("height",32))
-			var target := Rect2(enemy.x-width/2,GROUND-height-enemy.attack_jump(),width,height)
-			var flip: bool = (enemy.facing > 0) == bool(sprite.get("faces_left",true))
-			if flip: target.position.x += target.size.x; target.size.x = -target.size.x
-			draw_texture_rect_region(texture,target,Rect2(frame*texture.get_width()/float(count),0,texture.get_width()/float(count),texture.get_height()))
-		if enemy.awareness > 0:
-			var top := GROUND-float(sprite.get("height",32))-12
-			draw_rect(Rect2(enemy.x-30,top,60,5),Color("292738"))
-			draw_rect(Rect2(enemy.x-30,top,60*enemy.awareness/100,5),Color("e87b75") if enemy.alerted else Color("efc488"))
-			if enemy.alerted: draw_string(font,Vector2(enemy.x-4,top-3),"!",HORIZONTAL_ALIGNMENT_LEFT,-1,18,Color("ff9690"))
-
 func target_key(target: Dictionary) -> String:
 	return target.get("kind","")+"/"+str(target.get("id",target.get("station",target.get("slot",""))))
 
@@ -606,7 +594,13 @@ func activate_visual(target: Dictionary) -> void:
 func setup_interaction_visuals() -> void:
 	var loader = preload("res://scripts/commerce/customer_catalog.gd")
 	var cabinet_texture: Texture2D = loader.load_texture("res://assets/textures/Locker.png")
-	for point in LOOT:
+	for slot in range(LOOT.size()):
+		var point: Dictionary = LOOT[slot]
+		if not point.has("cabinet"):
+			var kind: String = state.ground_kind(slot)
+			if not kind.is_empty():
+				var definition: Dictionary = preload("res://scripts/items/item_catalog.gd").definition(kind)
+				add_interaction_visual({"kind":"pickup","slot":slot,"caption":"拾取 "+state.item_name(kind)},point,loader.load_texture(definition.get("texture","")),Vector2(28,28))
 		if point.has("cabinet"):
 			add_interaction_visual({"kind":"cabinet","id":point.cabinet,"caption":"打开柜子"},point,cabinet_texture,Vector2(28,48))
 	for npc in NPCS:
@@ -636,12 +630,13 @@ func update_interaction_visuals() -> void:
 		var control: Control = entry.control
 		var point: Dictionary = entry.placement
 		control.visible = int(point.row) == row and point.get("building","") == building and int(point.get("floor",0)) == floor_index
-		if not building.is_empty() and not state.flashlight_on: control.visible = false
+		if entry.target.kind == "pickup" and state.ground_kind(int(entry.target.slot)).is_empty(): control.hide()
 		if not control.visible: continue
-		control.position = Vector2(float(point.x)-camera_offset()-entry.size.x/2,GROUND-floor_index*FLOOR_HEIGHT-entry.size.y)
+		control.position = Vector2(float(point.x)-camera_offset()-entry.size.x/2,GROUND-floor_index*FLOOR_HEIGHT-entry.size.y+render_offset_y())
 		var local := control.get_local_mouse_position()
 		var hover: bool = control.get_rect().has_point(control.position+local) and control._has_point(local)
 		control.set_highlighted(key == active_key or hover)
+	update_enemy_visuals()
 	update_hero_visual()
 	var current_prompt := active_key if has_visual_target(interaction()) else ""
 	if current_prompt != visual_prompt_key:
@@ -661,4 +656,36 @@ func update_hero_visual() -> void:
 		atlas.atlas = texture
 		atlas.region = Rect2(frame*texture.get_width()/4.0,0,texture.get_width()/4.0,texture.get_height())
 		hero_view.texture = atlas
-	hero_view.position = Vector2(player_x-camera_offset()-16,GROUND-floor_index*FLOOR_HEIGHT-64)
+	hero_view.position = Vector2(player_x-camera_offset()-16,GROUND-floor_index*FLOOR_HEIGHT-64+render_offset_y())
+
+func render_offset_y() -> float:
+	return size.y*0.79-GROUND
+
+func is_bright() -> bool:
+	return building.is_empty() or float(active_building().get("light_level",0.15)) >= 0.6
+
+func auto_manage_flashlight() -> bool:
+	if state != null and state.flashlight_on and is_bright():
+		state.flashlight_on = false
+		lighting_changed.emit()
+		return true
+	return false
+
+func update_enemy_visuals() -> void:
+	for index in range(enemy_views.size()):
+		var actor: Control = enemy_views[index]
+		var enemy = enemies[index]
+		actor.visible = enemy.row == row and building.is_empty()
+		actor.position = Vector2(enemy.x-camera_offset(),GROUND+render_offset_y())
+		actor.queue_redraw()
+
+func update_footsteps() -> void:
+	if not is_instance_valid(footstep_audio): return
+	var mode := ("run" if motion.running else "walk") if motion.moving else ""
+	if mode == footstep_mode: return
+	footstep_mode = mode
+	footstep_audio.stop()
+	if not mode.is_empty():
+		footstep_audio.stream = footstep_streams[mode]
+		footstep_audio.volume_db = -12 if mode == "run" else -9
+		footstep_audio.play()

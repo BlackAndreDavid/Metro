@@ -29,7 +29,7 @@ const RARITY := {
 const RARITY_NAMES := ["普通", "少见", "稀有", "珍稀"]
 const RARITY_COLORS := [Color("bfc3ce"), Color("e4be76"), Color("ffa271"), Color("ff7873")]
 const EPOCH := "2026-07-11T00:00:00"
-const CABIN_SAVE_VERSION := 15
+const CABIN_SAVE_VERSION := 16
 const CustomerDialogue = preload("res://scripts/commerce/customer_dialogue.gd")
 const CustomerOrders = preload("res://scripts/commerce/customer_orders.gd")
 const ItemCatalog = preload("res://scripts/items/item_catalog.gd")
@@ -62,6 +62,7 @@ var wide_bag := false
 var collected: Dictionary = {}
 var gear: Dictionary = {}
 var next_id := 1
+var active_item: Dictionary = {}
 var market_usage: Dictionary = {}
 var customer_visits: Dictionary = {}
 var content_flags: Dictionary = {}
@@ -187,6 +188,10 @@ func bag_size() -> Vector2i:
 	return LARGE if wide_bag else SMALL
 
 func entries(container: String) -> Array[Dictionary]:
+	if container == "active":
+		var equipped: Array[Dictionary] = []
+		if not active_item.is_empty(): equipped.append(active_item)
+		return equipped
 	if container == "battery":
 		var slot: Array[Dictionary] = []
 		if installed_charge != NO_CELL:
@@ -289,7 +294,8 @@ func place(selection: Dictionary, target: String, cell: Vector2i) -> bool:
 		collected[trip_loot_station].append(id)
 		entry = make_entry(entry.kind, cell, selection.rotated)
 	elif source != target:
-		entries(source).erase(entry)
+		if source == "active": active_item = {}
+		else: entries(source).erase(entry)
 	if source != target:
 		entries(target).append(entry)
 	entry.x = cell.x
@@ -602,6 +608,7 @@ func fail_trip() -> int:
 	var fee := 500 if gear.heavy else 300
 	spend_or_owe(fee)
 	inventory.clear()
+	active_item.clear()
 	installed_charge = NO_CELL
 	flashlight_drain = 0.0
 	end_trip()
@@ -651,7 +658,7 @@ func save_current(path: String) -> Error:
 func save_data() -> Dictionary:
 	return {
 		"base_name": base_name, "version": CABIN_SAVE_VERSION, "day": day, "account": account, "station": station,
-		"wide": wide_bag, "bag": inventory, "locker": locker,
+		"wide": wide_bag, "bag": inventory, "locker": locker, "active_item":active_item.duplicate(true),
 		"installed_charge": installed_charge, "debt": debt,
 		"days_in_debt": days_in_debt, "days_without_water": days_without_water,
 		"days_without_food": days_without_food, "drank_today": drank_today,
@@ -733,7 +740,7 @@ func load_cabin(path: String, known_stations: Array) -> bool:
 	if not data is Dictionary:
 		return false
 	var version: Variant = data.get("version")
-	if version != 1 and version != 2 and version != 3 and version != 4 and version != 5 and version != 6 and version != 7 and version != 8 and version != 9 and version != 10 and version != 11 and version != 12 and version != 13 and version != 14 and version != CABIN_SAVE_VERSION:
+	if version != 1 and version != 2 and version != 3 and version != 4 and version != 5 and version != 6 and version != 7 and version != 8 and version != 9 and version != 10 and version != 11 and version != 12 and version != 13 and version != 14 and version != 15 and version != CABIN_SAVE_VERSION:
 		return false
 	if version >= 15 and not CustomerDialogue.valid_social(data):
 		return false
@@ -761,17 +768,28 @@ func load_cabin(path: String, known_stations: Array) -> bool:
 	var loaded_locker := read_cargo(data.get("locker"), LOCKER)
 	if loaded_bag.is_empty() or loaded_locker.is_empty():
 		return false
+	var loaded_active := {}
+	if version >= 16:
+		var raw_active: Variant = data.get("active_item")
+		if not raw_active is Dictionary: return false
+		if not raw_active.is_empty():
+			if not ITEM_DEFINITIONS.has(raw_active.get("kind")) or not raw_active.get("rotated") is bool: return false
+			var active_bounds := footprint(raw_active.kind,raw_active.rotated)
+			var active_check := read_cargo([raw_active],active_bounds)
+			if active_check.is_empty() or active_check.entries.size() != 1: return false
+			loaded_active = active_check.entries[0]
 	var loaded_layout := Furniture.copy_layout(data.furniture_layout) if version == CABIN_SAVE_VERSION else migrate_furniture(data, int(version))
 	var computers := 1 if loaded_layout.computer != null else 0
-	for entry in loaded_bag.entries + loaded_locker.entries:
+	for entry in loaded_bag.entries + loaded_locker.entries + ([loaded_active] if not loaded_active.is_empty() else []):
 		if entry.kind == "computer": computers += 1
 	if computers > 1:
 		return false
 	inventory.assign(loaded_bag.entries)
 	locker.assign(loaded_locker.entries)
+	active_item = loaded_active
 	# Reissue runtime IDs across both grids after validating the saved placements.
 	next_id = 1
-	for entry in inventory + locker:
+	for entry in inventory + locker + ([active_item] if not active_item.is_empty() else []):
 		entry.id = next_id
 		next_id += 1
 	carriage_count = int(data.carriage_count) if version >= 4 else 1
@@ -957,7 +975,7 @@ func valid_home_layout(data: Dictionary, version: int = CABIN_SAVE_VERSION) -> b
 	return true
 
 func migrate_furniture(data: Dictionary, version: int) -> Dictionary:
-	if version in [11,12,13,14]:
+	if version in [11,12,13,14,15]:
 		return Furniture.copy_layout(data.furniture_layout)
 	if version in [6, 7, 8, 9, 10]:
 		return Furniture.migrate_grid_layout(data.furniture_layout, version)
@@ -982,3 +1000,54 @@ func migrate_furniture(data: Dictionary, version: int) -> Dictionary:
 
 func stored_furniture_available(kind: String) -> bool:
 	return furniture_layout[kind] == null and (kind != "computer" or material_count("computer") > 0)
+
+## Equip/swap is atomic; the active container owns its entry outside the backpack grid.
+func equip_active(id: int) -> String:
+	var incoming := find_entry("bag",id)
+	if incoming.is_empty(): return "先在背包中选中道具。"
+	var trial: Array[Dictionary] = inventory.duplicate(true)
+	for index in range(trial.size()-1,-1,-1):
+		if trial[index].id == id: trial.remove_at(index)
+	var placement := {}
+	if not active_item.is_empty():
+		for rotated in [false,true]:
+			var shape := footprint(active_item.kind,rotated)
+			for y in range(bag_size().y):
+				for x in range(bag_size().x):
+					if placement.is_empty() and fits(trial,bag_size(),Rect2i(Vector2i(x,y),shape)):
+						placement = {"x":x,"y":y,"rotated":rotated}
+		if placement.is_empty(): return "背包无法收回当前主动道具，换装未执行。"
+	inventory.erase(incoming)
+	if not active_item.is_empty():
+		active_item.merge(placement,true)
+		inventory.append(active_item)
+	active_item = incoming
+	active_item.x = 0; active_item.y = 0; active_item.rotated = false
+	return ""
+
+func unequip_active() -> String:
+	if active_item.is_empty(): return "主动位为空。"
+	var placement := first_free_placement(active_item.kind,"bag")
+	if placement.is_empty(): return "背包没有足够空间。"
+	active_item.x = placement.cell.x; active_item.y = placement.cell.y; active_item.rotated = placement.rotated
+	inventory.append(active_item)
+	active_item = {}
+	return ""
+
+func use_active() -> String:
+	if active_item.is_empty(): return "主动位为空，可在背包中装备道具。"
+	if not game_over_reason.is_empty(): return "当前无法使用主动道具。"
+	var action: String = ItemCatalog.definition(active_item.kind).get("active_use",{}).get("action","none")
+	match action:
+		"drink":
+			if drank_today: return "今天已经喝过水。"
+			drank_today = true
+		"eat":
+			if ate_today: return "今天已经进食。"
+			ate_today = true
+		"heal":
+			if health >= 100: return "当前无需医疗。"
+			health = minf(100,health+float(ItemCatalog.definition(active_item.kind).get("active_use",{}).get("amount",25)))
+		_: return "这件道具没有主动使用效果。"
+	active_item = {}
+	return ""

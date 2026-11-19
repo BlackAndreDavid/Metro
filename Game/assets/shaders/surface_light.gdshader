@@ -5,6 +5,7 @@ uniform vec2 interior_size;
 uniform vec2 lamp_position;
 uniform float facing = 1.0;
 uniform bool lamp_on = false;
+uniform float ambient_light = 0.15;
 
 void fragment() {
 	vec2 point = UV * interior_size;
@@ -19,5 +20,5 @@ void fragment() {
 		lit = max(cone, nearby);
 	}
 	vec3 shade = mix(vec3(0.039, 0.032, 0.066), vec3(0.99, 0.76, 0.46), lit);
-	COLOR = vec4(shade, mix(0.86, 0.12, lit));
+	COLOR = vec4(shade, mix(clamp(1.0-ambient_light,0.0,0.94),0.12,lit));
 }

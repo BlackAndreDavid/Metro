@@ -1,7 +1,7 @@
 extends RefCounted
 const Items = preload("res://scripts/items/item_catalog.gd")
 static func roll(state: RefCounted, point: Dictionary, station: String, index: int) -> String:
-	var token := "cabinet/"+str(point.get("cabinet",index))+"/"+str(point.get("roll",0))
+	var token := "cabinet/"+str(point.get("spawn_id",point.get("cabinet",index)))+"/"+str(point.get("roll",0))
 	if float(state.station_roll(station,token+"/chance",1000000))/1000001.0 >= float(point.get("chance",1)): return ""
 	var total := 0.0
 	var choices: Array = point.get("choices",[])

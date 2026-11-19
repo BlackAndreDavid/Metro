@@ -416,5 +416,39 @@
     0,
     0,
     0
+  ],
+  "spawn_points": [
+    {
+      "id": "street_water",
+      "row": 2,
+      "x": 320,
+      "container": "loose",
+      "chance": 1,
+      "rolls": 1,
+      "choices": [
+        {
+          "kind": "water",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "id": "street_salvage",
+      "row": 1,
+      "x": 500,
+      "container": "loose",
+      "chance": 0.8,
+      "rolls": 1,
+      "choices": [
+        {
+          "kind": "copper",
+          "weight": 3
+        },
+        {
+          "kind": "tools",
+          "weight": 1
+        }
+      ]
+    }
   ]
 }

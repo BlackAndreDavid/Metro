@@ -43,6 +43,9 @@ with tempfile.TemporaryDirectory(prefix='metro-catalog-browser-') as scratch:
    assert level['street_starts'][2]==200 and any(e['enemy']=='browser_rat' and e['row']==2 for e in level['monsters'])
    assert level['loot']==[];placed=next(b for b in level['buildings'] if b.get('template_id')=='browser_house');assert placed['loot_points'][0]['chance']==1
    page.locator('#map').scroll_into_view_if_needed();page.screenshot(path=str(OUTPUT/'offsets-and-monsters.png'),full_page=True)
+   drag_asset('#objectPalette [data-asset=spawn_points]',470,420)
+   page.get_by_role('button',name='编辑物资类型与权重').click();page.get_by_role('button',name='散落物资',exact=True).click();page.locator('#lootPointForm input[data-field=chance]').fill('0.9');page.click('#saveCatalog');page.click('#saveLevel');page.wait_for_function("document.getElementById('status').textContent.includes('关卡已保存')")
+   level=json.loads((game/registry['stations']['南京东路']['level'][6:]).read_text());assert any(p['container']=='loose' and p['chance']==.9 for p in level['spawn_points'])
    page.click('#customerTab');page.get_by_role('button',name='－ 删除当前顾客（归档）').click();page.wait_for_function("[...document.querySelectorAll('button')].some(b=>b.textContent==='恢复当前顾客')");page.get_by_role('button',name='恢复当前顾客').click()
    assert not errors,errors;print('CONTENT_CATALOG_BROWSER_OK: monster/item/building CRUD, sprite selection, weighted cabinets, offset +/- controls, monster placement, building instance editing, customer archival');browser.close()
  finally:server.terminate();server.wait(timeout=10)

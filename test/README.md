@@ -21,7 +21,7 @@ python test/tools/run_tests.py --godot "C:\Godot\Godot_v4.7.2-stable_win64.exe"
 
 ## 用例与工具
 
-统一入口目前包含15组：导入、11组 Godot 流程、临时素材、美术工具、内容编辑器。内容编辑器组还会在隔离 Game 副本中进行资源导入、Godot 关卡预览和剧情运行检查。
+统一入口目前包含16组：导入、12组 Godot 流程、临时素材、美术工具、内容编辑器。内容编辑器组还会在隔离 Game 副本中进行资源导入、Godot 关卡预览和剧情运行检查。
 
 | 用例 | 覆盖内容 |
 | --- | --- |
@@ -77,3 +77,5 @@ Godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Du
 `capture_content_story.gd` 使用相同环境与参数方式，输出剧情优先级、分支和结束截图。截图需要人工检查，自动检查不覆盖主观画面和音频体验。
 
 新增目录的真实鼠标检查：`python test/tools/check_content_catalogs_browser.py`。同样使用隔离项目，截图输出至 `results/catalog-ui/`。
+
+`exploration_hud` 覆盖全屏/背包键及鼠标按钮、主动位换装与容量失败、16版存档及15版迁移、空格使用、暗处/室外拾取、自动关灯、敌人绘制顺序和循环脚步声。界面截图位于 `results/exploration-hud/`。

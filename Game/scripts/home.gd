@@ -75,10 +75,12 @@ func _process(delta: float) -> void:
 		update_trip_clock()
 		var charge := state.installed_charge
 		var was_lit := state.flashlight_on
+		if is_instance_valid(surface_block): surface_block.auto_manage_flashlight()
+		else: state.flashlight_on = false
 		state.tick_flashlight(delta)
 		if was_lit != state.flashlight_on:
 			refresh_surface_light()
-			report("手电筒电池已耗尽。")
+			report("光照充足，手电已自动关闭。" if state.installed_charge > 0 else "手电筒电池已耗尽。")
 		elif charge != state.installed_charge:
 			refresh_equipment()
 
@@ -98,9 +100,19 @@ func _input(event: InputEvent) -> void:
 	elif event.physical_keycode == KEY_E and screen == "surface" and is_instance_valid(surface_block):
 		if not check_trip_timeout() and not is_instance_valid(vehicle_panel):
 			surface_block.interact()
+	elif event.physical_keycode == KEY_B and screen == "surface" and view.has_method("toggle_pack"):
+		view.toggle_pack()
+		get_viewport().set_input_as_handled()
+	elif event.physical_keycode == KEY_SPACE and screen == "surface":
+		use_active_item()
+		get_viewport().set_input_as_handled()
 	elif event.physical_keycode in [KEY_1, KEY_KP_1] and screen == "surface":
 		if not check_trip_timeout():
-			var problem := state.toggle_flashlight()
+			var problem := ""
+			if not is_instance_valid(surface_block) or surface_block.is_bright():
+				state.flashlight_on = false
+				problem = "当前光照充足，手电无需开启。"
+			else: problem = state.toggle_flashlight()
 			refresh_surface_light()
 			report(problem)
 	elif event.keycode == KEY_ESCAPE and is_instance_valid(vehicle_panel):
@@ -109,6 +121,8 @@ func _input(event: InputEvent) -> void:
 		clear_selection()
 	elif event.keycode == KEY_R and not selection.is_empty():
 		rotate_selection()
+	elif event.keycode == KEY_ESCAPE and screen == "surface" and view.has_method("set_pack_open") and view.pack_open:
+		view.set_pack_open(false)
 	elif event.keycode == KEY_ESCAPE and screen == "rules":
 		dismiss_rules()
 	elif event.keycode == KEY_ESCAPE and screen not in ["cabin", "surface", "game_over"]:
@@ -721,7 +735,7 @@ func update_surface_position() -> void:
 	var location: Dictionary = surface_block.active_building()
 	if not location.is_empty():
 		title = "%s · %d 楼" % [location.name, surface_block.floor_index + 1]
-	surface_location.text = title
+	if is_instance_valid(surface_location): surface_location.text = title
 	var target: Dictionary = surface_block.interaction()
 	surface_prompt.text = "" if target.is_empty() or surface_block.has_visual_target(target) else "[ E ]  " + target.caption
 	if not location.is_empty() and not state.flashlight_on and target.is_empty():
@@ -743,16 +757,14 @@ func extract_from_block(destination: String) -> void:
 	show_cabin(message)
 
 func show_legacy_surface(message: String) -> void:
-	begin_page("surface")
-	overlay(view, Color("191827"))
-	label(view, "%s · 地表" % state.station, Rect2(40, 24, 560, 46), 34)
-	label(view, "辐射 · %s   /   防护服 · %s" % [RADIATION[Rail.station_info(state.station).radiation], "加强" if state.gear.heavy else "普通"], Rect2(43, 73, 560, 25), 16, MINT)
-	time_label = label(view, "", Rect2(877, 31, 220, 41), 25, AMBER, HORIZONTAL_ALIGNMENT_RIGHT)
+	var was_open: bool = screen == "surface" and view != null and view.has_method("toggle_pack") and view.pack_open
+	begin_page("surface",EXPLORATION)
+	view.configure_legacy(self)
+	action(view,"返回车厢",Rect2(24,24,121,41),return_to_cabin)
 	update_trip_clock()
-	action(view, "返回车厢", Rect2(1119, 32, 121, 41), return_to_cabin)
 	var landscape := SurfaceScenery.new()
 	landscape.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	put(view, landscape, Rect2(40, 112, 777, 524))
+	put(view.get_node("StreetFrame"), landscape, Rect2(0,0,1280,720))
 	for id in range(LOOT_SPOTS.size()):
 		var kind := state.ground_kind(id)
 		if kind.is_empty():
@@ -771,8 +783,8 @@ func show_legacy_surface(message: String) -> void:
 		var sprite_hit := invisible_action(landscape, prop.get_rect().grow(4), pick_up_surface_item.bind(id))
 		sprite_hit.tooltip_text = "%s · %s" % [name, hotspot.tooltip_text]
 		sprite_hit.set_drag_forwarding(ground_drag.bind(sprite_hit, id), Callable(), Callable())
-	update_surface_pack(false)
-	status = label(view, "", Rect2(42, 647, 1190, 33), 16, AMBER)
+	update_surface_pack(true)
+	view.set_pack_open(was_open)
 	report(message)
 
 func update_surface_pack(walking: bool) -> void:
@@ -805,9 +817,13 @@ func update_surface_pack(walking: bool) -> void:
 		wrench_button.focus_mode = Control.FOCUS_NONE
 		wrench_button.disabled = not state.gear.wrench
 		wrench_button.tooltip_text = "点击装备或收起扳手。"
-	var instructions := "A / D 移动 · E 互动 · R 旋转 · 1 照明" if walking else "点击拾取或拖入背包 · R 旋转 · 1 照明"
-	label(sidebar, instructions, Rect2(24, 483, 356, 26), 14, MUTED)
+	if walking:
+		action(sidebar,"装入主动位",Rect2(24,476,168,28),equip_selected_active).focus_mode = Control.FOCUS_NONE
+		action(sidebar,"收回主动道具",Rect2(202,476,178,28),unequip_active_item).focus_mode = Control.FOCUS_NONE
+	var instructions := "B 背包 · 空格 主动 · R 旋转 · 1 照明" if walking else "点击拾取或拖入背包 · R 旋转 · 1 照明"
+	label(sidebar, instructions, Rect2(24, 508 if walking else 483, 356, 26), 14, MUTED)
 	refresh_equipment()
+	if view.has_method("refresh_active"): view.refresh_active()
 
 func toggle_battery_slot() -> void:
 	battery_slot_open = not battery_slot_open
@@ -932,3 +948,29 @@ func close_settings() -> void:
 	get_tree().paused = settings_was_paused
 	settings_panel.queue_free()
 	settings_panel = null
+
+func equip_selected_active(id: int = -1) -> void:
+	if check_trip_timeout(): return
+	if id < 0:
+		if selection.get("source") != "bag": report("先在背包中选中道具。"); return
+		id = int(selection.id)
+	var problem := state.equip_active(id)
+	if problem.is_empty():
+		clear_selection()
+		update_surface_pack(true)
+		report("道具已装备到主动位，不再占用背包格。")
+	else: report(problem)
+
+func unequip_active_item() -> void:
+	if check_trip_timeout(): return
+	var problem := state.unequip_active()
+	if problem.is_empty():
+		clear_selection();update_surface_pack(true);report("主动道具已放回背包。")
+	else: report(problem)
+
+func use_active_item() -> void:
+	if check_trip_timeout(): return
+	var problem := state.use_active()
+	if problem.is_empty():
+		clear_selection();update_surface_pack(true);report("已使用主动道具。")
+	else: report(problem)

@@ -30,7 +30,7 @@ func refresh() -> void:
 	if not found:
 		var empty := Label.new();empty.text = "柜子是空的。";contents.add_child(empty)
 func take_item(slot: int) -> void:
-	if not street.can_take(slot) or not state.pick_up_ground(slot):controller.report("无法拿取：检查照明、距离、背包空间和剩余时间。");return
+	if not street.can_take(slot) or not state.pick_up_ground(slot):controller.report("无法拿取：检查距离、背包空间和剩余时间。");return
 	controller.update_surface_pack(true)
 	controller.report("物资已放入背包。")
 	refresh()

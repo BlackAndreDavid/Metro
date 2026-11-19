@@ -29,14 +29,16 @@ Home
 ├─ SettingsButton                         始终属于 Home
 └─ Exploration (exploration.tscn)
    ├─ Background
-   ├─ Location / Departure / Timer         地点、出发站与车电、剩余时间
-   ├─ StreetFrame (clip_contents=true)     左侧777×524的裁切视窗
+   ├─ Timer                                剩余时间
+   ├─ StreetFrame (clip_contents=true)     全屏1280×720裁切视窗
    │  └─ SurfaceBlock                     地表世界 Control
    │     └─ InteriorLight                 setup 时创建的室内暗幕
    ├─ Minimap                             根据地图行列数自适应的小地图
    ├─ InteractionPrompt                   当前唯一 E 交互提示
-   ├─ PackAnchor                          右侧404×524区域
+   ├─ PackAnchor                          右侧404×536叠加区域，默认隐藏
    │  └─ 动态背包/装备/电池槽/扳手按钮
+   ├─ BackpackButton / ActiveSlot           背包开关与独立主动位
+   ├─ StaminaLabel / Stamina                左下体力信息
    ├─ Status                              底部结果和错误提示
    ├─ VehicleParts                        检查汽车时由 Home 动态创建
    └─ NPC 对话窗口                         npc_interaction.gd 动态创建
@@ -84,7 +86,7 @@ A/D或左右键改变 `player_x`，走速188像素/秒，Shift 跑速282；街�
 
 ## 5. 输入、交互与事件
 
-Home 把 E 键转给 `SurfaceBlock.interact()`，把1键转给手电开关。`interaction()` 每次只返回一个动作，优先级为：
+Home 把 E 键转给 `SurfaceBlock.interact()`，B 切换背包，空格使用主动位，1键控制暗处手电。`interaction()` 每次只返回一个动作，优先级为：
 
 1. 室外附近 NPC（对话/柜子界面中不返回新交互）；
 2. 附近建筑柜子；
@@ -94,7 +96,7 @@ Home 把 E 键转给 `SurfaceBlock.interact()`，把1键转给手电开关。`in
 6. 建筑入口；
 7. 附近汽车。
 
-交互距离默认43像素。物资还要求街道、建筑ID、楼层匹配；室内未开手电时不能拾取。`interact()` 对穿巷、进出建筑和楼梯直接更改世界位置，随后 `position_changed()` 刷新访问记录、照明和图形，并发出 `moved`。
+交互距离默认43像素。物资还要求街道、建筑ID、楼层匹配；拾取不依赖手电开关。`interact()` 对穿巷、进出建筑和楼梯直接更改世界位置，随后 `position_changed()` 刷新访问记录、照明和图形，并发出 `moved`。
 
 | 世界信号 | 接收回调 | 规则/界面效果 |
 | --- | --- | --- |
@@ -157,3 +159,13 @@ Home 把 E 键转给 `SurfaceBlock.interact()`，把1键转给手电开关。`in
 `exploration/container_panel.gd` 管理柜子窗口，领取仍走 cabin_state.pick_up_ground() 的原子容量/旋转检查。世界互动图形实例化现有 highlightable_item.tscn，使用同一描边着色器与功能说明；车辆和站口使用 outline_only 蒙版，保留原图形。HUD 不再重复同一条功能提示。
 
 街道 street_starts 为独立起点数组。移动、镜头、巷口重叠区、敌人边界与小地图都使用同一世界坐标；小地图连接分别计算相邻街道的局部格号。
+
+## 全屏探索、主动位与物资点
+
+世界铺满1280×720逻辑画面；右侧背包默认隐藏，B或背包按钮切换叠加面板，不改变世界尺寸及镜头。体力条在左下角，移除原站点/出发电量标签。`exploration.gd.set_pack_open()` 同步人物移动锁定；探索倒计时和怪物继续运行。
+
+右上主动位由 `exploration/active_slot.gd` 管理。背包内选中物品后点击“装入主动位”，或拖到主动位；可以换装、收回，也可把主动位物品拖回背包并旋转。State 的 `active_item` 独立拥有物品，不占用背包格；换装时先验证旧物品能否放回，失败保持原状。空格触发 `items.json.active_use`：医疗包恢复25生命，水/口粮满足当日饮食；无主动效果的材料不会消耗。存档升级到16版，兼容旧存档（主动位默认为空）；探索失败时主动位物品随背包一起丢失。
+
+建筑 `loot_points` 和关卡顶层 `spawn_points` 共用 `choices/chance/rolls`：`container` 为 `cabinet` 或 `loose`。建筑附属点可设 `outside:true`，改在该建筑所在街道地面生成；独立室外点的 x 是街道绝对坐标，建筑附属点 x 是相对建筑坐标。内容注册器展开后沿用原有领取槽索引，新增点采用稳定生成ID进行加权抽取。散落物资使用物品贴图与共用描边模块，领取后隐藏。室外或建筑 `light_level≥0.6` 会自动关手电；默认室内光照0.15。暗处同样允许按E或点击打开柜子、拾取物资。
+
+敌人由 `exploration/enemy_view.gd` 作为门交互控件之后的子节点绘制，避免被门遮挡；保持正常 z=0，使背包、对话和设置仍在其上。脚步音轨与生成说明见 [音频说明](assets/audio/footsteps/README.md)。

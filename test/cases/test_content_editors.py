@@ -177,6 +177,19 @@ console.log('EDITOR_MODELS_OK');
                 with urllib.request.urlopen(request) as response:self.assertTrue(json.load(response)['ok'])
                 saved=next(c for c in editor.catalog('customers','customers') if c['id']=='editor_test');self.assertEqual(saved['deleted'],deleted)
         finally:server.shutdown();server.server_close();thread.join()
+    def test_loose_outdoor_points_and_active_effect_validation(self):
+        level=self.level();level['npcs']=[]
+        level['spawn_points']=[dict(id='street_drop',row=2,x=400,container='loose',chance=1,rolls=1,choices=[dict(kind='water',weight=1)])]
+        editor.validate_level('南京东路',level)
+        bad=copy.deepcopy(level);bad['spawn_points'][0]['x']=-1
+        with self.assertRaises(ValueError):editor.validate_level('南京东路',bad)
+        bad=copy.deepcopy(level);bad['spawn_points'][0]['choices'][0]['weight']=0
+        with self.assertRaises(ValueError):editor.validate_level('南京东路',bad)
+        point=level['buildings'][0]['loot_points'][0];point.update(container='loose',outside=True)
+        editor.validate_level('南京东路',level)
+        item=editor.read(self.game/'content/items.json')['items'][0];item['active_use']={'action':'unknown','amount':25}
+        with self.assertRaises(ValueError):editor.validate_item(item)
+
     def test_authored_content_runs_in_isolated_game(self):
         godot=os.environ.get('METRO_GODOT')
         if not godot:self.skipTest('METRO_GODOT required for runtime integration')

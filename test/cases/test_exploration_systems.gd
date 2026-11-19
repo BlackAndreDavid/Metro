@@ -24,7 +24,9 @@ func run() -> void:
 	check(is_equal_approx(motion.step(0.1,1,false),150.4),"pounce slows walking by twenty percent")
 	motion.step(2,0,false)
 	check(motion.slow_remaining == 0,"slow expires after two seconds")
-	var spec: Dictionary = Content.read_json("res://content/enemies.json").enemies[0]
+	var spec: Dictionary = Content.read_json("res://content/enemies.json").enemies[0].duplicate(true)
+	# Fixed-size behavior fixture; live sprite/collider dimensions remain artist-editable.
+	spec.sprite.width = 128;spec.sprite.collision_width = 128
 	var enemy := Enemy.new(spec,{"id":"rat_test","row":0,"x":400})
 	check(enemy.body_rect(416).size == Vector2(128,32),"rat collider is four human widths and half human height")
 	check(enemy.perceive({"row":0,"x":160,"indoors":false}).vision,"forward vision cone sees twice body length")
@@ -63,6 +65,7 @@ func run() -> void:
 	for code in [KEY_SHIFT,KEY_D]:
 		var press := InputEventKey.new();press.keycode = code;press.physical_keycode = code;press.pressed = true;Input.parse_input_event(press)
 	await create_timer(0.15).timeout
+	await process_frame # Timer callbacks can precede the first SurfaceBlock process on a cold start.
 	check(street.motion.running and street.player_x > before_x and home.view.get_node("Stamina").value < 100,"actual Shift plus movement input drives stamina HUD and sprint")
 	for code in [KEY_SHIFT,KEY_D]:
 		var release := InputEventKey.new();release.keycode = code;release.physical_keycode = code;release.pressed = false;Input.parse_input_event(release)
