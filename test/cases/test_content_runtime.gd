@@ -49,6 +49,7 @@ func run() -> void:
 	window.set_customer(int(order.visitor))
 	check(window.Catalog.definition(int(order.visitor)).id == "editor_test" and order.budget == 77, "editor weighted visitor and base budget used by runtime")
 	check(order.category == "supplies", "edited category drives order")
+	check(order.stock=={"water":2},"editor-authored specific item weights reach real customer demand")
 	check(not Dialogue.pending(home.state,order).is_empty(), "condition-matched editor story has priority")
 	window.advance(window.approach_seconds)
 	check(scene.get_node("DialogueOverlay").visible and scene.get_node("Panel/Confirm").disabled, "arrival opens story before trading")

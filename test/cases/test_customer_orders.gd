@@ -17,6 +17,9 @@ func payload_for(state,kind: String) -> Dictionary:
 func run() -> void:
 	var state := State.new()
 	check(Orders.daily_limit("邮电新村") == 4 and Orders.daily_limit("四平路") == 6 and Orders.daily_limit("同济大学") == 5, "station-specific visitor caps")
+	var weighted := Orders.weighted_items(state,{"water":10,"ration":0,"meds":0},"supplies","weighted-test")
+	check(weighted=={"water":2},"weighted orders exclude zero-weight goods and cap repeated stock")
+	check(Orders.weighted_items(state,{"water":0},"supplies","weighted-test").is_empty(),"empty weighted catalogue cannot spawn goods")
 	var order := Orders.ensure(state)
 	check(order.side == "buy" and order.category == "supplies" and Orders.record(state).arrived == 1, "first customer buys a category rather than exact item")
 	check(Orders.ensure(state).id == order.id and Orders.record(state).arrived == 1, "reopening does not reroll order or consume another slot")
@@ -25,6 +28,10 @@ func run() -> void:
 	var battery := payload_for(state,"aaa")
 	check(not Orders.preview(state,[battery]).problem.is_empty(), "wrong category rejected")
 	check(not Orders.preview(state,[water,water]).problem.is_empty(), "same inventory object cannot be selected twice")
+	order.stock={"water":2}
+	check(not Orders.preview(state,[ration]).problem.is_empty(),"configured buyer rejects a good outside the drawn demand")
+	check(Orders.valid_saved(state.customer_visits),"weighted buyer demand survives order validation")
+	order.stock={}
 	order.budget = 1.0
 	var before := state.save_data().duplicate(true)
 	check(Orders.preview(state,[water]).problem.begins_with("买不起"), "over-budget order says cannot afford")

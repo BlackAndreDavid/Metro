@@ -30,6 +30,7 @@ class ContentEditors(unittest.TestCase):
     def customer(self):
         customer=copy.deepcopy(editor.read(self.game/'content/customers.json')['customers'][0])
         customer.update(faction='red',id='editor_test',name='编辑器客户',base_budget=77,weight=1000,buy_categories=['supplies'],sell_categories=['documents'])
+        customer['buy_item_weights']={'supplies':{'water':1,'ration':0}}
         customer['stories']=[dict(id='test_story',name='分支测试',priority=20,once=True,conditions={'day_min':1,'has_items':{'water':1}},start='greeting',nodes={
             'greeting':dict(speaker='编辑器客户',text='先聊聊再交易。',choices=[dict(text='听消息',next='thanks',conditions={},effects={'affection':3,'trust':5}),dict(text='先告别',next='',conditions={})]),
             'thanks':dict(effects={'affection':7,'trust':6},speaker='编辑器客户',text='谢谢你听我说。',set_flags=['editor_story_done'],next='more',choices=[]),
@@ -191,6 +192,13 @@ console.log('EDITOR_MODELS_OK');
             (editor.WEB/'.projects.local.json').write_text('broken json',encoding='utf-8')
             self.assertEqual(editor.linked_project(),ROOT/'Game')
         finally:editor.WEB=original
+
+    def test_customer_item_weights_validation(self):
+        customer=self.customer();customer['sell_categories']=['supplies'];customer['sell_item_weights']={'supplies':{'water':5,'ration':0}}
+        editor.validate_customer(customer)
+        for weights in [{'water':-1},{'unknown_item':3},{'circuit':2},{'water':0}]:
+            invalid=copy.deepcopy(customer);invalid['sell_item_weights']['supplies']=weights
+            with self.assertRaises(ValueError):editor.validate_customer(invalid)
 
     def test_browser_service_registration_and_link_validation(self):
         original=editor.WEB;previous=dict(editor.SERVICE)

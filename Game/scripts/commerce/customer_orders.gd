@@ -41,19 +41,47 @@ static func ensure(state: RefCounted) -> Dictionary:
 		visitor = pick_visitor(state,index,side)
 	if visitor < 0: return {}
 	var definition: Dictionary = Visitors.definition(visitor)
-	var allowed: Array = definition.get(side+"_categories",CATEGORIES.keys())
+	var allowed: Array = available_categories(definition,side)
 	var category: String = allowed[index % allowed.size()]
 	var stock := {}
-	if side == "sell":
+	var configured: Dictionary = definition.get(side+"_item_weights",{})
+	if configured.has(category):
+		stock = weighted_items(state,configured[category],category,"order/%d/%s" % [index,side])
+	elif side == "sell":
 		var kinds: Array = CATEGORIES[category].items.duplicate()
 		for extra in ItemCatalog.in_category(category):
-			if extra not in kinds: kinds.append(extra)
+			if extra not in kinds:kinds.append(extra)
 		for kind in kinds:
-			if kind in ItemCatalog.in_category(category): stock[kind] = 2
+			if kind in ItemCatalog.in_category(category):stock[kind] = 2
 	visits.active = {"id":"%d/%s/%d" % [state.day,state.station,index],"visitor":visitor,"side":side,"category":category,"budget":float(definition.get("base_budget",120)),"status":"open","stock":stock,"total":0.0}
 	state.daily_customer_ids[definition.id] = true
 	visits.arrived += 1
 	return visits.active
+
+static func available_categories(definition: Dictionary, side: String) -> Array:
+	var allowed: Array = []
+	var configured: Dictionary = definition.get(side+"_item_weights",{})
+	for category in definition.get(side+"_categories",CATEGORIES.keys()):
+		if not configured.has(category):allowed.append(category);continue
+		for kind in ItemCatalog.in_category(category):
+			if float(configured[category].get(kind,0)) > 0:allowed.append(category);break
+	return allowed
+
+static func weighted_items(state: RefCounted, weights: Dictionary, category: String, seed_key: String) -> Dictionary:
+	var pool := {}
+	for kind in ItemCatalog.in_category(category):
+		if float(weights.get(kind,0)) > 0: pool[kind] = float(weights[kind])
+	var result := {}
+	if pool.is_empty():return {}
+	for draw in range(3):
+		var total := 0.0
+		for value in pool.values(): total += float(value)
+		var roll: float = state.station_roll(state.station,seed_key+"/%d" % draw,1000000)/1000001.0*total
+		for kind in pool.keys():
+			roll -= float(pool[kind])
+			if roll < 0:
+				result[kind] = mini(2,int(result.get(kind,0))+1);break
+	return result
 
 static func pick_visitor(state: RefCounted, index: int, side: String) -> int:
 	var candidates: Array[int] = []
@@ -62,7 +90,7 @@ static func pick_visitor(state: RefCounted, index: int, side: String) -> int:
 		var data: Dictionary = Visitors.definition(i)
 		if state.daily_customer_ids.has(data.id): continue
 		if not data.get("trade_enabled",true): continue
-		if not data.get("enabled",true) or float(data.get("weight",1)) <= 0 or data.get(side+"_categories",CATEGORIES.keys()).is_empty(): continue
+		if not data.get("enabled",true) or float(data.get("weight",1)) <= 0 or available_categories(data,side).is_empty(): continue
 		if not data.get("stations",[]).is_empty() and state.station not in data.stations: continue
 		candidates.append(i)
 		total += float(data.get("weight",1))
@@ -128,6 +156,7 @@ static func preview(state: RefCounted, selection: Array) -> Dictionary:
 			kind = payload.kind
 			quantities[kind] = quantities.get(kind,0)+1
 			if quantities[kind] > order.stock.get(kind,0): result.problem = "顾客没有足够的这件商品。"; return result
+		if order.side == "buy" and not order.stock.is_empty() and not order.stock.has(kind): result.problem = "顾客本次不购买这件商品。"; return result
 		if category_of(kind) != order.category: result.problem = "这件商品不属于订单要求的类别。"; return result
 		result.total = snappedf(result.total + price(state,order,kind,charge),0.1)
 		result.kinds.append(kind)
@@ -192,7 +221,7 @@ static func valid_saved(raw: Variant, legacy: bool = false) -> bool:
 		if not (o.visitor is int or o.visitor is float) or not is_finite(o.visitor) or o.visitor != floor(o.visitor) or o.visitor < 0 or o.visitor >= Visitors.ENTRIES.size(): return false
 		for key in ["budget","total"]:
 			if not (o[key] is int or o[key] is float) or not is_finite(o[key]) or o[key] < 0 or o[key] > 1000000000: return false
-		if not o.stock is Dictionary or (o.side == "buy" and not o.stock.is_empty()): return false
+		if not o.stock is Dictionary: return false
 		for kind in o.stock:
 			var quantity: Variant = o.stock[kind]
 			if not kind is String or category_of(kind) != o.category or not (quantity is int or quantity is float) or not is_finite(quantity) or quantity != floor(quantity) or quantity < 0 or quantity > 2: return false

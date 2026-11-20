@@ -51,6 +51,10 @@ func refresh(message: String = "") -> void:
 		$Panel/Order.text += "\n今日顾客已全部接待，明日再来。"
 	else:
 		$Panel/Order.text += "\n顾客%s：%s类商品\n顾客预算 %s 度" % ["购买" if order.side == "buy" else "出售",Orders.CATEGORIES[order.category].name,home.energy_text(order.budget)]
+		if order.side == "buy" and not order.stock.is_empty():
+			var wanted: PackedStringArray = []
+			for kind in order.stock: wanted.append(home.state.item_name(kind))
+			$Panel/Order.text += "\n本次需求："+"、".join(wanted)
 		if order.status == "completed": $Panel/Order.text += "\n订单完成 · 顾客正在离开"
 		elif order.status == "dismissed": $Panel/Order.text += "\n已送客 · 顾客正在离开"
 	clear_column($Panel/Bag)

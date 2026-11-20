@@ -119,6 +119,8 @@ func _input(event: InputEvent) -> void:
 		close_vehicle()
 	elif event.keycode == KEY_ESCAPE and not selection.is_empty():
 		clear_selection()
+	elif event.keycode == KEY_F and not selection.is_empty():
+		flip_selection()
 	elif event.keycode == KEY_R and not selection.is_empty():
 		rotate_selection()
 	elif event.keycode == KEY_ESCAPE and screen == "surface" and view.has_method("set_pack_open") and view.pack_open:
@@ -532,7 +534,7 @@ func show_locker(message: String = "") -> void:
 	label(panel, cargo_title("locker"), Rect2(516, 91, 450, 34), 21)
 	add_grid(panel, "bag", Vector2(40, 139), 52)
 	add_grid(panel, "locker", Vector2(516, 139), 52)
-	label(panel, "点选或拖动物品到目标格   /   滚轮或 R 旋转   /   右键取消", Rect2(40, 414, 930, 23), 16, MUTED)
+	label(panel, "点选或拖动物品到目标格   /   滚轮或 R 旋转   /   F 镜像   /   右键取消", Rect2(40, 414, 930, 23), 16, MUTED)
 	status = label(panel, "", Rect2(40, 447, 936, 27), 16, AMBER)
 	report(message)
 
@@ -553,7 +555,7 @@ func select_cargo(source: String, id: int) -> void:
 	var entry := state.picked(source, id)
 	if entry.is_empty():
 		return
-	selection = {"source": source, "id": id, "rotated": entry.rotated}
+	selection = {"source": source, "id": id, "rotated": entry.rotated, "mirrored": entry.get("mirrored",false)}
 	update_cargo_preview()
 
 func clear_selection() -> void:
@@ -564,6 +566,10 @@ func clear_selection() -> void:
 
 func rotate_selection() -> void:
 	selection.rotated = not selection.rotated
+	update_cargo_preview()
+
+func flip_selection() -> void:
+	selection.mirrored = not selection.get("mirrored",false)
 	update_cargo_preview()
 
 func update_cargo_preview() -> void:
@@ -820,7 +826,7 @@ func update_surface_pack(walking: bool) -> void:
 	if walking:
 		action(sidebar,"装入主动位",Rect2(24,476,168,28),equip_selected_active).focus_mode = Control.FOCUS_NONE
 		action(sidebar,"收回主动道具",Rect2(202,476,178,28),unequip_active_item).focus_mode = Control.FOCUS_NONE
-	var instructions := "B 背包 · 空格 主动 · R 旋转 · 1 照明" if walking else "点击拾取或拖入背包 · R 旋转 · 1 照明"
+	var instructions := "B 背包 · 空格 主动 · R 旋转 · F 镜像 · 1 照明" if walking else "点击拾取或拖入背包 · R 旋转 · F 镜像 · 1 照明"
 	label(sidebar, instructions, Rect2(24, 508 if walking else 483, 356, 26), 14, MUTED)
 	refresh_equipment()
 	if view.has_method("refresh_active"): view.refresh_active()

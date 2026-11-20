@@ -96,7 +96,8 @@ func _draw() -> void:
 			var oriented := Vector2(raw.y, raw.x) if entry.rotated else raw
 			var fit := minf(area.x / oriented.x, area.y / oriented.y)
 			var center := rect.position+rect.size/2-Vector2(0,6)
-			draw_set_transform(center, PI / 2 if entry.rotated else 0.0)
+			var mirrored: bool = host.selection.get("mirrored",false) if active else entry.get("mirrored",false)
+			draw_set_transform(center, PI / 2 if entry.rotated else 0.0,Vector2(-1,1) if mirrored else Vector2.ONE)
 			draw_texture_rect(texture, Rect2(-raw * fit / 2, raw * fit), false)
 			draw_set_transform(Vector2.ZERO)
 		if entry.kind == "aaa":

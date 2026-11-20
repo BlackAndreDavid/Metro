@@ -1,6 +1,6 @@
 'use strict';
 // Same document and coordinate system are consumed by Godot's NetworkCatalog.
-const N={data:null,revision:null,layer:'lines',tool:'select',line:0,selection:null,history:[],dirty:false,box:null,svg:null,drag:null};
+const N={data:null,revision:null,layer:'lines',tool:'select',line:0,selection:null,history:[],grid:false,snap:false,gridSize:20,dirty:false,box:null,svg:null,drag:null};
 const beforeNetworkView=view;view=function(id){beforeNetworkView(id);$('networkView').hidden=id!=='networkView'};
 const beforeNetworkSave=$('saveAll').onclick;$('saveAll').onclick=()=>{if(!$('networkView').hidden)$('networkSave').click();else beforeNetworkSave()};
 function networkChanged(){N.dirty=true;dirty();$('networkState').textContent='● 地图尚未保存'}
@@ -12,6 +12,7 @@ $('networkTab').onclick=run(async()=>{view('networkView');if(!N.data)await loadN
 function networkFit(){if(!N.data)return;N.box={x:-30,y:-30,w:N.data.canvas.width+60,h:N.data.canvas.height+60};if(N.svg)N.svg.setAttribute('viewBox',`${N.box.x} ${N.box.y} ${N.box.w} ${N.box.h}`)}
 function networkZoom(scale){const w=Math.max(100,Math.min(16000,N.box.w*scale)),ratio=w/N.box.w;N.box.x+=(N.box.w-w)/2;N.box.y+=N.box.h*(1-ratio)/2;N.box.w=w;N.box.h*=ratio;N.svg.setAttribute('viewBox',`${N.box.x} ${N.box.y} ${N.box.w} ${N.box.h}`)}
 function networkAt(e){const p=N.svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const local=p.matrixTransform(N.svg.getScreenCTM().inverse());return [Math.round(local.x),Math.round(local.y)]}
+function snapNetwork(p){return N.layer==='lines'&&N.snap?p.map(v=>Math.round(v/N.gridSize)*N.gridSize):p}
 function clampNetwork(p){return [Math.max(0,Math.min(8000,p[0])),Math.max(0,Math.min(8000,p[1]))]}
 function networkSVG(tag,attrs={}){return svgElement(tag,attrs)}
 function networkTool(tool){N.tool=tool;for(const[id,value]of Object.entries({networkSelect:'select',networkAppend:'append',networkInsert:'insert',networkStation:'station'}))$(id).classList.toggle('selected',tool===value)}
@@ -46,6 +47,7 @@ function renderNetworkCanvas(detached=false){
  const svg=networkSVG('svg',{viewBox:`${N.box.x} ${N.box.y} ${N.box.w} ${N.box.h}`,'aria-label':'地图双层编辑画布',tabindex:0});if(!detached)N.svg=svg;
  svg.append(networkSVG('rect',{x:0,y:0,width:N.data.canvas.width,height:N.data.canvas.height,fill:'#faf9f3',stroke:'#9b93a4','stroke-width':2}));
  N.data.textures.forEach((image,index)=>{if(image.visible===false)return;const [x,y]=image.position,[w,h]=image.size,g=networkSVG('g',{transform:`translate(${x},${y}) rotate(${image.rotation||0})`,'data-network-texture':index,opacity:image.opacity??1});g.append(networkSVG('image',{href:'/asset?path='+encodeURIComponent(image.texture),width:w,height:h,preserveAspectRatio:'none'}));if(N.layer==='textures'&&N.selection?.kind==='texture'&&N.selection.index===index){g.append(networkSVG('rect',{width:w,height:h,fill:'none',stroke:'#5b3d98','stroke-width':3}));g.append(networkSVG('rect',{x:w-9,y:h-9,width:18,height:18,fill:'#5b3d98','data-network-resize':index}))}if(N.layer!=='textures')g.style.pointerEvents='none';svg.append(g)});
+ if(N.layer==='lines'&&N.grid){const defs=networkSVG('defs'),pattern=networkSVG('pattern',{id:'metro-line-grid',width:N.gridSize,height:N.gridSize,patternUnits:'userSpaceOnUse'});pattern.append(networkSVG('path',{d:`M ${N.gridSize} 0 H 0 V ${N.gridSize}`,fill:'none',stroke:'#81758e','stroke-opacity':.45,'stroke-width':1}));defs.append(pattern);svg.append(defs,networkSVG('rect',{width:N.data.canvas.width,height:N.data.canvas.height,fill:'url(#metro-line-grid)','pointer-events':'none','data-line-grid':'true'}))}
  N.data.lines.forEach((line,li)=>{
   const points=line[2].map(networkPoint);const g=networkSVG('g',{opacity:N.layer==='textures'?.45:1});g.append(networkSVG('polyline',{points:points.map(p=>p.join(',')).join(' '),fill:'none',stroke:'#'+line[1],'stroke-width':li===N.line?8:5,'stroke-linejoin':'round'}));
   if(N.layer==='lines')for(let i=0;i<points.length-1;i++)g.append(networkSVG('line',{x1:points[i][0],y1:points[i][1],x2:points[i+1][0],y2:points[i+1][1],stroke:'transparent','stroke-width':20,'data-network-segment':i,'data-network-line':li,class:'network-segment'}));
@@ -53,12 +55,12 @@ function renderNetworkCanvas(detached=false){
  });
  for(const[name,station]of Object.entries(N.data.stations)){const [x,y]=station.position,g=networkSVG('g',{'data-network-station':name,class:'network-node'});g.append(networkSVG('circle',{cx:x,cy:y,r:8,fill:N.selection?.name===name?'#f0cc91':'#fff',stroke:'#292a36','stroke-width':3}));const label=networkSVG('text',{x:x+station.label[0],y:y+station.label[1]+12,fill:'#292a36','font-size':14,'paint-order':'stroke',stroke:'#faf9f3','stroke-width':3});label.textContent=name;g.append(label);if(N.layer!=='lines')g.style.pointerEvents='none';svg.append(g)}
  if(detached)return svg;
- $('networkCanvas').replaceChildren(svg);svg.onpointerdown=networkDown;svg.onpointermove=networkMove;svg.onpointerup=networkUp;svg.onpointercancel=()=>N.drag=null;svg.oncontextmenu=e=>e.preventDefault();svg.onwheel=e=>{e.preventDefault();networkZoom(e.deltaY<0?.85:1.18)};svg.onkeydown=e=>{if(e.key==='Delete'){e.preventDefault();networkDelete()}if(e.ctrlKey&&e.key.toLowerCase()==='z'){e.preventDefault();networkUndo()}};
+ $('networkCanvas').replaceChildren(svg);svg.onpointerdown=networkDown;svg.onpointermove=networkMove;svg.onpointerup=networkUp;svg.onpointercancel=()=>N.drag=null;svg.oncontextmenu=e=>e.preventDefault();svg.onwheel=e=>{e.preventDefault();networkZoom(e.deltaY<0?.85:1.18)};svg.onkeydown=e=>{if(e.key==='Delete'){e.preventDefault();networkDelete()}};
 }
 function networkDown(e){
  N.svg.focus();
  if(e.button===1||e.button===2){e.preventDefault();N.drag={kind:'pan',at:networkAt(e),inverse:N.svg.getScreenCTM().inverse(),box:{...N.box}};N.svg.setPointerCapture(e.pointerId);return}if(e.button!==0)return;
- const at=clampNetwork(networkAt(e)),station=e.target.closest('[data-network-station]')?.dataset.networkStation,point=e.target.closest('[data-network-point]'),segment=e.target.closest('[data-network-segment]'),image=e.target.closest('[data-network-texture]');
+ const rawAt=clampNetwork(networkAt(e)),at=clampNetwork(snapNetwork(rawAt)),station=e.target.closest('[data-network-station]')?.dataset.networkStation,point=e.target.closest('[data-network-point]'),segment=e.target.closest('[data-network-segment]'),image=e.target.closest('[data-network-texture]');
  if(N.layer==='lines'){
   if(N.tool==='station'){networkCheckpoint();let i=1;while(N.data.stations['新站'+i])i++;const name='新站'+i;N.data.stations[name]={position:at,label:[10,-20]};if(N.data.lines[N.line])N.data.lines[N.line][2].push(name);N.selection={kind:'station',name};networkChanged();renderNetwork();return}
   if(N.tool==='append'){if(!N.data.lines[N.line]){status('请先新增或选择线路',true);return}networkCheckpoint();N.data.lines[N.line][2].push(station||at);N.selection={kind:'point',line:N.line,index:N.data.lines[N.line][2].length-1};networkChanged();renderNetwork();return}
@@ -67,21 +69,21 @@ function networkDown(e){
   else if(point){N.line=+point.dataset.networkLine;N.selection={kind:'point',line:N.line,index:+point.dataset.networkPoint}}
   else if(segment){N.line=+segment.dataset.networkLine;N.selection=null;renderNetwork();return}else{N.selection=null;renderNetwork();return}
  }else{if(!image){N.selection=null;renderNetwork();return}N.selection={kind:'texture',index:+image.dataset.networkTexture}}
- networkCheckpoint();const selected=networkSelected();const start=N.layer==='textures'?selected.position:('position'in selected?selected.position:selected);N.drag={kind:e.target.hasAttribute('data-network-resize')?'resize':'move',at,start:[...start],size:selected.size?[...selected.size]:null};renderNetworkInspector();N.svg.setPointerCapture(e.pointerId);
+ const selected=networkSelected();const start=N.layer==='textures'?selected.position:('position'in selected?selected.position:selected);N.drag={kind:e.target.hasAttribute('data-network-resize')?'resize':'move',at:rawAt,checkpoint:false,start:[...start],size:selected.size?[...selected.size]:null};renderNetworkInspector();N.svg.setPointerCapture(e.pointerId);
 }
 function networkMove(e){
  const d=N.drag;if(!d)return;let at=networkAt(e);
  if(d.kind==='pan'){const p=N.svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const fixed=p.matrixTransform(d.inverse);at=[fixed.x,fixed.y]}
  if(d.kind==='pan'){N.box.x=d.box.x-(at[0]-d.at[0]);N.box.y=d.box.y-(at[1]-d.at[1]);N.svg.setAttribute('viewBox',`${N.box.x} ${N.box.y} ${N.box.w} ${N.box.h}`);return}
- const selected=networkSelected(),dx=at[0]-d.at[0],dy=at[1]-d.at[1];
+ const selected=networkSelected(),dx=at[0]-d.at[0],dy=at[1]-d.at[1];if(!dx&&!dy)return;if(!d.checkpoint){networkCheckpoint();d.checkpoint=true}
  if(d.kind==='resize'){const angle=-(selected.rotation||0)*Math.PI/180;selected.size=[Math.max(1,Math.min(8000,Math.round(d.size[0]+dx*Math.cos(angle)-dy*Math.sin(angle)))),Math.max(1,Math.min(8000,Math.round(d.size[1]+dx*Math.sin(angle)+dy*Math.cos(angle))))]}
- else{const next=N.layer==='textures'?[Math.max(-8000,Math.min(8000,d.start[0]+dx)),Math.max(-8000,Math.min(8000,d.start[1]+dy))]:clampNetwork([d.start[0]+dx,d.start[1]+dy]);if(Array.isArray(selected)){selected[0]=next[0];selected[1]=next[1]}else selected.position=next}
+ else{const next=N.layer==='textures'?[Math.max(-8000,Math.min(8000,d.start[0]+dx)),Math.max(-8000,Math.min(8000,d.start[1]+dy))]:clampNetwork(snapNetwork([d.start[0]+dx,d.start[1]+dy]));if(Array.isArray(selected)){selected[0]=next[0];selected[1]=next[1]}else selected.position=next}
  networkChanged(); // Keep the capture-owning SVG alive; update its visual children only.
  const fresh=renderNetworkCanvas(true);N.svg.replaceChildren(...fresh.childNodes);renderNetworkInspector();
 }
 function networkUp(){if(!N.drag)return;N.drag=null;renderNetwork()}
 function networkDelete(){if(!N.selection)return;networkCheckpoint();const s=N.selection;if(s.kind==='texture')N.data.textures.splice(s.index,1);else if(s.kind==='point')N.data.lines[s.line][2].splice(s.index,1);else{if(S.project.stations.includes(s.name)){status('已有游戏站点需保留，可选中它在线路上的节点移除连接。',true);N.history.pop();return}delete N.data.stations[s.name];for(const line of N.data.lines)line[2]=line[2].filter(p=>p!==s.name)}N.selection=null;networkChanged();renderNetwork()}
-function networkUndo(){if(!N.history.length)return;const previous=N.history.pop();N.data=previous.data;N.selection=previous.selection;N.line=previous.line;networkChanged();renderNetwork()}
+function networkUndo(){if(!N.history.length)return;N.drag=null;const previous=N.history.pop();N.data=previous.data;N.selection=previous.selection;N.line=previous.line;networkChanged();renderNetwork()}
 $('networkDelete').onclick=networkDelete;$('networkUndo').onclick=networkUndo;
 $('networkNewLine').onclick=()=>{networkCheckpoint();let number=1;while(N.data.lines.some(l=>l[0]===number))number++;N.data.lines.push([number,'7a62a3',[]]);N.line=N.data.lines.length-1;N.selection=null;networkTool('append');networkChanged();renderNetwork()};
 $('networkRemoveLine').onclick=()=>{if(!N.data.lines[N.line])return;networkCheckpoint();N.data.lines.splice(N.line,1);N.line=Math.max(0,N.line-1);N.selection=null;networkChanged();renderNetwork()};
@@ -95,3 +97,8 @@ for(const[key,id]of Object.entries({width:'networkWidth',height:'networkHeight'}
 $('networkZoomIn').onclick=()=>networkZoom(.8);$('networkZoomOut').onclick=()=>networkZoom(1.25);$('networkFit').onclick=()=>{networkFit();renderNetworkCanvas()};
 
 window.addEventListener("beforeunload",e=>{if(N.dirty){e.preventDefault();e.returnValue=""}});
+
+// Page-level shortcuts survive SVG replacement and toolbar focus; text keeps native undo.
+document.addEventListener('keydown',e=>{if($('networkView').hidden||e.target.closest('input,textarea,select,[contenteditable=true]'))return;if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){e.preventDefault();networkUndo()}});
+for(const[id,key]of [['networkGrid','grid'],['networkSnap','snap']])$(id).onchange=()=>{N[key]=$(id).checked;renderNetworkCanvas()};
+$('networkGridSize').onchange=()=>{N.gridSize=Math.max(2,Math.min(500,Math.round(+$('networkGridSize').value||20)));$('networkGridSize').value=N.gridSize;renderNetworkCanvas()};

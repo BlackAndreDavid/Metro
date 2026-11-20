@@ -301,10 +301,11 @@ func place(selection: Dictionary, target: String, cell: Vector2i) -> bool:
 	entry.x = cell.x
 	entry.y = cell.y
 	entry.rotated = selection.rotated
+	entry.mirrored = selection.get("mirrored",entry.get("mirrored",false))
 	return true
 
 func make_entry(kind: String, cell: Vector2i, rotated: bool) -> Dictionary:
-	var entry := {"id": next_id, "kind": kind, "x": cell.x, "y": cell.y, "rotated": rotated}
+	var entry := {"id": next_id, "kind": kind, "x": cell.x, "y": cell.y, "rotated": rotated,"mirrored":false}
 	if kind == "aaa":
 		entry.charge = FULL_CHARGE
 	next_id += 1
@@ -844,10 +845,11 @@ func read_cargo(raw: Variant, bounds: Vector2i) -> Dictionary:
 			return {}
 		if not valid_index(entry.get("x"), 0, bounds.x - 1) or not valid_index(entry.get("y"), 0, bounds.y - 1):
 			return {}
+		if not entry.get("mirrored",false) is bool:return {}
 		var cell := Vector2i(int(entry.x), int(entry.y))
 		if not fits(cargo, bounds, Rect2i(cell, footprint(entry.kind, entry.rotated))):
 			return {}
-		var restored := {"id": 0, "kind": entry.kind, "x": cell.x, "y": cell.y, "rotated": entry.rotated}
+		var restored := {"id": 0, "kind": entry.kind, "x": cell.x, "y": cell.y, "rotated": entry.rotated,"mirrored":entry.get("mirrored",false)}
 		if entry.kind == "aaa":
 			if not valid_index(entry.get("charge"), 0, FULL_CHARGE):
 				return {}

@@ -27,6 +27,16 @@ with tempfile.TemporaryDirectory(prefix='metro-network-browser-') as scratch:
    # Drag one real station; referenced route nodes follow the shared station coordinate.
    x,y=original['stations']['邮电新村']['position'];drag_at(x,y,38,22)
    moved=page.evaluate('N.data.stations["邮电新村"].position');assert abs(moved[0]-x-38)<=2 and abs(moved[1]-y-22)<=2,moved
+   depth=page.evaluate('N.history.length');click_at(*moved);assert page.evaluate('N.history.length')==depth
+   page.click('#networkZoomIn');page.keyboard.press('Control+z')
+   assert page.evaluate('N.data.stations["邮电新村"].position')==[x,y]
+   # A canvas redraw loses SVG focus; the same shortcut must still undo the next drag.
+   page.check('#networkGrid');page.check('#networkSnap');page.fill('#networkGridSize','25');page.locator('#networkGridSize').press('Tab')
+   assert page.locator('[data-line-grid]').count()==1
+   drag_at(x,y,38,22)
+   snapped=page.evaluate('N.data.stations["邮电新村"].position');assert all(v%25==0 for v in snapped),snapped
+   page.keyboard.press('Control+z');assert page.evaluate('N.data.stations["邮电新村"].position')==[x,y]
+   page.uncheck('#networkSnap');page.uncheck('#networkGrid');drag_at(x,y,38,22)
    width=page.evaluate('N.box.w');page.click('#networkZoomIn');assert page.evaluate('N.box.w')<width
    page.locator('#networkCanvas').scroll_into_view_if_needed();box=page.locator('#networkCanvas').bounding_box();before=page.evaluate('N.box.x');cx=box['x']+box['width']/2;cy=box['y']+box['height']/2
    page.mouse.move(cx,cy);page.mouse.down(button='middle');page.mouse.move(cx+65,cy+35,steps=10);page.mouse.up(button='middle');assert page.evaluate('N.box.x')<before-20

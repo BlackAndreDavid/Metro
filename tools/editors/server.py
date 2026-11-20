@@ -142,6 +142,13 @@ def validate_customer(data):
     require(isinstance(data.get('enabled'),bool),'启用字段无效')
     for key in ['buy_categories','sell_categories']:
         require(isinstance(data.get(key),list) and set(data[key])<=CATEGORIES,'买卖类别无效')
+    items={v['id']:v for v in catalog('items','items')}
+    for side in ['buy','sell']:
+        groups=data.get(side+'_item_weights',{})
+        require(isinstance(groups,dict) and set(groups)<=CATEGORIES,'物品权重类别无效')
+        for category,weights in groups.items():
+            require(isinstance(weights,dict) and all(kind in items and items[kind].get('category')==category and number(weight,0,100000) for kind,weight in weights.items()),'具体物品或权重无效')
+            if category in data[side+'_categories'] and data.get('enabled') and data.get('trade_enabled',True):require(any(weight>0 for weight in weights.values()),'启用的买卖类别至少需要一个正权重物品')
     require(data['buy_categories'] or data['sell_categories'] or not data['enabled'] or not data.get('trade_enabled',True),'启用顾客至少需要一个买入或卖出类别')
     require(set(data.get('stations',[]))<=set(read(GAME/'content/stations.json')),'顾客站点无效')
     require(isinstance(data.get('stories',[]),list),'剧情须为数组')

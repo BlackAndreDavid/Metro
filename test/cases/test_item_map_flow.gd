@@ -15,8 +15,8 @@ func run() -> void:
 	for item in state.locker:
 		if item.kind == "computer": entry = item
 	check(not entry.is_empty() and state.material_count("computer") == 1, "initial computer exists once in storage")
-	check(state.place({"source":"locker","id":entry.id,"rotated":true}, "locker", Vector2i(entry.x,entry.y)), "computer rotates in storage")
-	check(entry.rotated, "stored orientation retained")
+	check(state.place({"source":"locker","id":entry.id,"rotated":true,"mirrored":true}, "locker", Vector2i(entry.x,entry.y)), "computer rotates in storage")
+	check(entry.rotated and entry.mirrored, "stored orientation and mirror retained")
 	var copy := State.new()
 	var path := OS.get_environment("METRO_TEST_RESULTS").path_join("rotated_item.json")
 	var file := FileAccess.open(path,FileAccess.WRITE)
@@ -25,8 +25,10 @@ func run() -> void:
 	var loaded := copy.load_cabin(path,[state.station])
 	var rotated_copy := false
 	for item in copy.locker:
-		if item.kind == "computer": rotated_copy = item.rotated
-	check(loaded and rotated_copy, "rotated computer save roundtrip")
+		if item.kind == "computer": rotated_copy = item.rotated and item.get("mirrored",false)
+	check(loaded and rotated_copy, "rotated and mirrored computer save roundtrip")
+	var malformed := state.locker.duplicate(true);malformed[0].mirrored="wrong"
+	check(state.read_cargo(malformed,state.LOCKER).is_empty(),"invalid mirror flag rejected")
 	check(state.place_furniture("computer", state.Furniture.default_placement("computer")).is_empty(), "stored computer can become furniture")
 	check(state.material_count("computer") == 0 and not state.furniture_layout.computer.has("rotated"), "placement consumes item and discards storage rotation")
 	var forged := state.save_data()
@@ -53,6 +55,13 @@ func run() -> void:
 	home.show_cabin()
 	await process_frame
 	check(home.home_backdrop.get_node("Carriage/FurnitureSlots/Computer").rotation == 0, "furniture sprite bottom remains down")
+	var stored: Dictionary = home.state.inventory[0]
+	home.select_cargo("bag",stored.id)
+	var flip := InputEventKey.new();flip.keycode=KEY_F;flip.pressed=true
+	home._input(flip)
+	check(home.selection.get("mirrored",false),"F toggles selected item mirror")
+	check(home.state.place(home.selection,"bag",Vector2i(stored.x,stored.y)) and stored.mirrored,"mirror commits without changing occupied cells")
+	home.clear_selection()
 	home.show_news()
 	var map = home.map_scene
 	check(map.get_parent() == home.get_parent() and map.state == home.state and current_scene == map, "map is independent sibling with shared model")

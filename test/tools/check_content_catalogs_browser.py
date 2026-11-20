@@ -21,7 +21,7 @@ with tempfile.TemporaryDirectory(prefix='metro-catalog-browser-') as scratch:
    page.click('#enemyTab');page.click('#newCatalog');fill('id','browser_rat');fill('name','浏览器鼠');fill('patrol_speed',77);fill('cone_length',300);fill('collision_width',120);choose_art('mutant_crawler');save('browser_rat')
    enemies=json.loads((game/'content/enemies.json').read_text())['enemies'];rat=next(e for e in enemies if e['id']=='browser_rat');assert rat['movement']['patrol_speed']==77 and rat['alert']['cone_length']==300 and 'mutant_crawler' in rat['sprite']['texture']
    page.click('#archiveCatalog');page.wait_for_function("document.getElementById('archiveCatalog').textContent.includes('恢复')");page.click('#archiveCatalog');page.wait_for_function("document.getElementById('archiveCatalog').textContent.includes('删除')")
-   page.click('#itemTab');page.click('#newCatalog');fill('id','browser_item');fill('name','浏览器物资');fill('price',42.5);fill('width',2);fill('height',3);choose_art('medkit');save('browser_item')
+   page.click('#itemTab');page.click('#newCatalog');fill('id','browser_item');fill('name','浏览器物资');fill('price',42.5);grid=page.locator('#itemFootprint');grid.scroll_into_view_if_needed();box=grid.bounding_box();page.mouse.move(box['x']+8,box['y']+8);page.mouse.down();page.mouse.move(box['x']+42,box['y']+70,steps=8);page.mouse.up();assert page.evaluate('C.data.width===2&&C.data.height===3');page.get_by_role('button',name='旋转预览',exact=True).click();assert page.evaluate('C.previewRotated');page.get_by_role('button',name='镜像预览',exact=True).click();assert page.evaluate('C.previewMirrored');choose_art('medkit');assert page.evaluate('C.previewRotated&&C.previewMirrored');page.locator('#catalogPreview').screenshot(path=str(OUTPUT/'item-footprint-preview.png'));save('browser_item')
    item=next(e for e in json.loads((game/'content/items.json').read_text())['items'] if e['id']=='browser_item');assert (item['price'],item['width'],item['height'])==(42.5,2,3)
    page.click('#archiveCatalog');page.wait_for_function("document.getElementById('archiveCatalog').textContent.includes('恢复')");page.click('#archiveCatalog');page.wait_for_function("document.getElementById('archiveCatalog').textContent.includes('删除')")
    page.click('#buildingTab');page.click('#newCatalog');fill('id','browser_house');fill('name','浏览器储物楼');page.locator('#catalogForm > label input[data-field=width]').fill('240');fill('floors',2);page.locator('#catalogForm fieldset input[data-field=width]').fill('240');page.locator('#catalogForm fieldset input[data-field=height]').fill('220');choose_art('grow_cabinet');page.click('#clearBuildingTexture')
@@ -46,6 +46,13 @@ with tempfile.TemporaryDirectory(prefix='metro-catalog-browser-') as scratch:
    drag_asset('#objectPalette [data-asset=spawn_points]',470,420)
    page.get_by_role('button',name='编辑物资类型与权重').click();page.get_by_role('button',name='散落物资',exact=True).click();page.locator('#lootPointForm input[data-field=chance]').fill('0.9');page.click('#saveCatalog');page.click('#saveLevel');page.wait_for_function("document.getElementById('status').textContent.includes('关卡已保存')")
    level=json.loads((game/registry['stations']['南京东路']['level'][6:]).read_text());assert any(p['container']=='loose' and p['chance']==.9 for p in level['spawn_points'])
+   page.click('#customerTab')
+   page.locator('#sellCategories details[data-trade-category=supplies] summary').click()
+   page.locator('#sellCategories input[data-trade-item=water]').fill('7')
+   page.locator('#sellCategories input[data-trade-item=ration]').fill('0')
+   customer_id=page.evaluate('S.customer.id');page.click('#saveCustomer');page.wait_for_function("S.project.customers.find(c=>c.id===S.customer.id)?.sell_item_weights?.supplies?.water===7")
+   saved_customer=next(c for c in json.loads((game/'content/customers.json').read_text())['customers'] if c['id']==customer_id)
+   assert saved_customer['sell_item_weights']['supplies']['water']==7 and saved_customer['sell_item_weights']['supplies']['ration']==0
    page.click('#customerTab');page.get_by_role('button',name='－ 删除当前顾客（归档）').click();page.wait_for_function("[...document.querySelectorAll('button')].some(b=>b.textContent==='恢复当前顾客')");page.get_by_role('button',name='恢复当前顾客').click()
    assert not errors,errors;print('CONTENT_CATALOG_BROWSER_OK: monster/item/building CRUD, sprite selection, weighted cabinets, offset +/- controls, monster placement, building instance editing, customer archival');browser.close()
  finally:server.terminate();server.wait(timeout=10)
