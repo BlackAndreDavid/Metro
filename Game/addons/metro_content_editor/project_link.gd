@@ -8,6 +8,8 @@ static func read_json(path:String)->Dictionary:
 static func discover()->Dictionary:
 	var project:=ProjectSettings.globalize_path("res://").simplify_path().trim_suffix("/")
 	var settings:=read_json(project.path_join("content/editor-settings.local.json"))
+	var binary:=project.get_base_dir().path_join("tools/bin/MetroEditor/MetroEditor.exe" if OS.get_name()=="Windows" else "tools/bin/MetroEditor/MetroEditor")
+	if FileAccess.file_exists(binary):return {"project":project,"editor_root":binary.get_base_dir(),"executable":binary,"external":false}
 	for candidate in [project.get_base_dir().path_join("tools/editors"),settings.get("editor_root","")]:
 		if not str(candidate).is_empty() and FileAccess.file_exists(str(candidate).path_join("desktop.py")):
 			return {"project":project,"editor_root":str(candidate).simplify_path(),"external":str(candidate).simplify_path()!=project.get_base_dir().path_join("tools/editors")}

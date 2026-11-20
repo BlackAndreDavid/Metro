@@ -64,13 +64,13 @@ static func available_categories(definition: Dictionary, side: String) -> Array:
 	for category in definition.get(side+"_categories",CATEGORIES.keys()):
 		if not configured.has(category):allowed.append(category);continue
 		for kind in ItemCatalog.in_category(category):
-			if float(configured[category].get(kind,0)) > 0:allowed.append(category);break
+			if ItemCatalog.item_weight(configured[category],kind) > 0:allowed.append(category);break
 	return allowed
 
 static func weighted_items(state: RefCounted, weights: Dictionary, category: String, seed_key: String) -> Dictionary:
 	var pool := {}
 	for kind in ItemCatalog.in_category(category):
-		if float(weights.get(kind,0)) > 0: pool[kind] = float(weights[kind])
+		if ItemCatalog.item_weight(weights,kind) > 0: pool[kind] = ItemCatalog.item_weight(weights,kind)
 	var result := {}
 	if pool.is_empty():return {}
 	for draw in range(3):

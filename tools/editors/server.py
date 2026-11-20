@@ -14,7 +14,7 @@ import secrets
 import tempfile
 import threading
 import os
-import webbrowser
+import sys
 import subprocess
 import shutil
 from urllib.parse import parse_qs, urlparse
@@ -22,7 +22,13 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
 GAME = ROOT / 'Game'
-WEB = Path(__file__).resolve().parent
+WEB = Path(getattr(sys,'_MEIPASS',Path(__file__).resolve().parent))/'editors' if getattr(sys,'frozen',False) else Path(__file__).resolve().parent
+if getattr(sys,'frozen',False):
+    ROOT=next((p for p in Path(sys.executable).resolve().parents if (p/'Game/project.godot').is_file()),ROOT)
+    GAME=ROOT/'Game'
+def tool_root():return Path(sys.executable).resolve().parent if getattr(sys,'frozen',False) else WEB
+def projects_file():
+    return Path(os.environ.get('LOCALAPPDATA',Path.home()/'.local/share'))/'MetroEditor/projects.json' if getattr(sys,'frozen',False) else WEB/'.projects.local.json'
 SERVICE = {}
 DESKTOP_STATE = None
 DESKTOP_ACTION = None
@@ -48,15 +54,39 @@ def resource(path):
     require(resolved.is_relative_to(GAME.resolve()),'资源必须位于 Game 内')
     return resolved
 
+def art_sprites():
+    for path in [GAME/'assets/source/temp/manifest.json',ROOT/'Game/assets/source/temp/manifest.json']:
+        if path.is_file():return read(path).get('sprites',[])
+    return []
+
 def catalog(name,key):
     path=GAME/'content'/(name+'.json')
     return read(path if path.exists() else ROOT/'Game/content'/(name+'.json')).get(key,[])
-def item_ids(): return {v['id'] for v in catalog('items','items')}
+def item_ids(): return {name for v in catalog('items','items') for name in [v['id'],v.get('runtime_id',v['id']),*v.get('aliases',[])]}
 def upsert_catalog(name,key,data):
     entries=catalog(name,key);old=next((e for e in entries if e['id']==data['id']),None)
     if old is not None: entries[entries.index(old)]=data
     else:entries.append(data)
     atomic(GAME/'content'/(name+'.json'),{'version':1,key:entries})
+ITEM_LOCK=threading.RLock()
+def save_item(raw):
+    data=copy.deepcopy(raw);original=data.pop('_original_id',None)
+    with ITEM_LOCK:
+        entries=catalog('items','items')
+        old=next((e for e in entries if e['id']==(original if original is not None else data.get('id'))),None)
+        require(original is None or original=='' or old is not None,'原物品已变化，请重新读取目录')
+        reserved={name for e in entries if e is not old for name in [e['id'],e.get('runtime_id',e['id']),*e.get('aliases',[])]}
+        require(data.get('id') not in reserved,'物品ID重复或已被旧ID映射占用')
+        data['runtime_id']=old.get('runtime_id',old['id']) if old else data.get('id')
+        aliases=set(old.get('aliases',[])) if old else set()
+        if old and old['id']!=data.get('id'):aliases.add(old['id'])
+        aliases.discard(data.get('id'));data['aliases']=sorted(aliases)
+        validate_item(data)
+        if old:entries[entries.index(old)]=data
+        else:entries.append(data)
+        atomic(GAME/'content/items.json',{'version':1,'items':entries})
+    return data
+
 def validate_texture(path,optional=False):
     if optional and not path:return
     file=resource(path);require(file.is_file() and file.suffix.lower()=='.png','请选择工程内PNG或上传素材')
@@ -163,7 +193,7 @@ def validate_customer(data):
     require(isinstance(data.get('enabled'),bool),'启用字段无效')
     for key in ['buy_categories','sell_categories']:
         require(isinstance(data.get(key),list) and set(data[key])<=CATEGORIES,'买卖类别无效')
-    items={v['id']:v for v in catalog('items','items')}
+    items={name:v for v in catalog('items','items') for name in [v['id'],v.get('runtime_id',v['id']),*v.get('aliases',[])]}
     for side in ['buy','sell']:
         groups=data.get(side+'_item_weights',{})
         require(isinstance(groups,dict) and set(groups)<=CATEGORIES,'物品权重类别无效')
@@ -353,10 +383,10 @@ def save_network(data,revision):
         return {'ok':True,'revision':network_revision(),'definition':data}
 
 def bridge_manifest():
-    return {**SERVICE,'editor_root':str(WEB),'window':DESKTOP_STATE,'protocol':'metro-editor','version':1,'project':str(GAME),'network':'/api/network-map','resources':{'network':'res://content/network_map.json','stations':'res://content/stations.json','registry':'res://content/registry.json'},'layers':['textures','lines'],'writes':'X-Editor-Token required','runtime':'Godot reads local JSON directly; reload when reopening map'}
+    return {**SERVICE,'editor_root':str(tool_root()),'window':DESKTOP_STATE,'protocol':'metro-editor','version':1,'project':str(GAME),'network':'/api/network-map','resources':{'network':'res://content/network_map.json','stations':'res://content/stations.json','registry':'res://content/registry.json'},'layers':['textures','lines'],'writes':'X-Editor-Token required','runtime':'Godot reads local JSON directly; reload when reopening map'}
 
 def linked_project():
-    path=WEB/'.projects.local.json'
+    path=projects_file()
     if path.exists():
         try:
             linked=read(path).get('active_project','')
@@ -367,20 +397,20 @@ def linked_project():
 def editor_settings():
     path=GAME/'content/editor-settings.local.json'
     settings=read(path) if path.exists() else {'godot_executable':shutil.which('godot') or shutil.which('godot4') or ''}
-    return {**settings,'project':str(GAME),'editor_root':str(WEB)}
+    return {**settings,'project':str(GAME),'editor_root':str(tool_root())}
 
 def register_project(godot_executable=None, integration=None):
     """One shared implementation of the persisted project <-> editor relationship."""
     settings=editor_settings()
     if godot_executable is not None:settings['godot_executable']=godot_executable
-    settings.update(project=str(GAME),editor_root=str(WEB),integration=integration or SERVICE.get('kind','desktop'),protocol_version=1)
+    settings.update(project=str(GAME),editor_root=str(tool_root()),integration=integration or SERVICE.get('kind','desktop'),protocol_version=1)
     if SERVICE:settings.setdefault('services',{})[SERVICE['kind']]=dict(SERVICE)
     atomic(GAME/'content/editor-settings.local.json',settings)
-    reverse_path=WEB/'.projects.local.json'
+    reverse_path=projects_file()
     try:reverse=read(reverse_path) if reverse_path.exists() else {}
     except (OSError,ValueError):reverse={}
     projects=reverse.get('projects',{})
-    projects[hashlib.sha256(str(GAME).encode()).hexdigest()]={'project':str(GAME),'editor_root':str(WEB),'godot_executable':settings.get('godot_executable',''),'services':settings.get('services',{})}
+    projects[hashlib.sha256(str(GAME).encode()).hexdigest()]={'project':str(GAME),'editor_root':str(tool_root()),'godot_executable':settings.get('godot_executable',''),'services':settings.get('services',{})}
     reverse.update(version=1,active_project=str(GAME),projects=projects)
     atomic(reverse_path,reverse)
     return settings
@@ -394,7 +424,7 @@ def publish_service(url, kind, connection):
     require(valid_service_url(url),'仅允许本机服务地址')
     require(connection.resolve().is_relative_to(GAME.resolve()),'连接文件必须位于工程内')
     SERVICE.clear()
-    SERVICE.update(url=url,kind=kind,pid=os.getpid(),project=str(GAME),editor_root=str(WEB),python_executable=sys.executable,protocol='metro-editor',version=1,session_id=secrets.token_hex(16))
+    SERVICE.update(url=url,kind=kind,pid=os.getpid(),project=str(GAME),editor_root=str(tool_root()),python_executable=sys.executable,protocol='metro-editor',version=1,session_id=secrets.token_hex(16))
     register_project(integration=kind)
     atomic(connection,SERVICE)
 
@@ -434,7 +464,7 @@ class Handler(BaseHTTPRequestHandler):
             if route.path=='/api/network-map':return self.respond({'definition':network_document(),'revision':network_revision()})
             if route.path=='/api/bridge':return self.respond(bridge_manifest())
             if route.path=='/api/settings':return self.respond({'settings':editor_settings(),'service':dict(SERVICE)})
-            if route.path=='/api/project': return self.respond({'enemies':catalog('enemies','enemies'),'items':catalog('items','items'),'art':read(ROOT/'Game/assets/source/temp/manifest.json')['sprites'],'station_map':station_map(),'building_templates':read(GAME/'content/building_templates.json' if (GAME/'content/building_templates.json').exists() else ROOT/'Game/content/building_templates.json')['templates'],'settings':editor_settings(),'token':self.token,'stations':read(GAME/'content/stations.json'),'customers':read(GAME/'content/customers.json')['customers'],'registry':read(GAME/'content/registry.json'),'categories':{'supplies':'生活补给','power':'电力用品','materials':'工业材料','documents':'文书旧物'}})
+            if route.path=='/api/project': return self.respond({'enemies':catalog('enemies','enemies'),'items':catalog('items','items'),'art':art_sprites(),'station_map':station_map(),'building_templates':read(GAME/'content/building_templates.json' if (GAME/'content/building_templates.json').exists() else ROOT/'Game/content/building_templates.json')['templates'],'settings':editor_settings(),'token':self.token,'stations':read(GAME/'content/stations.json'),'customers':read(GAME/'content/customers.json')['customers'],'registry':read(GAME/'content/registry.json'),'categories':{'supplies':'生活补给','power':'电力用品','materials':'工业材料','documents':'文书旧物'}})
             if route.path=='/api/level':
                 station=parse_qs(route.query).get('station',['邮电新村'])[0]; entry=read(GAME/'content/registry.json')['stations'].get(station)
                 return self.respond({'definition':migrate_level(read(resource(entry['level']))) if entry else None,'template':migrate_level(read(GAME/'content/levels/postal.json'))})
@@ -462,7 +492,7 @@ class Handler(BaseHTTPRequestHandler):
                 path='res://assets/maps/'+data['id']+'.png';target=resource(path);target.parent.mkdir(parents=True,exist_ok=True);image.convert('RGBA').save(target)
                 return self.respond({'ok':True,'texture':path,'size':list(image.size)})
             if self.path=='/api/enemy':validate_enemy(data);upsert_catalog('enemies','enemies',data);return self.respond({'ok':True})
-            if self.path=='/api/item':validate_item(data);upsert_catalog('items','items',data);return self.respond({'ok':True})
+            if self.path=='/api/item':return self.respond({'ok':True,'item':save_item(data)})
             if self.path=='/api/catalog/archive':
                 name=data.get('catalog');require(name in ['customers','items','enemies','building_templates'],'目录无效')
                 key={'building_templates':'templates'}.get(name,name);entries=catalog(name,key)
@@ -512,6 +542,9 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     global GAME
     parser=argparse.ArgumentParser(description=__doc__); parser.add_argument('--connection-file',type=Path); parser.add_argument('--port',type=int,default=8765); parser.add_argument('--no-browser',action='store_true'); parser.add_argument('--project',type=Path,default=None); args=parser.parse_args()
+    if not args.no_browser:
+        import desktop
+        return desktop.main(['--project',str(args.project)] if args.project else [])
     GAME=(args.project or linked_project()).resolve()
     require((GAME/'project.godot').is_file(),'项目目录内找不到 project.godot')
     Handler.token=secrets.token_urlsafe(24)
@@ -519,9 +552,8 @@ def main():
     url=f'http://127.0.0.1:{server.server_port}'; print('Metro editors: '+url,flush=True)
     connection=(args.connection_file or GAME/'.godot/metro_browser_connection.json').resolve()
     publish_service(url,'browser',connection)
-    if not args.no_browser: webbrowser.open(url)
     try: server.serve_forever()
     except KeyboardInterrupt: pass
     finally:
         server.server_close();unpublish_service(connection)
-if __name__=='__main__': main()
+if __name__=='__main__': raise SystemExit(main())

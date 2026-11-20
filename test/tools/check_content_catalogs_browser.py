@@ -15,7 +15,9 @@ with tempfile.TemporaryDirectory(prefix='metro-catalog-browser-') as scratch:
    def save(id):page.click('#saveCatalog');page.wait_for_selector('#catalogCards [data-catalog-id="'+id+'"]')
    def drag_preview(start,end):
     canvas=page.locator('#catalogPreview');canvas.scroll_into_view_if_needed();box=canvas.bounding_box()
-    def screen(p):return (box['x']+p[0]*box['width']/600,box['y']+p[1]*box['height']/340)
+    def screen(p):
+     p=page.evaluate('p=>p.map((v,i)=>v*G.viewZoom+G.viewPan[i])',p)
+     return (box['x']+p[0]*box['width']/600,box['y']+p[1]*box['height']/340)
     page.mouse.move(*screen(start));page.mouse.down();page.mouse.move(*screen(end),steps=10);page.mouse.up()
    def choose_art(name):
     if not page.locator('#artChoices').is_visible():page.locator('details:has(#artChoices) > summary').click()
@@ -34,6 +36,15 @@ with tempfile.TemporaryDirectory(prefix='metro-catalog-browser-') as scratch:
    page.click('#saveCatalog');page.wait_for_function("S.project.items.find(i=>i.id==='browser_item')?.cells?.length===5")
    stored=next(i for i in json.loads((game/'content/items.json').read_text())['items'] if i['id']=='browser_item');assert len(stored['cells'])==5 and abs(stored['texture_binding']['rotation'])>5
    page.locator('#catalogPreview').screenshot(path=str(OUTPUT/'irregular-bound-item.png'))
+   before=page.evaluate('JSON.stringify(C.data)');page.get_by_role('button',name='＋ 展示放大',exact=True).click();assert page.evaluate('G.viewZoom')>1;assert page.evaluate('JSON.stringify(C.data)')==before
+   page.get_by_role('button',name='拖动贴图',exact=True).click();center=page.evaluate('stageXY([C.data.texture_binding.x+C.data.texture_binding.width/2,C.data.texture_binding.y+C.data.texture_binding.height/2])');page.evaluate('p=>zoomPreview(2,p)',center);old_x=page.evaluate('C.data.texture_binding.x');drag_preview(center,[center[0]+16,center[1]]);assert .3<page.evaluate('C.data.texture_binding.x')-old_x<.7
+   page.get_by_role('button',name='重置视图',exact=True).click();assert page.evaluate('G.viewZoom')==1
+   before=(game/'content/items.json').read_bytes();fill('id','water');page.wait_for_function("document.getElementById('itemIdStatus').textContent.includes('占用')");page.click('#saveCatalog');assert (game/'content/items.json').read_bytes()==before
+   fill('id','browser_renamed');page.click('#saveCatalog');page.wait_for_function("S.project.items.some(i=>i.id==='browser_renamed')")
+   renamed=next(i for i in json.loads((game/'content/items.json').read_text())['items'] if i['id']=='browser_renamed');assert renamed['runtime_id']=='browser_item' and 'browser_item' in renamed['aliases']
+   response=page.request.post(url+'/api/item',data={**renamed,'id':'water','_original_id':'browser_renamed'},headers={'X-Editor-Token':page.evaluate('S.project.token')});assert response.status==400
+   fill('id','browser_item');page.click('#saveCatalog');page.wait_for_function("S.project.items.some(i=>i.id==='browser_item')")
+
 
    page.click('#archiveCatalog');page.wait_for_function("document.getElementById('archiveCatalog').textContent.includes('恢复')");page.click('#archiveCatalog');page.wait_for_function("document.getElementById('archiveCatalog').textContent.includes('删除')")
    page.click('#buildingTab');page.click('#newCatalog');fill('id','browser_house');fill('name','浏览器储物楼');page.locator('#catalogForm > label input[data-field=width]').fill('240');page.get_by_role('button',name='＋ 添加楼层',exact=True).click();page.locator('#catalogForm fieldset input[data-field=width]').fill('240');page.locator('#catalogForm fieldset input[data-field=height]').fill('220');choose_art('grow_cabinet');page.click('#clearBuildingTexture')

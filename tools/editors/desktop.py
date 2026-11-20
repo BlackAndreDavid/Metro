@@ -38,7 +38,7 @@ def run_window(project,connection):
     from PySide6.QtWebEngineCore import QWebEnginePage,QWebEngineProfile
     from PySide6.QtWebEngineWidgets import QWebEngineView
 
-    app=QApplication(sys.argv[:1]);app.setApplicationName('Metro Content Editor');app.setOrganizationName('Metro');app.setApplicationVersion('2.0')
+    app=QApplication.instance() or QApplication(sys.argv[:1]);app.setApplicationName('Metro Content Editor');app.setOrganizationName('Metro');app.setApplicationVersion('2.0')
     lock_path=project/'.godot/metro-editor/instance.lock';lock_path.parent.mkdir(parents=True,exist_ok=True)
     lock=QLockFile(str(lock_path));lock.setStaleLockTime(0)
     if not lock.tryLock(0):
@@ -123,16 +123,24 @@ def main(argv=None):
     parser.add_argument('--connection-file',type=Path)
     args=parser.parse_args(argv)
     project=(args.project or server.linked_project()).resolve()
+    if getattr(sys,'frozen',False) and not (project/'project.godot').is_file():
+        from PySide6.QtWidgets import QApplication,QFileDialog
+        app=QApplication.instance() or QApplication(sys.argv[:1])
+        selected,_=QFileDialog.getOpenFileName(None,'选择 Metro 的 project.godot',str(Path.home()),'Godot project (project.godot)')
+        if not selected:return 0
+        project=Path(selected).parent.resolve()
     server.require((project/'project.godot').is_file(),'找不到游戏 project.godot')
     server.GAME=project
+    if getattr(sys,"frozen",False):server.ROOT=project.parent
     connection=(args.connection_file or project/'.godot/metro_editor_connection.json').resolve()
     server.require(connection.is_relative_to(project),'连接文件必须位于工程内')
     if activate_existing(connection,project):return 0
     connection.unlink(missing_ok=True)
     try:
         log_path=project/".godot/metro_editor_desktop.log";log_path.parent.mkdir(parents=True,exist_ok=True)
-        with log_path.open("a",encoding="utf-8",buffering=1) as log:
-            os.dup2(log.fileno(),1);os.dup2(log.fileno(),2)
+        log=log_path.open("a",encoding="utf-8",buffering=1);sys.stdout=log;sys.stderr=log
+        try:os.dup2(log.fileno(),1);os.dup2(log.fileno(),2)
+        except OSError:pass
         server.register_project(args.godot_executable or None)
         return run_window(project,connection)
     except Exception as error:

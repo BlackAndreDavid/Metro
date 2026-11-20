@@ -102,3 +102,19 @@ $('catalogPreview').onpointermove=e=>{
  drawCatalogPreview();dirty();
 };
 $('catalogPreview').onpointerup=$('catalogPreview').onpointercancel=()=>{if(G.drag&&C.kind==='building_templates')renderCatalogForm();G.drag=null};
+
+// Camera zoom is independent of authored item sizes and texture bindings.
+G.viewZoom=1;G.viewPan=[0,0];G.cameraDrag=null;
+const previewCameraBar=document.createElement('div');previewCameraBar.className='bar';previewCameraBar.id='previewZoomBar';
+const previewZoomLabel=document.createElement('span');previewZoomLabel.id='previewZoomValue';previewZoomLabel.textContent='展示 100%';
+function previewScreen(e){const r=$('catalogPreview').getBoundingClientRect();return [(e.clientX-r.left)*600/r.width,(e.clientY-r.top)*340/r.height]}
+function zoomPreview(value,anchor=[300,170]){const next=Math.max(.25,Math.min(8,value)),local=anchor.map((v,i)=>(v-G.viewPan[i])/G.viewZoom);G.viewPan=anchor.map((v,i)=>v-local[i]*next);G.viewZoom=next;previewZoomLabel.textContent=`展示 ${Math.round(next*100)}%`;drawCatalogPreview()}
+previewCameraBar.append(button('－ 展示缩小',()=>zoomPreview(G.viewZoom/1.25)),previewZoomLabel,button('＋ 展示放大',()=>zoomPreview(G.viewZoom*1.25)),button('重置视图',()=>{G.viewPan=[0,0];G.viewZoom=1;previewZoomLabel.textContent='展示 100%';drawCatalogPreview()}));
+const cameraHint=document.createElement('span');cameraHint.textContent='滚轮缩放 · 中键/右键拖动画面';previewCameraBar.append(cameraHint);$('catalogPreview').before(previewCameraBar);
+stagePoint=function(e){const p=previewScreen(e);return p.map((v,i)=>(v-G.viewPan[i])/G.viewZoom)};
+const unzoomedPreview=drawCatalogPreview;drawCatalogPreview=function(){const ctx=$('catalogPreview').getContext('2d');ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,600,340);ctx.fillStyle='#191927';ctx.fillRect(0,0,600,340);ctx.setTransform(G.viewZoom,0,0,G.viewZoom,...G.viewPan);unzoomedPreview();ctx.restore()};
+const modelDown=$('catalogPreview').onpointerdown,modelMove=$('catalogPreview').onpointermove,modelUp=$('catalogPreview').onpointerup;
+$('catalogPreview').onpointerdown=e=>{if(e.button===1||e.button===2){e.preventDefault();G.cameraDrag={at:previewScreen(e),pan:[...G.viewPan]};G.drag=null;$('catalogPreview').setPointerCapture(e.pointerId)}else modelDown(e)};
+$('catalogPreview').onpointermove=e=>{if(G.cameraDrag){const at=previewScreen(e);G.viewPan=at.map((v,i)=>G.cameraDrag.pan[i]+v-G.cameraDrag.at[i]);drawCatalogPreview()}else modelMove(e)};
+$('catalogPreview').onpointerup=$('catalogPreview').onpointercancel=e=>{G.cameraDrag=null;modelUp(e)};
+$('catalogPreview').oncontextmenu=e=>e.preventDefault();$('catalogPreview').addEventListener('wheel',e=>{e.preventDefault();zoomPreview(G.viewZoom*(e.deltaY<0?1.15:1/1.15),previewScreen(e))},{passive:false});

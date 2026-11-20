@@ -21,3 +21,8 @@ Game/content/editor-settings.local.json
 # Per-machine Python environments
 .venv-editor/
 .venv/
+
+# Local tester associations
+Game/content/tester-settings.local.json
+/tools/tester/.projects.local.json
+/tools/bin/

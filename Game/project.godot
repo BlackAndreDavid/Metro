@@ -18,6 +18,7 @@ config/icon="res://assets/icons/icon.svg"
 [autoload]
 
 GameSession="*res://scripts/core/game_session.gd"
+MetroTesterBridge="*res://addons/metro_tester/runtime_bridge.gd"
 _mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
 
 [display]
@@ -31,7 +32,7 @@ window/stretch/mode="canvas_items"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg", "res://addons/metro_content_editor/plugin.cfg")
+enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg", "res://addons/metro_content_editor/plugin.cfg", "res://addons/metro_tester/plugin.cfg")
 
 [rendering]
 

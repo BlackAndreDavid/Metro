@@ -33,7 +33,7 @@ func cell_offsets(rotated: bool = false, mirrored: bool = false) -> Array[Vector
 
 static func from_data(data: Dictionary) -> Resource:
 	var result = load("res://scripts/items/item_definition.gd").new()
-	result.id = data.id
+	result.id = data.get("runtime_id",data.id)
 	result.display_name = data.get("name",data.id)
 	result.inventory_size = Vector2i(int(data.get("width",1)),int(data.get("height",1)))
 	for cell in data.get("cells",[]):result.occupancy.append(Vector2i(int(cell[0]),int(cell[1])))

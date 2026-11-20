@@ -318,6 +318,7 @@ func place(selection: Dictionary, target: String, cell: Vector2i) -> bool:
 	return true
 
 func make_entry(kind: String, cell: Vector2i, rotated: bool) -> Dictionary:
+	kind = ItemCatalog.runtime_id(kind)
 	var entry := {"id": next_id, "kind": kind, "x": cell.x, "y": cell.y, "rotated": rotated,"mirrored":false}
 	if kind == "aaa":
 		entry.charge = FULL_CHARGE
@@ -464,6 +465,7 @@ func give_starter_supplies() -> void:
 			add_supply(kind, "locker")
 
 func supply_count(kind: String) -> int:
+	kind = ItemCatalog.runtime_id(kind)
 	var count := 0
 	for entry in inventory + locker:
 		if entry.kind == kind:
@@ -753,6 +755,9 @@ func load_cabin(path: String, known_stations: Array) -> bool:
 	var data: Variant = parser.data
 	if not data is Dictionary:
 		return false
+	return load_data(data,known_stations)
+
+func load_data(data: Dictionary, known_stations: Array) -> bool:
 	var version: Variant = data.get("version")
 	if version != 1 and version != 2 and version != 3 and version != 4 and version != 5 and version != 6 and version != 7 and version != 8 and version != 9 and version != 10 and version != 11 and version != 12 and version != 13 and version != 14 and version != 15 and version != CABIN_SAVE_VERSION:
 		return false
@@ -862,8 +867,8 @@ func read_cargo(raw: Variant, bounds: Vector2i) -> Dictionary:
 		var cell := Vector2i(int(entry.x), int(entry.y))
 		if not fits_item(cargo,bounds,entry.kind,cell,entry.rotated,entry.get("mirrored",false)):
 			return {}
-		var restored := {"id": 0, "kind": entry.kind, "x": cell.x, "y": cell.y, "rotated": entry.rotated,"mirrored":entry.get("mirrored",false)}
-		if entry.kind == "aaa":
+		var restored := {"id": 0, "kind": ItemCatalog.runtime_id(entry.kind), "x": cell.x, "y": cell.y, "rotated": entry.rotated,"mirrored":entry.get("mirrored",false)}
+		if ItemCatalog.runtime_id(entry.kind) == "aaa":
 			if not valid_index(entry.get("charge"), 0, FULL_CHARGE):
 				return {}
 			restored.charge = int(entry.charge)
@@ -919,6 +924,7 @@ func store_furniture(kind: String) -> String:
 	return ""
 
 func material_count(kind: String) -> int:
+	kind = ItemCatalog.runtime_id(kind)
 	var count := 0
 	for entry in inventory + locker:
 		if entry.kind == kind:

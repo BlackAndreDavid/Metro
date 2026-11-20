@@ -13,11 +13,11 @@ Windows 可使用 [启动Demo.cmd](Game/启动Demo.cmd) 直接试玩，或 [打�
 在仓库根目录执行：
 
 ```sh
-python -m pip install -r tools/editors/requirements.txt
+python -m pip install -r tools/editors/requirements-desktop.txt
 python tools/editors/server.py
 ```
 
-浏览器默认打开 `http://127.0.0.1:8765`。在“总设置 / Godot”填写引擎路径并测试连接，再编辑客户、NPC 剧情和站点地图；点击顶部“保存当前编辑”写入工程。
+默认打开独立程序窗口，不启动浏览器。Godot 插件会自动登记双方路径；在“总设置 / Godot”可查看和测试连接。编辑客户、NPC 剧情和站点地图后，点击顶部“保存当前编辑”写入工程。
 
 完整操作、跨日事件示例、地图预览和常见问题统一见 **[编辑器操作 README](tools/editors/README.md)**。
 
@@ -47,3 +47,5 @@ python test/tools/run_tests.py --godot /path/to/Godot_v4.7.2-stable_linux.x86_64
 完整依赖、浏览器交互检查与结果位置见 [test/README.md](test/README.md)。
 
 中心城区线路参考申通地铁 D202501 版，设施、辐射和物价采用游戏设定：[上海轨道交通网络示意图](https://www.shanghai.gov.cn/shanghai/newshanghai/shgl2025.pdf)。
+
+游戏测试器与数值调试见 [测试器说明](tools/tester/README.md)；编辑器和测试器的 Windows EXE 构建见 [打包说明](tools/build/README.md)。

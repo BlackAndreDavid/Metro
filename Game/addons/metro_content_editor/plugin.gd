@@ -64,7 +64,7 @@ func open_editor()->void:
 	refresh_paths(true)
 	if links.has("error"):status.text=links.error;return
 	if links.get("external",false):status.text="发现项目外编辑器："+links.editor_root+"。请将可信工具放回仓库 tools/editors。";return
-	var executable:=resolved_python
+	var executable:String=links.get("executable",resolved_python)
 	if executable.is_empty():
 		status.text="未找到已安装的 Python。请安装 Python 与桌面依赖；安装后会自动发现并填充，无需手动填写路径。";return
 	activate=true
@@ -72,10 +72,11 @@ func open_editor()->void:
 		if linked_kind=="desktop" and not base_url.is_empty():send("activate-token","/api/project")
 		else:attempts=0;poll.start()
 		return
-	var args:=PackedStringArray([links.editor_root.path_join("desktop.py"),"--project",links.project,"--godot-executable",OS.get_executable_path(),"--connection-file",ProjectSettings.globalize_path(connection)])
+	var args:=PackedStringArray(["--project",links.project,"--godot-executable",OS.get_executable_path(),"--connection-file",ProjectSettings.globalize_path(connection)])
+	if not links.has("executable"):args.insert(0,links.editor_root.path_join("desktop.py"))
 	owned_pid=OS.create_process(executable,args,false)
-	if owned_pid<=0:activate=false;status.text="无法创建 Python 子进程："+executable+"\n请确认文件可运行；若移动过虚拟环境，请在当前仓库重新创建并安装依赖。";return
-	attempts=0;status.text="正在打开独立编辑器…\nPython："+executable
+	if owned_pid<=0:activate=false;status.text="无法创建启动子进程："+executable+"\n请确认文件可运行；若移动过虚拟环境，请在当前仓库重新创建并安装依赖。";return
+	attempts=0;status.text="正在打开独立编辑器…\n"+("程序：" if links.has("executable") else "Python：")+executable
 	poll.start()
 func discover_service()->void:
 	refresh_paths()

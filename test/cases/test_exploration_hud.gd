@@ -30,7 +30,7 @@ func run() -> void:
 	var id:int=home.state.inventory[0].id
 	check(home.state.equip_active(id).is_empty() and home.state.inventory.is_empty(),"active item occupies no backpack grid")
 	key(KEY_SPACE);await process_frame
-	check(home.state.health==75 and home.state.active_item.is_empty(),"Space consumes equipped medical item")
+	check(home.state.health==mini(100,50+int(home.state.ItemCatalog.definition("meds").get("active_use",{}).get("amount",25))) and home.state.active_item.is_empty(),"Space consumes equipped medical item")
 	home.state.add_supply("tools","bag");home.state.equip_active(home.state.inventory[0].id)
 	var count:int=home.state.inventory.size();var active_id:int=home.state.active_item.id
 	check(not home.state.use_active().is_empty() and home.state.active_item.id==active_id,"nonusable item does not disappear")

@@ -50,6 +50,8 @@ func run() -> void:
 	await process_frame
 	check(home.state.ITEM_DEFINITIONS.editor_part.texture_binding.rotation==25,"editor-authored manual texture binding loads and renders in cargo")
 	bound_grid.queue_free()
+	check(home.state.supply_count("drinking_water")==home.state.supply_count("water") and home.state.supply_count("water")>0,"renamed built-in keeps stable inventory identity")
+	check(Orders.ItemCatalog.item_weight({"drinking_water":9},"water")==9,"renamed IDs resolve in authored demand weights")
 	var order := Orders.ensure(home.state)
 	window.set_customer(int(order.visitor))
 	check(window.Catalog.definition(int(order.visitor)).id == "editor_test" and order.budget == 77, "editor weighted visitor and base budget used by runtime")

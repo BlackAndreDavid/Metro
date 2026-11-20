@@ -1,0 +1,23 @@
+name: Build Windows desktop tools
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r tools/build/requirements.txt
+      - run: python tools/build/build_tools.py
+      - run: python test/tools/check_packaged_tools.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Metro-Windows-Tools
+          path: |
+            tools/bin/
+            test/results/packaging-smoke.json

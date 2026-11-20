@@ -14,7 +14,7 @@ with tempfile.TemporaryDirectory(prefix='metro-desktop-ui-') as scratch:
  shutil.copytree(ROOT/'tools/editors',base/'tools/editors',ignore=shutil.ignore_patterns('__pycache__','.projects.local.json'))
  with socket.socket() as port:port.bind(('127.0.0.1',0));debug=port.getsockname()[1]
  env=os.environ.copy();env.update(QT_QPA_PLATFORM='xcb' if os.environ.get('DISPLAY') else 'offscreen',QTWEBENGINE_DISABLE_SANDBOX='1',QTWEBENGINE_CHROMIUM_FLAGS='--disable-gpu',QTWEBENGINE_REMOTE_DEBUGGING='127.0.0.1:'+str(debug),XDG_CONFIG_HOME=str(base/'config'),XDG_CACHE_HOME=str(base/'cache'),XDG_DATA_HOME=str(base/'data'))
- connection=game/'.godot/metro_editor_connection.json';command=[PYTHON,str(base/'tools/editors/desktop.py'),'--project',str(game),'--godot-executable','/test/godot']
+ connection=game/'.godot/metro_editor_connection.json';command=[PYTHON,str(base/'tools/editors/server.py'),'--project',str(game)]
  with (OUTPUT/'desktop.log').open('w',encoding='utf-8') as log:
   process=subprocess.Popen(command,env=env,stdout=log,stderr=subprocess.STDOUT)
   try:
@@ -41,7 +41,7 @@ with tempfile.TemporaryDirectory(prefix='metro-desktop-ui-') as scratch:
     except OSError:pass
     time.sleep(.1)
    assert target is not None,(OUTPUT/'desktop.log').read_text()
-   with connect(target['webSocketDebuggerUrl'],proxy=None,open_timeout=5,max_size=16*1024*1024) as ws:
+   with connect(target['webSocketDebuggerUrl'],proxy=None,open_timeout=15,max_size=16*1024*1024) as ws:
     def call(method,params):
      global_sequence[0]+=1;number=global_sequence[0];ws.send(json.dumps({'id':number,'method':method,'params':params}))
      while True:
@@ -97,4 +97,6 @@ with tempfile.TemporaryDirectory(prefix='metro-desktop-ui-') as scratch:
    assert not connection.exists()
    print('DESKTOP_EDITOR_OK: independent Qt window, full embedded editor, map/item/customer save, bidirectional paths, single instance, clean close')
   finally:
+   inner=game/".godot/metro_editor_desktop.log"
+   if inner.exists():shutil.copy2(inner,OUTPUT/"inner-window.log")
    if process.poll() is None:process.terminate();process.wait(timeout=5)

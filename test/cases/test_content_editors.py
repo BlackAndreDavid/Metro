@@ -195,6 +195,18 @@ console.log('EDITOR_MODELS_OK');
             self.assertEqual(editor.linked_project(),ROOT/'Game')
         finally:editor.WEB=original
 
+    def test_item_rename_identity_and_duplicate_protection(self):
+        original=copy.deepcopy(editor.catalog('items','items')[0]);old=original['id']
+        renamed=editor.save_item({**original,'id':'renamed_computer','_original_id':old})
+        self.assertEqual(renamed['runtime_id'],old);self.assertIn(old,renamed['aliases'])
+        self.assertIn(old,editor.item_ids())
+        for payload in [{**original,'_original_id':''},{**renamed,'id':'water','_original_id':'renamed_computer'}]:
+            before=(self.game/'content/items.json').read_bytes()
+            with self.assertRaises(ValueError):editor.save_item(payload)
+            self.assertEqual((self.game/'content/items.json').read_bytes(),before)
+        twice=editor.save_item({**renamed,'id':'computer_again','_original_id':'renamed_computer','runtime_id':'forged'})
+        self.assertEqual(twice['runtime_id'],old);self.assertIn('renamed_computer',twice['aliases'])
+
     def test_item_mask_and_building_geometry_validation(self):
         item=copy.deepcopy(editor.catalog('items','items')[0]);item.update(width=2,height=2,cells=[[0,0],[0,1],[1,1]],texture_binding={'x':-.2,'y':.4,'width':3,'height':1,'rotation':35})
         editor.validate_item(item)
@@ -307,6 +319,8 @@ console.log('EDITOR_MODELS_OK');
         editor.atomic(self.game/'content/customers.json',data)
         custom=copy.deepcopy(editor.catalog('items','items')[0]);custom.update(cells=[[0,0],[1,0]],texture_binding={'x':-.1,'y':0,'width':1.7,'height':.9,'rotation':25},id='editor_part',name='编辑零件',texture='res://assets/textures/temp/items/scrap_metal.png',price=17.25,width=2,height=1,category='materials',rarity=1)
         editor.validate_item(custom);editor.upsert_catalog('items','items',custom)
+        water=next(i for i in editor.catalog('items','items') if i['id']=='water')
+        editor.save_item({**water,'id':'drinking_water','_original_id':'water'})
         editor.save_customer(self.customer());editor.save_level('南京东路',self.level())
         output=Path(os.environ['METRO_TEST_RESULTS'])
         env=os.environ.copy()

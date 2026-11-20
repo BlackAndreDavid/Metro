@@ -12,5 +12,5 @@ static func roll(state: RefCounted, point: Dictionary, station: String, index: i
 	for choice in choices:
 		if Items.definition(choice.kind).get("deleted",false) or not Items.definition(choice.kind).get("enabled",true): continue
 		random_value -= float(choice.weight)
-		if random_value < 0: return choice.kind
+		if random_value < 0: return Items.runtime_id(choice.kind)
 	return ""
