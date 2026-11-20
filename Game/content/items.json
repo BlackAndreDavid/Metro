@@ -15,13 +15,20 @@
       "active_use": {
         "action": "none",
         "amount": 1
+      },
+      "texture_binding": {
+        "x": 0.046874284744262695,
+        "y": 0.33645725250244185,
+        "width": 1.8864590167999262,
+        "height": 1.4763592305390727,
+        "rotation": 0
       }
     },
     {
       "id": "copper",
       "name": "铜线束",
-      "width": 1,
-      "height": 2,
+      "width": 2,
+      "height": 1,
       "price": 27,
       "category": "materials",
       "texture": "res://assets/textures/temp/items/scrap_metal.png",
@@ -31,13 +38,30 @@
       "active_use": {
         "action": "none",
         "amount": 1
-      }
+      },
+      "texture_binding": {
+        "x": 0.5000002384185791,
+        "y": -0.017709684371948198,
+        "width": 1.1395809650421147,
+        "height": 1.012015931641878,
+        "rotation": 0
+      },
+      "cells": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ]
+      ]
     },
     {
       "id": "tools",
       "name": "维修工具",
-      "width": 3,
-      "height": 1,
+      "width": 2,
+      "height": 2,
       "price": 52,
       "category": "materials",
       "texture": "res://assets/textures/temp/items/workbench.png",
@@ -47,13 +71,38 @@
       "active_use": {
         "action": "none",
         "amount": 1
-      }
+      },
+      "texture_binding": {
+        "x": 0.0312502384185791,
+        "y": 0,
+        "width": 1.9775057995573004,
+        "height": 2.1614598274230956,
+        "rotation": 0
+      },
+      "cells": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ]
     },
     {
       "id": "book",
       "name": "维修手册",
-      "width": 1,
-      "height": 2,
+      "width": 2,
+      "height": 1,
       "price": 32,
       "category": "documents",
       "texture": "res://assets/textures/temp/items/credit_card.png",
@@ -63,12 +112,29 @@
       "active_use": {
         "action": "none",
         "amount": 1
-      }
+      },
+      "texture_binding": {
+        "x": 0.3593752384185791,
+        "y": 0.017708873748779164,
+        "width": 1.331248807907104,
+        "height": 1.013797169098487,
+        "rotation": 0
+      },
+      "cells": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ]
+      ]
     },
     {
       "id": "meds",
       "name": "密封医疗包",
-      "width": 2,
+      "width": 3,
       "height": 2,
       "price": 80,
       "category": "supplies",
@@ -78,14 +144,47 @@
       "protected": true,
       "active_use": {
         "action": "heal",
-        "amount": 25
-      }
+        "amount": 50
+      },
+      "texture_binding": {
+        "x": 0.3593745231628418,
+        "y": 0.01770968437194842,
+        "width": 2.1791691780090328,
+        "height": 1.9699689369201656,
+        "rotation": 0
+      },
+      "cells": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          2,
+          0
+        ],
+        [
+          2,
+          1
+        ]
+      ]
     },
     {
       "id": "circuit",
       "name": "通信电路板",
       "width": 2,
-      "height": 1,
+      "height": 2,
       "price": 82,
       "category": "materials",
       "texture": "res://assets/textures/temp/items/beacon.png",
@@ -95,7 +194,32 @@
       "active_use": {
         "action": "none",
         "amount": 1
-      }
+      },
+      "texture_binding": {
+        "x": -0.031246662139892578,
+        "y": 0.03541612625122026,
+        "width": 2.0822930335998544,
+        "height": 1.929930128702304,
+        "rotation": -0.5269893394258816
+      },
+      "cells": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ]
     },
     {
       "id": "powercore",
@@ -111,6 +235,13 @@
       "active_use": {
         "action": "none",
         "amount": 1
+      },
+      "texture_binding": {
+        "x": 0.3281257152557373,
+        "y": 0.017707252502441317,
+        "width": 2.406250476837158,
+        "height": 1.9108459669000961,
+        "rotation": 0
       }
     },
     {
@@ -127,6 +258,13 @@
       "active_use": {
         "action": "none",
         "amount": 1
+      },
+      "texture_binding": {
+        "x": 0,
+        "y": 0,
+        "width": 2.086460018157959,
+        "height": 1.9696182571411132,
+        "rotation": 0
       }
     },
     {
@@ -143,13 +281,20 @@
       "active_use": {
         "action": "none",
         "amount": 1
+      },
+      "texture_binding": {
+        "x": 0.1562497615814209,
+        "y": 0.017708873748779164,
+        "width": 0.6403455031769618,
+        "height": 0.956249284744263,
+        "rotation": 0
       }
     },
     {
       "id": "water",
       "name": "饮用水",
       "width": 1,
-      "height": 1,
+      "height": 2,
       "price": 6,
       "category": "supplies",
       "texture": "res://assets/textures/temp/items/water_bottle.png",
@@ -159,7 +304,24 @@
       "active_use": {
         "action": "drink",
         "amount": 1
-      }
+      },
+      "texture_binding": {
+        "x": 0,
+        "y": 0,
+        "width": 1.0183746181550573,
+        "height": 1.8270838737487791,
+        "rotation": 0
+      },
+      "cells": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ]
     },
     {
       "id": "ration",
@@ -255,6 +417,13 @@
       "active_use": {
         "action": "none",
         "amount": 1
+      },
+      "texture_binding": {
+        "x": 0.46875,
+        "y": 0.0708322525024414,
+        "width": 2.0812495231628416,
+        "height": 1.9277147222737796,
+        "rotation": 0
       }
     },
     {
@@ -271,6 +440,28 @@
       "active_use": {
         "action": "none",
         "amount": 1
+      }
+    },
+    {
+      "id": "item_1",
+      "name": "压缩饼干",
+      "enabled": true,
+      "texture": "res://assets/textures/temp/items/supply_crate.png",
+      "price": 20,
+      "width": 1,
+      "height": 1,
+      "rarity": 0,
+      "category": "materials",
+      "active_use": {
+        "action": "eat",
+        "amount": 25
+      },
+      "texture_binding": {
+        "x": 0,
+        "y": 0,
+        "width": 0.9916667938232419,
+        "height": 0.9565635444843661,
+        "rotation": 0
       }
     }
   ]
