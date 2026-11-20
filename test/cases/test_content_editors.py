@@ -48,6 +48,8 @@ class ContentEditors(unittest.TestCase):
         level['buildings']=[b for b in level['buildings'] if b['x']+b['width']<=level['segment']*len(level['cell_names'][b['row']])]
         for building in level['buildings']:building['loot_points']=[]
         level['buildings'][0]['loot_points']=[dict(id='test_cabinet',x=40,floor=0,chance=1,rolls=1,legacy_slot=0,choices=[dict(kind='book',weight=1)])]
+        level['buildings'][0].update(floors=3,floor_positions=[0,115,235],texture='res://assets/textures/temp/items/grow_cabinet.png',texture_binding={'x':5,'y':0,'width':120,'height':200,'rotation':15})
+        level['buildings'][0]['loot_points'].append(dict(id='test_arc',x=80,floor=1,chance=1,rolls=2,container='loose',region={'type':'arc','start':[60,0],'end':[100,0],'control':[80,40]},choices=[dict(kind='water',weight=1)]))
         level['loot']=[]
         level['vehicles']=[v for v in level['vehicles'] if v['x']<=level['segment']*len(level['cell_names'][v['row']])-24]
         level['junctions']=[j for j in level['junctions'] if j['x']<=min(level['segment']*len(level['cell_names'][j['row']]),level['segment']*len(level['cell_names'][j['row']+1]))-24]
@@ -193,6 +195,20 @@ console.log('EDITOR_MODELS_OK');
             self.assertEqual(editor.linked_project(),ROOT/'Game')
         finally:editor.WEB=original
 
+    def test_item_mask_and_building_geometry_validation(self):
+        item=copy.deepcopy(editor.catalog('items','items')[0]);item.update(width=2,height=2,cells=[[0,0],[0,1],[1,1]],texture_binding={'x':-.2,'y':.4,'width':3,'height':1,'rotation':35})
+        editor.validate_item(item)
+        for cells in [[],[[0,0],[0,0]],[[2,0]],[[0,'bad']]]:
+            bad=copy.deepcopy(item);bad['cells']=cells
+            with self.assertRaises(ValueError):editor.validate_item(bad)
+        geometry={'width':240,'floors':3,'floor_positions':[0,90,230],'loot_points':[{'id':'arc','x':120,'floor':1,'chance':1,'rolls':2,'choices':[{'kind':'water','weight':1}],'region':{'type':'arc','start':[20,0],'end':[210,0],'control':[120,80]}}]}
+        editor.validate_points(geometry)
+        for floors in [[0,90],[0,90,80],[0,2,230]]:
+            bad=copy.deepcopy(geometry);bad['floor_positions']=floors
+            with self.assertRaises(ValueError):editor.validate_points(bad)
+        bad=copy.deepcopy(geometry);bad['loot_points'][0]['region']['control']=[241,20]
+        with self.assertRaises(ValueError):editor.validate_points(bad)
+
     def test_customer_item_weights_validation(self):
         customer=self.customer();customer['sell_categories']=['supplies'];customer['sell_item_weights']={'supplies':{'water':5,'ration':0}}
         editor.validate_customer(customer)
@@ -289,7 +305,7 @@ console.log('EDITOR_MODELS_OK');
         data=editor.read(self.game/'content/customers.json')
         for customer in data['customers']:customer['weight']=0
         editor.atomic(self.game/'content/customers.json',data)
-        custom=copy.deepcopy(editor.catalog('items','items')[0]);custom.update(id='editor_part',name='编辑零件',texture='res://assets/textures/temp/items/scrap_metal.png',price=17.25,width=2,height=1,category='materials',rarity=1)
+        custom=copy.deepcopy(editor.catalog('items','items')[0]);custom.update(cells=[[0,0],[1,0]],texture_binding={'x':-.1,'y':0,'width':1.7,'height':.9,'rotation':25},id='editor_part',name='编辑零件',texture='res://assets/textures/temp/items/scrap_metal.png',price=17.25,width=2,height=1,category='materials',rarity=1)
         editor.validate_item(custom);editor.upsert_catalog('items','items',custom)
         editor.save_customer(self.customer());editor.save_level('南京东路',self.level())
         output=Path(os.environ['METRO_TEST_RESULTS'])

@@ -64,8 +64,10 @@ func run() -> void:
 	var before_x: float = street.player_x
 	for code in [KEY_SHIFT,KEY_D]:
 		var press := InputEventKey.new();press.keycode = code;press.physical_keycode = code;press.pressed = true;Input.parse_input_event(press)
-	await create_timer(0.15).timeout
-	await process_frame # Timer callbacks can precede the first SurfaceBlock process on a cold start.
+	# Wait for real input processing instead of assuming a cold frame completes in 150ms.
+	var input_deadline := Time.get_ticks_msec()+2000
+	while Time.get_ticks_msec()<input_deadline and not (street.motion.running and street.player_x>before_x and home.view.get_node("Stamina").value<100):
+		await process_frame
 	check(street.motion.running and street.player_x > before_x and home.view.get_node("Stamina").value < 100,"actual Shift plus movement input drives stamina HUD and sprint")
 	for code in [KEY_SHIFT,KEY_D]:
 		var release := InputEventKey.new();release.keycode = code;release.physical_keycode = code;release.pressed = false;Input.parse_input_event(release)

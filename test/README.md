@@ -21,7 +21,7 @@ python test/tools/run_tests.py --godot "C:\Godot\Godot_v4.7.2-stable_win64.exe"
 
 ## 用例与工具
 
-统一入口目前包含18组：导入、13组 Godot 流程、临时素材、美术工具、内容编辑器和 Godot 独立编辑器启动接入。内容编辑器组还会在隔离 Game 副本中进行资源导入、Godot 关卡预览和剧情运行检查。
+统一入口目前包含19组：导入、14组 Godot 流程、临时素材、美术工具、内容编辑器和 Godot 独立编辑器启动接入。内容编辑器组还会在隔离 Game 副本中进行资源导入、Godot 关卡预览和剧情运行检查。
 
 | 用例 | 覆盖内容 |
 | --- | --- |
@@ -98,3 +98,6 @@ python test/tools/check_desktop_editor.py
 ```
 
 该测试直接连接程序内置的 Qt WebEngine 页面，验证地图、物品、客户保存、双向路径、单实例与关闭，不启动浏览器程序。仍保留原三套浏览器回归测试，以核对共享界面全部功能。Qt 桌面依赖安装在另一解释器时，可设 `METRO_EDITOR_PYTHON=/path/to/python`；测试记录和截图保存在 `results/desktop-editor/` 与每轮结果的 `desktop-bridge/`。
+
+
+`cases/test_geometry_contract.gd` 验证不规则占位的空洞利用、旋转镜像、存档重叠检查、手动贴图绑定、楼层高度，以及直线/弧线随机生成与同日稳定性，已纳入统一入口。目录浏览器测试包含框选增删格子、贴图拖动缩放旋转、楼层增减、物理/贴图层切换和弧线控制点拖动，截图保存在 `results/catalog-ui/`。

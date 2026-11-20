@@ -192,7 +192,7 @@ new ResizeObserver(sizeHeader).observe(editorHeader);sizeHeader();
 
 const renameTurn=$('renameNode').onclick;$('renameNode').onclick=async()=>{await renameTurn();W.pendingLink=null;W.chat=[{node:S.story.start}];renderChat();dirty()};
 
-const workspaceInspector=entityForm;entityForm=function(){workspaceInspector();for(const input of $('entityFields').querySelectorAll('input'))if(['collision','loot_points'].includes(input.dataset.key))input.closest('label').remove();const selected=Boolean(S.level?.[S.type]?.[S.entity]);$('removeEntity').disabled=!selected;$('applyEntity').disabled=!selected};
+const workspaceInspector=entityForm;entityForm=function(){workspaceInspector();for(const input of $('entityFields').querySelectorAll('input'))if((['collision','loot_points','floor_positions','texture_binding','region'].includes(input.dataset.key)||(S.type==='buildings'&&input.dataset.key==='floors')))input.closest('label').remove();const selected=Boolean(S.level?.[S.type]?.[S.entity]);$('removeEntity').disabled=!selected;$('applyEntity').disabled=!selected};
 
 function setStreetStart(row,value,snapshot=true){
   if(snapshot)checkpoint();const grid=$('snap').checked?(+$('gridSize').value||20):1,start=Math.max(0,Math.min(8000,Math.round(value/grid)*grid)),delta=start-rowStart(row);

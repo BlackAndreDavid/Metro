@@ -45,6 +45,11 @@ func run() -> void:
 	check(window.get_node("Name").text == "动态新增客户" and window.portrait.texture.atlas != null,"an already-open trade window displays a newly appended customer without stale texture indices")
 	check(home.state.item_name("editor_part") == "编辑零件" and home.state.footprint("editor_part") == Vector2i(2,1) and home.state.footprint("editor_part",true) == Vector2i(1,2),"registered custom item supplies names and rotated grid footprint")
 	check(Orders.category_of("editor_part") == "materials" and Orders.price(home.state,{"side":"buy"},"editor_part") == 12.9,"custom item category and edited price reach real trade rules")
+	home.state.add_supply("editor_part","locker")
+	var bound_grid=load("res://scripts/cargo_grid.gd").new();bound_grid.setup(home,"locker",32);root.add_child(bound_grid)
+	await process_frame
+	check(home.state.ITEM_DEFINITIONS.editor_part.texture_binding.rotation==25,"editor-authored manual texture binding loads and renders in cargo")
+	bound_grid.queue_free()
 	var order := Orders.ensure(home.state)
 	window.set_customer(int(order.visitor))
 	check(window.Catalog.definition(int(order.visitor)).id == "editor_test" and order.budget == 77, "editor weighted visitor and base budget used by runtime")
@@ -96,6 +101,10 @@ func run() -> void:
 	check(home.screen == "surface" and home.view.scene_file_path == Content.scene("南京东路"), "editor-generated tscn selected for station")
 	check(home.surface_block.BUILDINGS[0].name == "编辑建筑" and home.surface_block.STATIONS.size() == 1 and home.surface_block.STATIONS[0].name == "南京东路", "authored buildings and station entry loaded")
 	check(home.state.trip_loot[0] == "book" and home.surface_block.LOOT[0].kind == "book", "authored loot kind connects to inventory rules")
+	check(home.surface_block.BUILDINGS[0].floor_positions.size()==3 and home.surface_block.floor_elevation(1,home.surface_block.BUILDINGS[0])==115 and home.surface_block.floor_elevation(2,home.surface_block.BUILDINGS[0])==235,"editor-authored floor positions reach exploration")
+	check(home.surface_block.BUILDINGS[0].texture_binding.rotation==15,"building art binding reaches the rendered scene")
+	var drops:Array=home.surface_block.LOOT.filter(func(point):return point.get("spawn_id","").ends_with("/test_arc"))
+	check(drops.size()==2 and drops[0].has("drop_height") and drops[0].x!=drops[1].x,"editor-authored drop arcs sample individual world positions")
 	check(home.surface_block.VEHICLES[0].id.begins_with("station_"), "custom level vehicle ids are namespaced")
 	var x: float = home.surface_block.player_x
 	home.surface_block.move_horizontal(1,0.1)

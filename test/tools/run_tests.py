@@ -91,6 +91,7 @@ def main():
     if results[0]['passed']:
         run('exploration_hud', ['--script', str(root / 'cases/test_exploration_hud.gd'), '--', '--save-file='+str(output/'hud-home.json')], ['EXPLORATION_HUD_OK'])
     if results[0]['passed']:
+        run('geometry_contract', ['--script', str(root / 'cases/test_geometry_contract.gd')], ['GEOMETRY_CONTRACT_OK'])
         run('network_runtime', ['--script', str(root / 'cases/test_network_runtime.gd')], ['NETWORK_RUNTIME_OK'])
     run('temp_art', [], ['OK'], command_override=[sys.executable, '-m', 'unittest', 'discover', '-s', str(root/'cases'), '-p', 'test_temp_art.py'])
     run('art_tools', [], ['OK'], command_override=[sys.executable, '-m', 'unittest', 'discover',
@@ -99,7 +100,7 @@ def main():
         '-s', str(root / 'cases'), '-p', 'test_content_editors.py'])
     if results[0]['passed']:
         run('godot_editor_bridge', [], ['GODOT_EDITOR_BRIDGE_OK'], command_override=[sys.executable, str(root/'tools/check_godot_editor_bridge.py')])
-    passed = len(results) == 18 and all(item['passed'] for item in results)
+    passed = len(results) == 19 and all(item['passed'] for item in results)
     summary = dict(run_id=run_id, passed=passed, results=results)
     (output / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print(f'Results: {output}')

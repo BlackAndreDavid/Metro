@@ -210,12 +210,22 @@ func footprint(kind: String, rotated: bool = false) -> Vector2i:
 	var shape: Vector2i = FOOTPRINTS[kind]
 	return Vector2i(shape.y, shape.x) if rotated else shape
 
+func item_cells(entry: Dictionary) -> Array[Vector2i]:
+	var offsets: Array[Vector2i] = ITEM_DEFINITIONS[entry.kind].cell_offsets(entry.get("rotated",false),entry.get("mirrored",false))
+	var result: Array[Vector2i] = []
+	for offset in offsets:result.append(Vector2i(entry.x,entry.y)+offset)
+	return result
+
+func fits_item(cargo: Array[Dictionary], bounds: Vector2i, kind: String, cell: Vector2i, rotated: bool=false, mirrored: bool=false, ignore_id: int=-1) -> bool:
+	var candidate := {"kind":kind,"x":cell.x,"y":cell.y,"rotated":rotated,"mirrored":mirrored}
+	return fits(cargo,bounds,Rect2i(cell,footprint(kind,rotated)),ignore_id,item_cells(candidate))
+
 func item_rect(entry: Dictionary) -> Rect2i:
 	return Rect2i(Vector2i(entry.x, entry.y), footprint(entry.kind, entry.rotated))
 
 func entry_at(container: String, cell: Vector2i) -> Dictionary:
 	for entry in entries(container):
-		if item_rect(entry).has_point(cell):
+		if cell in item_cells(entry):
 			return entry
 	return {}
 
@@ -225,12 +235,16 @@ func find_entry(container: String, id: int) -> Dictionary:
 			return entry
 	return {}
 
-func fits(cargo: Array[Dictionary], bounds: Vector2i, box: Rect2i, ignore_id: int = -1) -> bool:
-	if not Rect2i(Vector2i.ZERO, bounds).encloses(box):
-		return false
+func fits(cargo: Array[Dictionary], bounds: Vector2i, box: Rect2i, ignore_id: int = -1, mask: Array[Vector2i] = []) -> bool:
+	if not Rect2i(Vector2i.ZERO,bounds).encloses(box):return false
+	var candidate: Array[Vector2i] = mask.duplicate()
+	if candidate.is_empty():
+		for y in range(box.position.y,box.end.y):
+			for x in range(box.position.x,box.end.x):candidate.append(Vector2i(x,y))
 	for entry in cargo:
-		if entry.id != ignore_id and item_rect(entry).intersects(box):
-			return false
+		if entry.id == ignore_id:continue
+		for cell in item_cells(entry):
+			if cell in candidate:return false
 	return true
 
 func ground_kind(slot: int) -> String:
@@ -269,8 +283,7 @@ func can_place(selection: Dictionary, target: String, cell: Vector2i) -> bool:
 		return source == "bag" and entry.kind == "aaa" and cell == Vector2i.ZERO
 	if source == "battery" and target != "bag":
 		return false
-	var rect := Rect2i(cell, footprint(entry.kind, selection.rotated))
-	return fits(entries(target), grid_size(target), rect, id if source == target else -1)
+	return fits_item(entries(target),grid_size(target),entry.kind,cell,selection.rotated,selection.get("mirrored",entry.get("mirrored",false)),id if source==target else -1)
 
 func place(selection: Dictionary, target: String, cell: Vector2i) -> bool:
 	if not can_place(selection, target, cell):
@@ -314,7 +327,7 @@ func make_entry(kind: String, cell: Vector2i, rotated: bool) -> Dictionary:
 func used_cells(container: String) -> int:
 	var occupied := 0
 	for entry in entries(container):
-		occupied += item_rect(entry).get_area()
+		occupied += item_cells(entry).size()
 	return occupied
 
 func enroll_auto_repair(level: int) -> String:
@@ -425,7 +438,7 @@ func first_free_placement(kind: String, container: String) -> Dictionary:
 		for y in range(bounds.y):
 			for x in range(bounds.x):
 				var cell := Vector2i(x, y)
-				if fits(cargo, bounds, Rect2i(cell, shape)):
+				if fits_item(cargo,bounds,kind,cell,rotated):
 					return {"cell": cell, "rotated": rotated}
 	return {}
 
@@ -847,7 +860,7 @@ func read_cargo(raw: Variant, bounds: Vector2i) -> Dictionary:
 			return {}
 		if not entry.get("mirrored",false) is bool:return {}
 		var cell := Vector2i(int(entry.x), int(entry.y))
-		if not fits(cargo, bounds, Rect2i(cell, footprint(entry.kind, entry.rotated))):
+		if not fits_item(cargo,bounds,entry.kind,cell,entry.rotated,entry.get("mirrored",false)):
 			return {}
 		var restored := {"id": 0, "kind": entry.kind, "x": cell.x, "y": cell.y, "rotated": entry.rotated,"mirrored":entry.get("mirrored",false)}
 		if entry.kind == "aaa":
@@ -1016,7 +1029,7 @@ func equip_active(id: int) -> String:
 			var shape := footprint(active_item.kind,rotated)
 			for y in range(bag_size().y):
 				for x in range(bag_size().x):
-					if placement.is_empty() and fits(trial,bag_size(),Rect2i(Vector2i(x,y),shape)):
+					if placement.is_empty() and fits_item(trial,bag_size(),active_item.kind,Vector2i(x,y),rotated,active_item.get("mirrored",false)):
 						placement = {"x":x,"y":y,"rotated":rotated}
 		if placement.is_empty(): return "背包无法收回当前主动道具，换装未执行。"
 	inventory.erase(incoming)

@@ -6,7 +6,8 @@ class BuildingDefinition {
     const data=structuredClone(this.data),start=level.street_starts?.[row]||0,limit=start+level.segment*level.cell_names[row].length;
     let serial=1;while(level.buildings.some(b=>b.id===`${data.id}_${serial}`))serial++;
     data.template_id=data.id;data.id=`${data.id}_${serial}`;data.row=row;
-    data.width=Math.min(data.width,limit-start-48);data.x=Math.max(start+24,Math.min(limit-data.width,x));
+    if(data.width>limit-start-48)throw Error('该街道不足以容纳完整建筑，请增加地图格或缩小建筑');
+    data.x=Math.max(start+24,Math.min(limit-data.width,x));
     if(snap)data.x=Math.max(start+24,Math.min(limit-data.width,Math.round(data.x/snap)*snap));
     for(const point of data.loot_points||[]){point.x=Math.max(0,Math.min(data.width,point.x));point.floor=Math.min(point.floor,data.floors-1);delete point.legacy_slot}
     if(data.collision)data.collision.width=Math.min(data.width,data.collision.width);

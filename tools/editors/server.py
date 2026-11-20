@@ -80,20 +80,41 @@ def validate_enemy(data):
     for key in ['range','speed']:require(number(attack.get(key),0,4096),'攻击距离/速度无效')
     for key in ['duration','recovery']:require(number(attack.get(key),0.05,60),'攻击时间无效')
     require(number(attack.get('time_penalty'),0,90) and number(attack.get('slow_seconds'),0,60) and number(attack.get('slow_multiplier'),0.05,1),'攻击效果无效')
+def validate_binding(data):
+    if 'texture_binding' not in data:return
+    binding=data['texture_binding']
+    require(isinstance(binding,dict) and all(number(binding.get(k),-4096 if k in ['x','y'] else 0.01,4096) for k in ['x','y','width','height']) and number(binding.get('rotation',0),-360,360),'贴图绑定位置、尺寸或角度无效')
+
+def validate_building_geometry(data):
+    validate_binding(data)
+    if data.get('collision'):require(isinstance(data['collision'],dict) and all(number(data['collision'].get(k),-4096 if k in ['x','y'] else 1,4096) for k in ['x','y','width','height']),'建筑碰撞箱无效')
+    if 'floor_positions' in data:
+        floors=data['floor_positions']
+        require(isinstance(floors,list) and len(floors)==data['floors'] and all(number(y,0,2000) for y in floors) and all(b-a>=24 for a,b in zip(floors,floors[1:])),'地板位置须逐层上升且间距至少24')
+
 def validate_item(data):
     require(isinstance(data,dict) and ID.fullmatch(data.get('id','')) and isinstance(data.get('name'),str) and data['name'],'物品ID或名称无效')
     require(integer(data.get('width'),1,8) and integer(data.get('height'),1,8),'物品占格必须为1～8')
     require(number(data.get('price'),0,1000000) and integer(data.get('rarity'),0,3) and data.get('category') in CATEGORIES|{'none'},'物品价格、稀有度或类别无效')
     effect=data.get('active_use',{'action':'none','amount':1})
     require(isinstance(effect,dict) and effect.get('action') in ('none','drink','eat','heal') and number(effect.get('amount',1),1,100),'主动使用效果无效')
+    if 'cells' in data:
+        cells=data['cells']
+        require(isinstance(cells,list) and 0<len(cells)<=64 and all(isinstance(c,list) and len(c)==2 and integer(c[0],0,data['width']-1) and integer(c[1],0,data['height']-1) for c in cells) and len({tuple(c) for c in cells})==len(cells),'不规则占位格无效、为空或重复')
+    validate_binding(data)
     validate_texture(data.get('texture',''))
 def validate_points(building):
+    validate_building_geometry(building)
     require(number(building.get('light_level',0.15),0,1),'建筑光照须为0～1')
     points=building.get('loot_points',[]);require(isinstance(points,list) and len(points)<=32,'每栋建筑最多32个柜子点位')
     ids=set()
     for point in points:
         require(ID.fullmatch(point.get('id','')) and point['id'] not in ids,'柜子ID无效或重复');ids.add(point['id'])
         require(number(point.get('x'),0,building['width']) and integer(point.get('floor',0),0,building['floors']-1),'物资点位置/楼层无效')
+        if 'region' in point:
+            region=point['region'];require(isinstance(region,dict) and region.get('type') in ('line','arc'),'掉落区域类型无效')
+            for key in (['start','end','control'] if region['type']=='arc' else ['start','end']):
+                coord=region.get(key);require(isinstance(coord,list) and len(coord)==2 and number(coord[0],0,building['width']) and number(coord[1],0,200),'掉落区域控制点超出范围')
         require(point.get('container','cabinet') in ('cabinet','loose') and isinstance(point.get('outside',False),bool),'物资点类型无效')
         require(number(point.get('chance'),0,1) and integer(point.get('rolls'),1,8),'生成概率或抽取次数无效')
         choices=point.get('choices',[])
@@ -228,7 +249,7 @@ def validate_level(station,data):
     for building in data['buildings']:
         require(ID.fullmatch(building.get('id','')) and building['id'] not in buildings,'建筑ID无效或重复')
         require(isinstance(building.get('name'),str) and building['name'] and number(building.get('width'),100,width) and building['x']+building['width']<=row_width(building['row']),'建筑名称、宽度或边界无效')
-        require(integer(building.get('floors'),1,2) and building['floors']*data['floor_height']<=data['ground'],'建筑楼层超出画面')
+        require(integer(building.get('floors'),1,8),'建筑楼层须为1～8')
         require(re.fullmatch(r'#[0-9a-fA-F]{6}',building.get('wall','')),'墙体颜色须为#RRGGBB')
         validate_texture(building.get('texture',''),True)
         validate_points(building)
@@ -420,7 +441,7 @@ class Handler(BaseHTTPRequestHandler):
             if route.path=='/asset':
                 path=resource(parse_qs(route.query).get('path',[''])[0]); require(path.suffix.lower()=='.png','只能预览PNG'); data=path.read_bytes(); mime='image/png'
             else:
-                file={'/':'index.html','/editor.js':'editor.js','/style.css':'style.css','/enhancements.js':'enhancements.js','/models.js':'models.js','/workspace.js':'workspace.js','/catalogs.js':'catalogs.js','/network_editor.js':'network_editor.js'}.get(route.path)
+                file={'/':'index.html','/editor.js':'editor.js','/style.css':'style.css','/enhancements.js':'enhancements.js','/models.js':'models.js','/workspace.js':'workspace.js','/catalogs.js':'catalogs.js','/network_editor.js':'network_editor.js','/geometry_editor.js':'geometry_editor.js'}.get(route.path)
                 if not file: return self.respond({'error':'未找到'},404)
                 path=WEB/file; data=path.read_bytes(); mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'}[path.suffix]
             self.send_response(200); self.send_header('Content-Type',mime); self.send_header('Content-Length',str(len(data))); self.end_headers(); self.wfile.write(data)
@@ -457,7 +478,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond({'ok':True,'texture':'res://assets/textures/temp/custom/'+suffix})
             if self.path=='/api/building-template':
                 require(ID.fullmatch(data.get('id','')) and isinstance(data.get('name'),str) and 0<len(data['name'])<=80,'建筑素材ID或名称无效')
-                require(number(data.get('width'),100,1600) and integer(data.get('floors'),1,2) and re.fullmatch(r'#[0-9a-fA-F]{6}',data.get('wall','')),'建筑素材尺寸、楼层或颜色无效')
+                require(number(data.get('width'),100,1600) and integer(data.get('floors'),1,8) and re.fullmatch(r'#[0-9a-fA-F]{6}',data.get('wall','')),'建筑素材尺寸、楼层或颜色无效')
                 validate_texture(data.get('texture',''),True);validate_points(data)
                 path=GAME/'content/building_templates.json'
                 template_document=read(path if path.exists() else ROOT/'Game/content/building_templates.json')

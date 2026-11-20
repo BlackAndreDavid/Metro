@@ -126,13 +126,13 @@ static func supports(station: String) -> bool:
 
 func setup(owner_state: RefCounted, ui_font: Font) -> void:
 	state = owner_state
-	apply_level(Content.level(state.station))
+	apply_level(Content.level(state.station,state.world_seed,state.day))
 	font = ui_font
 	var loader = preload("res://scripts/commerce/customer_catalog.gd")
 	for direction in ["left","right"]:
 		hero_textures[direction] = loader.load_texture("res://assets/textures/temp/characters/suit_walk_"+direction+".png")
 	var specs: Array = Content.read_json("res://content/enemies.json").get("enemies",[])
-	for placement in Content.level(state.station).get("monsters",[]):
+	for placement in Content.level(state.station,state.world_seed,state.day).get("monsters",[]):
 		for definition in specs:
 			if definition.id == placement.enemy and definition.get("enabled",true):
 				enemies.append(Enemy.new(definition,placement))
@@ -284,7 +284,7 @@ func move_horizontal(axis: float, delta: float, sprint: bool = false) -> void:
 	position_changed()
 
 func update_enemies(delta: float) -> void:
-	var perception := {"row":row,"x":player_x,"indoors":not building.is_empty(),"moving":motion.moving,"noise_radius":motion.noise_radius(),"vertical_offset":-floor_index*FLOOR_HEIGHT}
+	var perception := {"row":row,"x":player_x,"indoors":not building.is_empty(),"moving":motion.moving,"noise_radius":motion.noise_radius(),"vertical_offset":-floor_elevation()}
 	for enemy in enemies:
 		var hit: Dictionary = enemy.step(delta,perception,Vector2(street_start(enemy.row),street_end(enemy.row)),GROUND)
 		if not hit.is_empty():
@@ -299,6 +299,10 @@ func position_changed() -> void:
 	update_lighting()
 	queue_redraw()
 	moved.emit()
+
+func floor_elevation(index: int=-1, definition: Dictionary={}) -> float:
+	var location := active_building() if definition.is_empty() else definition
+	return Building.elevation(location,floor_index if index<0 else index,FLOOR_HEIGHT)
 
 func active_building() -> Dictionary:
 	for entry in BUILDINGS:
@@ -336,7 +340,7 @@ func interaction() -> Dictionary:
 			return {"kind": "pickup", "slot": slot, "caption": "拾取 %s" % state.item_name(item)}
 	if not location.is_empty():
 		if location.floors > 1 and absf(player_x - stair_x(location)) <= REACH:
-			return {"kind": "stairs", "caption": "上二楼" if floor_index == 0 else "下一楼"}
+			return {"kind": "stairs", "caption": "前往第%d层" % ((floor_index+1)%int(location.floors)+1)}
 		if floor_index == 0 and absf(player_x - door_x(location)) <= REACH:
 			return {"kind": "leave", "id":building,"caption": "回到街道"}
 		return {}
@@ -368,7 +372,7 @@ func interact() -> void:
 		"extract": extraction_requested.emit(target.station)
 		"vehicle": vehicle_requested.emit(target.id)
 		"stairs":
-			floor_index = 1 - floor_index
+			floor_index = (floor_index+1)%int(active_building().floors)
 			position_changed()
 		"leave":
 			building = ""
@@ -396,11 +400,11 @@ func update_lighting() -> void:
 	shade.visible = not location.is_empty() and not is_bright()
 	if not shade.visible:
 		return
-	var height: float = location.floors * FLOOR_HEIGHT
+	var height: float = Building.height_for(location,FLOOR_HEIGHT)
 	shade.position = Vector2(location.x-camera_offset(),GROUND-height+render_offset_y())
 	shade.size = Vector2(location.width, height)
 	lighting.set_shader_parameter("interior_size", shade.size)
-	lighting.set_shader_parameter("lamp_position", Vector2(player_x - location.x + 10.0 * facing, height - floor_index * FLOOR_HEIGHT - 29.0))
+	lighting.set_shader_parameter("lamp_position", Vector2(player_x - location.x + 10.0 * facing, height - floor_elevation() - 29.0))
 	lighting.set_shader_parameter("facing", facing)
 	lighting.set_shader_parameter("lamp_on", state.flashlight_on)
 	lighting.set_shader_parameter("ambient_light",float(location.get("light_level",0.15)))
@@ -459,14 +463,14 @@ func _draw() -> void:
 		if point.has("cabinet") or interaction_visuals.has("pickup/"+str(slot)): continue
 		if point.row == row and point.building == building and not kind.is_empty():
 			var tint: Color = state.rarity_color(kind)
-			draw_rect(Rect2(point.x - 9, GROUND - point.floor * FLOOR_HEIGHT - 12, 18, 10), tint.darkened(0.44))
-			draw_line(Vector2(point.x - 8, GROUND - point.floor * FLOOR_HEIGHT - 12), Vector2(point.x + 8, GROUND - point.floor * FLOOR_HEIGHT - 12), tint, 2.0)
+			draw_rect(Rect2(point.x - 9, GROUND - floor_elevation(int(point.floor)) - float(point.get("drop_height",0)) - 12, 18, 10), tint.darkened(0.44))
+			draw_line(Vector2(point.x - 8, GROUND - floor_elevation(int(point.floor)) - float(point.get("drop_height",0)) - 12), Vector2(point.x + 8, GROUND - floor_elevation(int(point.floor)) - float(point.get("drop_height",0)) - 12), tint, 2.0)
 	for npc in NPCS:
 		if not interaction_visuals.has("npc/"+npc.npc) and npc.row == row and building.is_empty() and npc_textures.get(npc.npc) != null:
 			draw_texture_rect(npc_textures[npc.npc],Rect2(npc.x-24,GROUND-80,48,80),false)
 	if motion.moving:
-		draw_arc(Vector2(player_x,GROUND-floor_index*FLOOR_HEIGHT-32),motion.noise_radius(),0,TAU,48,Color(0.6,0.85,0.8,0.2),1.0)
-	draw_player(Vector2(player_x, GROUND - floor_index * FLOOR_HEIGHT))
+		draw_arc(Vector2(player_x,GROUND-floor_elevation()-32),motion.noise_radius(),0,TAU,48,Color(0.6,0.85,0.8,0.2),1.0)
+	draw_player(Vector2(player_x, GROUND - floor_elevation()))
 	draw_set_transform(Vector2.ZERO)
 
 
@@ -497,15 +501,22 @@ func draw_vehicle(vehicle: Dictionary) -> void:
 
 func draw_facade(entry: Dictionary, distant: bool) -> void:
 	if building_textures.has(entry.id):
-		draw_texture_rect(building_textures[entry.id],Rect2(entry.x,GROUND-entry.floors*FLOOR_HEIGHT,entry.width,entry.floors*FLOOR_HEIGHT),false)
+		var binding: Dictionary = entry.get("texture_binding",{})
+		if binding.is_empty():draw_texture_rect(building_textures[entry.id],Rect2(entry.x,GROUND-Building.height_for(entry,FLOOR_HEIGHT),entry.width,Building.height_for(entry,FLOOR_HEIGHT)),false)
+		else:
+			var center := Vector2(float(entry.x)+float(binding.x)+float(binding.width)/2,GROUND-float(binding.y)-float(binding.height)/2)
+			var transform := Transform2D(deg_to_rad(float(binding.get("rotation",0))),center)
+			var half := Vector2(binding.width,binding.height)/2
+			var corners := PackedVector2Array([transform*Vector2(-half.x,-half.y),transform*Vector2(half.x,-half.y),transform*half,transform*Vector2(-half.x,half.y)])
+			draw_polygon(corners,PackedColorArray([Color.WHITE]),PackedVector2Array([Vector2.ZERO,Vector2.RIGHT,Vector2.ONE,Vector2.DOWN]),building_textures[entry.id])
 		return
-	var top: float = GROUND - entry.floors * FLOOR_HEIGHT
+	var top: float = GROUND - Building.height_for(entry,FLOOR_HEIGHT)
 	var wall: Color = entry.wall.lerp(Color("735f72"), 0.68) if distant else entry.wall
 	draw_rect(Rect2(entry.x, top, entry.width, GROUND - top), wall)
 	draw_rect(Rect2(entry.x - 4, top, entry.width + 8, 8), wall.lightened(0.24))
 	draw_rect(Rect2(entry.x + entry.width - 10, top + 8, 10, GROUND - top - 8), wall.darkened(0.22))
 	for level in range(entry.floors):
-		var y := GROUND - level * FLOOR_HEIGHT
+		var y := GROUND - floor_elevation(level,entry)
 		draw_rect(Rect2(entry.x, y - 9, entry.width, 9), wall.darkened(0.22))
 		for x in range(57, int(entry.width) - 37, 55):
 			var window := Rect2(entry.x + x, y - 75, 37, 47)
@@ -532,10 +543,10 @@ func draw_door(x: float, y: float, wall: Color) -> void:
 	draw_rect(Rect2(x + 7, y - 30, 4, 3), Color("c9a382"))
 
 func draw_interior(entry: Dictionary) -> void:
-	var top: float = GROUND - entry.floors * FLOOR_HEIGHT
+	var top: float = GROUND - Building.height_for(entry,FLOOR_HEIGHT)
 	draw_rect(Rect2(entry.x, top, entry.width, GROUND - top), Color("534150"))
 	for level in range(entry.floors):
-		var y := GROUND - level * FLOOR_HEIGHT
+		var y := GROUND - floor_elevation(level,entry)
 		var light := Color("96727b") if level == floor_index else Color("685260")
 		draw_rect(Rect2(entry.x + 8, y - 98, entry.width - 16, 97), light)
 		draw_rect(Rect2(entry.x + 8, y - 24, entry.width - 16, 23), light.darkened(0.22))
@@ -632,7 +643,7 @@ func update_interaction_visuals() -> void:
 		control.visible = int(point.row) == row and point.get("building","") == building and int(point.get("floor",0)) == floor_index
 		if entry.target.kind == "pickup" and state.ground_kind(int(entry.target.slot)).is_empty(): control.hide()
 		if not control.visible: continue
-		control.position = Vector2(float(point.x)-camera_offset()-entry.size.x/2,GROUND-floor_index*FLOOR_HEIGHT-entry.size.y+render_offset_y())
+		control.position = Vector2(float(point.x)-camera_offset()-entry.size.x/2,GROUND-floor_elevation()-float(point.get("drop_height",0))-entry.size.y+render_offset_y())
 		var local := control.get_local_mouse_position()
 		var hover: bool = control.get_rect().has_point(control.position+local) and control._has_point(local)
 		control.set_highlighted(key == active_key or hover)
@@ -656,10 +667,10 @@ func update_hero_visual() -> void:
 		atlas.atlas = texture
 		atlas.region = Rect2(frame*texture.get_width()/4.0,0,texture.get_width()/4.0,texture.get_height())
 		hero_view.texture = atlas
-	hero_view.position = Vector2(player_x-camera_offset()-16,GROUND-floor_index*FLOOR_HEIGHT-64+render_offset_y())
+	hero_view.position = Vector2(player_x-camera_offset()-16,GROUND-floor_elevation()-64+render_offset_y())
 
 func render_offset_y() -> float:
-	return size.y*0.79-GROUND
+	return size.y*0.79-GROUND+maxf(0.0,floor_elevation()-150.0)
 
 func is_bright() -> bool:
 	return building.is_empty() or float(active_building().get("light_level",0.15)) >= 0.6

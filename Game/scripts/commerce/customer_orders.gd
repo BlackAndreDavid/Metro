@@ -174,7 +174,7 @@ static func free_placement(state: RefCounted, cargo: Array[Dictionary], kind: St
 	for rotated in [false,true]:
 		for y in range(bounds.y):
 			for x in range(bounds.x):
-				if state.fits(cargo,bounds,Rect2i(Vector2i(x,y),state.footprint(kind,rotated))):
+				if state.fits_item(cargo,bounds,kind,Vector2i(x,y),rotated):
 					return {"kind":kind,"x":x,"y":y,"rotated":rotated}
 	return {}
 

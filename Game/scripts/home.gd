@@ -642,7 +642,7 @@ func choose_gear(key: String, enabled: bool) -> void:
 
 func confirm_departure() -> void:
 	var previous_debt := state.debt
-	var level := Content.level(state.station)
+	var level := Content.level(state.station,state.world_seed,state.day)
 	var loot_station: String = level.get("loot_station",state.station) if SurfaceBlock.supports(state.station) else ""
 	var problem := state.depart(loadout, Rail.station_info(state.station).radiation, loot_station)
 	if problem.is_empty():

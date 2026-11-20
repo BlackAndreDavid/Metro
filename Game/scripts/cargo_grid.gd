@@ -83,23 +83,36 @@ func _draw() -> void:
 		var rect := Rect2(box.position * cell_size, box.size * cell_size).grow(-3)
 		var tint: Color = host.state.rarity_color(entry.kind)
 		var active: bool = host.selection.get("source") == container and host.selection.get("id") == entry.id
-		draw_rect(rect, tint.darkened(0.72))
-		draw_rect(rect, tint if active else tint.darkened(0.22), false, 2)
-		draw_rect(Rect2(rect.position + Vector2(4, 4), Vector2(rect.size.x - 8, 3)), tint)
+		for cell in host.state.item_cells(entry):
+			var occupied := Rect2(Vector2(cell*cell_size)+Vector2.ONE,Vector2.ONE*(cell_size-2))
+			draw_rect(occupied,tint.darkened(0.72))
+			draw_rect(occupied,tint if active else tint.darkened(0.22),false,2)
 		var short_name: String = {"copper": "铜线", "tools": "工具", "book": "手册", "meds": "医疗", "circuit": "电路", "powercore": "电源", "relic": "相机", "aaa": "电池", "water": "饮水", "ration": "口粮", "car_battery": "车电池"}.get(entry.kind, host.state.item_name(entry.kind))
 		var title: String = host.state.item_name(entry.kind) if box.size.x >= 2 else short_name
 		draw_string(host.font, rect.position + Vector2(5, rect.size.y-5), title, HORIZONTAL_ALIGNMENT_CENTER, rect.size.x-10, 12, Color("f0ebdf"))
 		if host.state.ITEM_DEFINITIONS.has(entry.kind) and host.state.ITEM_DEFINITIONS[entry.kind].texture != null:
 			var texture: Texture2D = host.state.ITEM_DEFINITIONS[entry.kind].texture
-			var area := (rect.size-Vector2(12,24)).max(Vector2(8,8))
-			var raw := Vector2(texture.get_size())
-			var oriented := Vector2(raw.y, raw.x) if entry.rotated else raw
-			var fit := minf(area.x / oriented.x, area.y / oriented.y)
-			var center := rect.position+rect.size/2-Vector2(0,6)
+			var definition: Resource = host.state.ITEM_DEFINITIONS[entry.kind]
+			var binding: Dictionary = definition.texture_binding
 			var mirrored: bool = host.selection.get("mirrored",false) if active else entry.get("mirrored",false)
-			draw_set_transform(center, PI / 2 if entry.rotated else 0.0,Vector2(-1,1) if mirrored else Vector2.ONE)
-			draw_texture_rect(texture, Rect2(-raw * fit / 2, raw * fit), false)
+			if not binding.is_empty():
+				var center := Vector2(box.position*cell_size)+Vector2(box.size*cell_size)/2
+				draw_set_transform(center,PI/2 if entry.rotated else 0.0,Vector2(-1,1) if mirrored else Vector2.ONE)
+				var at := (Vector2(float(binding.x)+float(binding.width)/2,float(binding.y)+float(binding.height)/2)-Vector2(definition.inventory_size)/2)*cell_size
+				var transform := Transform2D(deg_to_rad(float(binding.get("rotation",0))),at)
+				var base := Transform2D(PI/2 if entry.rotated else 0.0,Vector2(-1,1) if mirrored else Vector2.ONE,0,center)
+				draw_set_transform_matrix(base*transform)
+				var pixels := Vector2(binding.width,binding.height)*cell_size
+				draw_texture_rect(texture,Rect2(-pixels/2,pixels),false)
+			else:
+				var area := (rect.size-Vector2(12,24)).max(Vector2(8,8))
+				var raw := Vector2(texture.get_size())
+				var oriented := Vector2(raw.y,raw.x) if entry.rotated else raw
+				var fit := minf(area.x/oriented.x,area.y/oriented.y)
+				draw_set_transform(rect.position+rect.size/2-Vector2(0,6),PI/2 if entry.rotated else 0.0,Vector2(-1,1) if mirrored else Vector2.ONE)
+				draw_texture_rect(texture,Rect2(-raw*fit/2,raw*fit),false)
 			draw_set_transform(Vector2.ZERO)
+
 		if entry.kind == "aaa":
 			draw_string(host.font, rect.position+Vector2(rect.size.x-30,13), "%d%%" % entry.charge, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, tint)
 		elif box.size.y >= 2:
@@ -109,10 +122,10 @@ func _draw() -> void:
 	var selected: Dictionary = host.state.picked(host.selection.source, host.selection.id)
 	if selected.is_empty():
 		return
-	var shape: Vector2i = host.state.footprint(selected.kind, host.selection.rotated)
-	var visible_shape := shape.min(bounds - hover_cell)
-	var ghost := Rect2(hover_cell * cell_size, visible_shape * cell_size).grow(-2)
-	var valid: bool = host.state.can_place(host.selection, container, hover_cell)
+	var valid: bool = host.state.can_place(host.selection,container,hover_cell)
 	var color := Color("91ddc0") if valid else Color("ff9a8d")
-	draw_rect(ghost, Color(color, 0.28))
-	draw_rect(ghost, color, false, 2)
+	var candidate := {"kind":selected.kind,"x":hover_cell.x,"y":hover_cell.y,"rotated":host.selection.rotated,"mirrored":host.selection.get("mirrored",false)}
+	for cell in host.state.item_cells(candidate):
+		if Rect2i(Vector2i.ZERO,bounds).has_point(cell):
+			var ghost := Rect2(cell*cell_size,Vector2.ONE*cell_size).grow(-2)
+			draw_rect(ghost,Color(color,0.28));draw_rect(ghost,color,false,2)
