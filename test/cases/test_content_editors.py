@@ -178,6 +178,20 @@ console.log('EDITOR_MODELS_OK');
                 with urllib.request.urlopen(request) as response:self.assertTrue(json.load(response)['ok'])
                 saved=next(c for c in editor.catalog('customers','customers') if c['id']=='editor_test');self.assertEqual(saved['deleted'],deleted)
         finally:server.shutdown();server.server_close();thread.join()
+    def test_bidirectional_editor_path_discovery(self):
+        original=editor.WEB
+        try:
+            editor.WEB=Path(self.temp.name)/'tools/editors';editor.WEB.mkdir(parents=True)
+            (self.game/'project.godot').write_text('config_version=5\n',encoding='utf-8')
+            editor.atomic(editor.WEB/'.projects.local.json',{'version':1,'active_project':str(self.game),'projects':{}})
+            self.assertEqual(editor.linked_project(),self.game)
+            editor.atomic(self.game/'content/editor-settings.local.json',{'godot_executable':'/local/godot','custom_preference':42})
+            settings=editor.register_project('/local/godot');self.assertEqual(settings['editor_root'],str(editor.WEB));self.assertEqual(settings['project'],str(self.game));self.assertEqual(settings['integration'],'desktop');self.assertEqual(settings['custom_preference'],42)
+            reverse=editor.read(editor.WEB/'.projects.local.json');self.assertEqual(reverse['active_project'],str(self.game));self.assertEqual(len(reverse['projects']),1)
+            (editor.WEB/'.projects.local.json').write_text('broken json',encoding='utf-8')
+            self.assertEqual(editor.linked_project(),ROOT/'Game')
+        finally:editor.WEB=original
+
     def test_network_roundtrip_conflicts_and_validation(self):
         document=editor.network_document();revision=editor.network_revision()
         document['stations']['编辑测试站']={'position':[300,250],'label':[10,-20]}

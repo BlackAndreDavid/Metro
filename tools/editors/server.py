@@ -23,6 +23,8 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[2]
 GAME = ROOT / 'Game'
 WEB = Path(__file__).resolve().parent
+DESKTOP_STATE = None
+DESKTOP_ACTION = None
 CATEGORIES = {'supplies','power','materials','documents'}
 ITEMS = {'computer','water','ration','meds','aaa','car_battery','powercore','copper','circuit','steel_plate','bolts','tire','engine','tools','book','relic'}
 ID = re.compile(r'^[a-z][a-z0-9_-]{0,63}$')
@@ -276,7 +278,8 @@ def network_document():
     return read(path if path.exists() else ROOT/'Game/content/network_map.json')
 
 def network_revision():
-    return hashlib.sha256(json.dumps(network_document(),ensure_ascii=False,sort_keys=True).encode()).hexdigest()
+    path=GAME/'content/network_map.json'
+    return hashlib.sha256((path if path.exists() else ROOT/'Game/content/network_map.json').read_bytes()).hexdigest()
 
 def station_map():
     return network_document()
@@ -321,11 +324,36 @@ def save_network(data,revision):
         return {'ok':True,'revision':network_revision(),'definition':data}
 
 def bridge_manifest():
-    return {'protocol':'metro-editor','version':1,'project':str(GAME),'network':'/api/network-map','resources':{'network':'res://content/network_map.json','stations':'res://content/stations.json','registry':'res://content/registry.json'},'layers':['textures','lines'],'writes':'X-Editor-Token required','runtime':'Godot reads local JSON directly; reload when reopening map'}
+    return {'window':DESKTOP_STATE,'protocol':'metro-editor','version':1,'project':str(GAME),'network':'/api/network-map','resources':{'network':'res://content/network_map.json','stations':'res://content/stations.json','registry':'res://content/registry.json'},'layers':['textures','lines'],'writes':'X-Editor-Token required','runtime':'Godot reads local JSON directly; reload when reopening map'}
+
+def linked_project():
+    path=WEB/'.projects.local.json'
+    if path.exists():
+        try:
+            linked=read(path).get('active_project','')
+            if isinstance(linked,str) and linked and (Path(linked)/'project.godot').is_file():return Path(linked)
+        except (OSError,ValueError,AttributeError):pass
+    return ROOT/'Game'
 
 def editor_settings():
     path=GAME/'content/editor-settings.local.json'
-    return read(path) if path.exists() else {'godot_executable':shutil.which('godot') or shutil.which('godot4') or '', 'project':str(GAME)}
+    settings=read(path) if path.exists() else {'godot_executable':shutil.which('godot') or shutil.which('godot4') or ''}
+    return {**settings,'project':str(GAME),'editor_root':str(WEB)}
+
+def register_project(godot_executable=''):
+    """One shared implementation of the persisted project <-> editor relationship."""
+    settings=editor_settings()
+    if godot_executable:settings['godot_executable']=godot_executable
+    settings.update(project=str(GAME),editor_root=str(WEB),integration='desktop',protocol_version=1)
+    atomic(GAME/'content/editor-settings.local.json',settings)
+    reverse_path=WEB/'.projects.local.json'
+    try:reverse=read(reverse_path) if reverse_path.exists() else {}
+    except (OSError,ValueError):reverse={}
+    projects=reverse.get('projects',{})
+    projects[hashlib.sha256(str(GAME).encode()).hexdigest()]={'project':str(GAME),'editor_root':str(WEB),'godot_executable':settings.get('godot_executable','')}
+    reverse.update(version=1,active_project=str(GAME),projects=projects)
+    atomic(reverse_path,reverse)
+    return settings
 
 def godot_action(data):
     settings=editor_settings(); executable=settings.get('godot_executable','')
@@ -372,6 +400,9 @@ class Handler(BaseHTTPRequestHandler):
             require(self.headers.get('X-Editor-Token')==self.token,'编辑令牌无效，请刷新页面')
             length=int(self.headers.get('Content-Length','0')); require(0<length<=16*1024*1024,'请求体过大或为空')
             data=json.loads(self.rfile.read(length))
+            if self.path in ['/api/desktop/show','/api/desktop/close']:
+                require(DESKTOP_ACTION is not None,'当前服务不是独立编辑器程序')
+                DESKTOP_ACTION(self.path.rsplit('/',1)[1]);return self.respond({'ok':True})
             if self.path=='/api/network-map':return self.respond(save_network(data.get('definition'),data.get('revision')))
             if self.path=='/api/network-image':
                 require(ID.fullmatch(data.get('id','')),'贴图ID无效')
@@ -405,7 +436,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond({'ok':True})
             if self.path=='/api/settings':
                 require(isinstance(data.get('godot_executable'),str) and len(data['godot_executable'])<=1024,'Godot路径无效')
-                atomic(GAME/'content/editor-settings.local.json',{'godot_executable':data['godot_executable'],'project':str(GAME)})
+                atomic(GAME/'content/editor-settings.local.json',{**editor_settings(),'godot_executable':data['godot_executable']})
                 return self.respond({'ok':True,'settings':editor_settings()})
             if self.path=='/api/godot': return self.respond(godot_action(data))
             if self.path=='/api/customer': save_customer(data); return self.respond({'ok':True})
@@ -425,8 +456,8 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     global GAME
-    parser=argparse.ArgumentParser(description=__doc__); parser.add_argument('--connection-file',type=Path); parser.add_argument('--port',type=int,default=8765); parser.add_argument('--no-browser',action='store_true'); parser.add_argument('--project',type=Path,default=GAME); args=parser.parse_args()
-    GAME=args.project.resolve()
+    parser=argparse.ArgumentParser(description=__doc__); parser.add_argument('--connection-file',type=Path); parser.add_argument('--port',type=int,default=8765); parser.add_argument('--no-browser',action='store_true'); parser.add_argument('--project',type=Path,default=None); args=parser.parse_args()
+    GAME=(args.project or linked_project()).resolve()
     require((GAME/'project.godot').is_file(),'项目目录内找不到 project.godot')
     Handler.token=secrets.token_urlsafe(24)
     server=ThreadingHTTPServer(('127.0.0.1',args.port),Handler)

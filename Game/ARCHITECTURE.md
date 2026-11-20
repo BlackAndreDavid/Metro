@@ -26,7 +26,7 @@ Game/
 │  ├─ shaders/                  描边及地表照明
 │  └─ icons/                    图标
 ├─ addons/godot_ai/             第三方插件，保留内部依赖
-├─ addons/metro_content_editor/ Godot 内容编辑器停靠面板
+├─ addons/metro_content_editor/ 独立桌面编辑器启动器（可选自动启动）
 └─ saves/legacy_demo/           旧调试存档归档
 ```
 
@@ -172,4 +172,6 @@ HomeBackdrop 仍使用原窗户热点，不显示客户。客户窗口448×360�
 
 主菜单存档和设置路径见 [游戏 README](README.md#存档与设置)，关系与来访记录的迁移边界见 [编辑器 README](../tools/editors/README.md#7-存档与生效时机)。测试分组、命令与日志统一见 [test/README.md](../test/README.md)。
 
-地铁总地图统一存储在 `content/network_map.json`：线路层为站点/折点/线路连接，贴图层为地图素材、坐标、尺寸、旋转及透明度。`cabin_map.gd` 不再保存站点及线路坐标常量，游戏重新打开地图时刷新数据，线路变化同时影响路径计算。编辑器与 Godot 面板的操作及协议见 [编辑器 README](../tools/editors/README.md#从-godot-接入当前编辑器)。
+地铁总地图统一存储在 `content/network_map.json`：线路层为站点/折点/线路连接，贴图层为地图素材、坐标、尺寸、旋转及透明度。`cabin_map.gd` 不再保存站点及线路坐标常量，游戏重新打开地图时刷新数据，线路变化同时影响路径计算。编辑器与 Godot 启动入口见 [编辑器 README](../tools/editors/README.md)。
+
+`addons/metro_content_editor/plugin.gd` 只调用 Godot 自带的启动、项目偏好、HTTP 和资源刷新接口；`project_link.gd` 负责发现编辑器位置。独立程序入口为 `tools/editors/desktop.py`，Qt 提供原生窗口、菜单、文件选择、关闭确认和单实例锁，完整编辑界面及业务校验复用现有文件。双向路径集中由 `server.register_project()` 保存；不维护第二套 Godot 原生编辑 UI。

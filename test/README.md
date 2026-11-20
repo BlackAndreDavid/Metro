@@ -4,7 +4,7 @@
 
 ## 依赖与统一入口
 
-需要 **Python 3.10+、Pillow、Godot 4.7.2**。美术工具和编辑器共用 Pillow，但各自保留 requirements 文件，便于独立安装。
+需要 **Python 3.10+、Pillow、PySide6、Godot 4.7.2**。独立窗口接入测试需先安装 `tools/editors/requirements-desktop.txt`。美术工具和编辑器共用 Pillow，但各自保留 requirements 文件，便于独立安装。
 
 ```sh
 python -m pip install -r tools/art/requirements.txt
@@ -21,7 +21,7 @@ python test/tools/run_tests.py --godot "C:\Godot\Godot_v4.7.2-stable_win64.exe"
 
 ## 用例与工具
 
-统一入口目前包含18组：导入、13组 Godot 流程、临时素材、美术工具、内容编辑器和 Godot 停靠面板接入。内容编辑器组还会在隔离 Game 副本中进行资源导入、Godot 关卡预览和剧情运行检查。
+统一入口目前包含18组：导入、13组 Godot 流程、临时素材、美术工具、内容编辑器和 Godot 独立编辑器启动接入。内容编辑器组还会在隔离 Game 副本中进行资源导入、Godot 关卡预览和剧情运行检查。
 
 | 用例 | 覆盖内容 |
 | --- | --- |
@@ -88,4 +88,13 @@ python test/tools/check_network_editor_browser.py
 
 该工具在临时工程中验证真实鼠标拖动/新增/删除结点、线路增删与撤销、贴图导入/缩放/旋转/排序、保存重读、多窗口冲突和 Godot 连接清单。截图保存在 `test/results/network-editor/`。
 
-`python test/tools/check_godot_editor_bridge.py` 在临时 Godot 工程中触发真实插件的启动/停止按钮回调，验证 Python 服务发现、HTTP 协议与工程路径检查及进程清理；该检查也已加入统一测试入口。
+`python test/tools/check_godot_editor_bridge.py` 在隔离 Godot 工程中测试真实启动按钮、自动启动偏好、独立 Qt 窗口、双向路径、重复唤起、禁用插件时保留程序，以及窗口关闭后的清理。测试驱动为 `tools/desktop_plugin_driver.gd`。该检查也纳入统一入口。
+
+独立窗口内部的编辑/保存可额外验证：
+
+```sh
+python -m pip install -r tools/editors/requirements-desktop.txt websockets
+python test/tools/check_desktop_editor.py
+```
+
+该测试直接连接程序内置的 Qt WebEngine 页面，验证地图、物品、客户保存、双向路径、单实例与关闭，不启动浏览器程序。仍保留原三套浏览器回归测试，以核对共享界面全部功能。Qt 桌面依赖安装在另一解释器时，可设 `METRO_EDITOR_PYTHON=/path/to/python`；测试记录和截图保存在 `results/desktop-editor/` 与每轮结果的 `desktop-bridge/`。
