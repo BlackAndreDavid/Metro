@@ -63,6 +63,13 @@ with tempfile.TemporaryDirectory(prefix='metro-desktop-ui-') as scratch:
     def click(selector):evaluate('document.querySelector('+json.dumps(selector)+').click()')
     def fill(selector,value):evaluate('(()=>{const e=document.querySelector('+json.dumps(selector)+');e.value='+json.dumps(value)+';e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));})()')
     wait('Boolean(document.querySelector("#customerCards button"))')
+    # Settings must refresh a Godot path learned after the web page initially loaded.
+    token=evaluate('S.project.token')
+    request=urllib.request.Request(url+'/api/link',data=json.dumps({'project':str(game),'godot_executable':'/newly-linked/godot'}).encode(),headers={'Content-Type':'application/json','X-Editor-Token':token})
+    with urllib.request.urlopen(request,timeout=5) as r:assert json.load(r)['ok']
+    click('#settingsTab');wait('document.querySelector("#godotPath").value==="/newly-linked/godot"')
+    assert evaluate('document.querySelector("#editorService").value')==url
+    assert evaluate('document.querySelector("#editorPath").value')==str(base/'tools/editors')
     click('#networkTab');wait('Boolean(document.querySelector("#networkCanvas svg"))')
     fill('#networkWidth','1550');click('#networkSave');wait('!N.dirty')
     assert json.loads((game/'content/network_map.json').read_text())['canvas']['width']==1550

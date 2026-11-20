@@ -23,6 +23,7 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[2]
 GAME = ROOT / 'Game'
 WEB = Path(__file__).resolve().parent
+SERVICE = {}
 DESKTOP_STATE = None
 DESKTOP_ACTION = None
 CATEGORIES = {'supplies','power','materials','documents'}
@@ -324,7 +325,7 @@ def save_network(data,revision):
         return {'ok':True,'revision':network_revision(),'definition':data}
 
 def bridge_manifest():
-    return {'window':DESKTOP_STATE,'protocol':'metro-editor','version':1,'project':str(GAME),'network':'/api/network-map','resources':{'network':'res://content/network_map.json','stations':'res://content/stations.json','registry':'res://content/registry.json'},'layers':['textures','lines'],'writes':'X-Editor-Token required','runtime':'Godot reads local JSON directly; reload when reopening map'}
+    return {**SERVICE,'editor_root':str(WEB),'window':DESKTOP_STATE,'protocol':'metro-editor','version':1,'project':str(GAME),'network':'/api/network-map','resources':{'network':'res://content/network_map.json','stations':'res://content/stations.json','registry':'res://content/registry.json'},'layers':['textures','lines'],'writes':'X-Editor-Token required','runtime':'Godot reads local JSON directly; reload when reopening map'}
 
 def linked_project():
     path=WEB/'.projects.local.json'
@@ -340,20 +341,41 @@ def editor_settings():
     settings=read(path) if path.exists() else {'godot_executable':shutil.which('godot') or shutil.which('godot4') or ''}
     return {**settings,'project':str(GAME),'editor_root':str(WEB)}
 
-def register_project(godot_executable=''):
+def register_project(godot_executable=None, integration=None):
     """One shared implementation of the persisted project <-> editor relationship."""
     settings=editor_settings()
-    if godot_executable:settings['godot_executable']=godot_executable
-    settings.update(project=str(GAME),editor_root=str(WEB),integration='desktop',protocol_version=1)
+    if godot_executable is not None:settings['godot_executable']=godot_executable
+    settings.update(project=str(GAME),editor_root=str(WEB),integration=integration or SERVICE.get('kind','desktop'),protocol_version=1)
+    if SERVICE:settings.setdefault('services',{})[SERVICE['kind']]=dict(SERVICE)
     atomic(GAME/'content/editor-settings.local.json',settings)
     reverse_path=WEB/'.projects.local.json'
     try:reverse=read(reverse_path) if reverse_path.exists() else {}
     except (OSError,ValueError):reverse={}
     projects=reverse.get('projects',{})
-    projects[hashlib.sha256(str(GAME).encode()).hexdigest()]={'project':str(GAME),'editor_root':str(WEB),'godot_executable':settings.get('godot_executable','')}
+    projects[hashlib.sha256(str(GAME).encode()).hexdigest()]={'project':str(GAME),'editor_root':str(WEB),'godot_executable':settings.get('godot_executable',''),'services':settings.get('services',{})}
     reverse.update(version=1,active_project=str(GAME),projects=projects)
     atomic(reverse_path,reverse)
     return settings
+
+def valid_service_url(url):
+    return isinstance(url,str) and re.fullmatch(r'http://127\.0\.0\.1:[0-9]{1,5}',url) is not None and 0<int(url.rsplit(':',1)[1])<=65535
+
+def publish_service(url, kind, connection):
+    """Publish only this process's actual loopback listener and paths; never execute them."""
+    import sys
+    require(valid_service_url(url),'仅允许本机服务地址')
+    require(connection.resolve().is_relative_to(GAME.resolve()),'连接文件必须位于工程内')
+    SERVICE.clear()
+    SERVICE.update(url=url,kind=kind,pid=os.getpid(),project=str(GAME),editor_root=str(WEB),python_executable=sys.executable,protocol='metro-editor',version=1,session_id=secrets.token_hex(16))
+    register_project(integration=kind)
+    atomic(connection,SERVICE)
+
+def unpublish_service(connection):
+    try:
+        if read(connection).get('session_id')==SERVICE.get('session_id'):connection.unlink(missing_ok=True)
+    except (OSError,ValueError):pass
+    # Persistent paths remain useful after exit. Godot verifies the listener before linking.
+
 
 def godot_action(data):
     settings=editor_settings(); executable=settings.get('godot_executable','')
@@ -383,6 +405,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if route.path=='/api/network-map':return self.respond({'definition':network_document(),'revision':network_revision()})
             if route.path=='/api/bridge':return self.respond(bridge_manifest())
+            if route.path=='/api/settings':return self.respond({'settings':editor_settings(),'service':dict(SERVICE)})
             if route.path=='/api/project': return self.respond({'enemies':catalog('enemies','enemies'),'items':catalog('items','items'),'art':read(ROOT/'Game/assets/source/temp/manifest.json')['sprites'],'station_map':station_map(),'building_templates':read(GAME/'content/building_templates.json' if (GAME/'content/building_templates.json').exists() else ROOT/'Game/content/building_templates.json')['templates'],'settings':editor_settings(),'token':self.token,'stations':read(GAME/'content/stations.json'),'customers':read(GAME/'content/customers.json')['customers'],'registry':read(GAME/'content/registry.json'),'categories':{'supplies':'生活补给','power':'电力用品','materials':'工业材料','documents':'文书旧物'}})
             if route.path=='/api/level':
                 station=parse_qs(route.query).get('station',['邮电新村'])[0]; entry=read(GAME/'content/registry.json')['stations'].get(station)
@@ -434,9 +457,13 @@ class Handler(BaseHTTPRequestHandler):
                 template_document['templates']=[t for t in template_document['templates'] if t['id']!=data['id']]+[data]
                 atomic(path,template_document)
                 return self.respond({'ok':True})
+            if self.path=='/api/link':
+                require(isinstance(data.get('project'),str) and Path(data['project']).resolve()==GAME.resolve(),'项目不匹配')
+                require(isinstance(data.get('godot_executable'),str) and len(data['godot_executable'])<=1024,'Godot路径无效')
+                return self.respond({'ok':True,'settings':register_project(data['godot_executable'])})
             if self.path=='/api/settings':
                 require(isinstance(data.get('godot_executable'),str) and len(data['godot_executable'])<=1024,'Godot路径无效')
-                atomic(GAME/'content/editor-settings.local.json',{**editor_settings(),'godot_executable':data['godot_executable']})
+                register_project(data['godot_executable'],integration=SERVICE.get('kind','browser'))
                 return self.respond({'ok':True,'settings':editor_settings()})
             if self.path=='/api/godot': return self.respond(godot_action(data))
             if self.path=='/api/customer': save_customer(data); return self.respond({'ok':True})
@@ -462,11 +489,11 @@ def main():
     Handler.token=secrets.token_urlsafe(24)
     server=ThreadingHTTPServer(('127.0.0.1',args.port),Handler)
     url=f'http://127.0.0.1:{server.server_port}'; print('Metro editors: '+url,flush=True)
-    if args.connection_file:
-        require(args.connection_file.resolve().is_relative_to(GAME.resolve()),'连接文件必须位于工程内')
-        atomic(args.connection_file,{'url':url,'pid':os.getpid(),'protocol':'metro-editor','version':1})
+    connection=(args.connection_file or GAME/'.godot/metro_browser_connection.json').resolve()
+    publish_service(url,'browser',connection)
     if not args.no_browser: webbrowser.open(url)
     try: server.serve_forever()
     except KeyboardInterrupt: pass
-    finally: server.server_close()
+    finally:
+        server.server_close();unpublish_service(connection)
 if __name__=='__main__': main()

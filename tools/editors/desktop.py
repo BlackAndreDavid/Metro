@@ -19,12 +19,15 @@ def activate_existing(connection, project):
     try:
         info=server.read(connection)
         url=info['url']
-        if info.get('kind')!='desktop' or not url.startswith('http://127.0.0.1:'):return False
-        with urllib.request.urlopen(url+'/api/bridge',timeout=1) as response:bridge=json.load(response)
-        if Path(bridge['project']).resolve()!=project or not isinstance(bridge.get('window'),dict) or bridge['window'].get('kind')!='desktop':return False
-        with urllib.request.urlopen(url+'/api/project',timeout=1) as response:token=json.load(response)['token']
+        if info.get('kind')!='desktop' or not server.valid_service_url(url):return False
+        class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self,*args,**kwargs):return None
+        opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
+        with opener.open(url+'/api/bridge',timeout=1) as response:bridge=json.load(response)
+        if bridge.get('protocol')!='metro-editor' or bridge.get('version')!=1 or bridge.get('session_id')!=info.get('session_id') or Path(bridge['project']).resolve()!=project or not isinstance(bridge.get('window'),dict) or bridge['window'].get('kind')!='desktop':return False
+        with opener.open(url+'/api/project',timeout=1) as response:token=json.load(response)['token']
         request=urllib.request.Request(url+'/api/desktop/show',data=b'{}',headers={'Content-Type':'application/json','X-Editor-Token':token})
-        with urllib.request.urlopen(request,timeout=2) as response:return json.load(response).get('ok',False)
+        with opener.open(request,timeout=2) as response:return json.load(response).get('ok',False)
     except (OSError,ValueError,KeyError,TypeError,AttributeError):return False
 
 
@@ -101,7 +104,7 @@ def run_window(project,connection):
     actions.show.connect(window.foreground);actions.close.connect(window.close)
     server.DESKTOP_ACTION=lambda action:actions.show.emit() if action=='show' else actions.close.emit()
     server.DESKTOP_STATE={'kind':'desktop','pid':os.getpid(),'title':window.windowTitle(),'native_window_id':int(window.winId())}
-    server.atomic(connection,{'url':url,'pid':os.getpid(),'protocol':'metro-editor','version':1,'kind':'desktop','project':str(project)})
+    server.publish_service(url,'desktop',connection)
     window.show()
     try:
         return app.exec()
@@ -109,9 +112,7 @@ def run_window(project,connection):
         service.shutdown();service.server_close();worker.join(timeout=2)
         window.page.deleteLater();app.sendPostedEvents(None,QEvent.Type.DeferredDelete)
         profile.deleteLater();app.sendPostedEvents(None,QEvent.Type.DeferredDelete)
-        try:
-            if server.read(connection).get('pid')==os.getpid():connection.unlink(missing_ok=True)
-        except (OSError,ValueError):pass
+        server.unpublish_service(connection)
         server.DESKTOP_ACTION=None;server.DESKTOP_STATE=None;lock.unlock()
 
 
@@ -132,7 +133,7 @@ def main(argv=None):
         log_path=project/".godot/metro_editor_desktop.log";log_path.parent.mkdir(parents=True,exist_ok=True)
         with log_path.open("a",encoding="utf-8",buffering=1) as log:
             os.dup2(log.fileno(),1);os.dup2(log.fileno(),2)
-        server.register_project(args.godot_executable)
+        server.register_project(args.godot_executable or None)
         return run_window(project,connection)
     except Exception as error:
         log=project/'.godot/metro_editor_desktop.log';log.parent.mkdir(parents=True,exist_ok=True)

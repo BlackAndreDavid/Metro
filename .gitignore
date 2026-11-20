@@ -17,3 +17,7 @@ Game/content/editor-settings.local.json
 
 # Bidirectional Godot/editor paths are specific to each collaborator
 /tools/editors/.projects.local.json
+
+# Per-machine Python environments
+.venv-editor/
+.venv/

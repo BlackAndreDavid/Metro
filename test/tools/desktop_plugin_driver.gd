@@ -26,15 +26,29 @@ func run()->void:
 	var label:Label
 	var open:Button
 	for child in dock.get_children():
-		if child is LineEdit:child.text=OS.get_environment("METRO_EDITOR_PYTHON")
+		if child is LineEdit:child.text=""
 		if child is Label:label=child
 		if child is Button and child.text=="打开独立编辑器窗口":open=child
 		if child is CheckBox:child.button_pressed=true
 	check(EditorInterface.get_editor_settings().get_project_metadata("metro_editor","autostart",false),"autostart uses built-in persistent Godot project metadata")
+	var link=load("res://addons/metro_content_editor/project_link.gd")
+	check(await wait_for(func():return label.text.contains("浏览器编辑器已关联")),"browser-first discovery registers both paths without launching a desktop")
+	check(link.read_json("res://content/editor-settings.local.json").get("godot_executable","")==OS.get_executable_path(),"browser handshake learns the running Godot executable")
+	check(link.python_runtime(ProjectSettings.globalize_path("res://").trim_suffix("/")).contains(".venv-editor"),"relocated local Python environment is discovered with blank startup setting")
+	for invalid in ["http://127.0.0.1:80@evil.test","http://127.0.0.1:0","http://127.0.0.1:99999","http://localhost:80","http://192.168.1.2:80"]:
+		check(not link.valid_url(invalid),"reject non-loopback or invalid service URL: "+invalid)
+	# Restart a browser after Godot is already open, using a fresh session on another port.
+	var browser:Dictionary=link.read_json("res://.godot/metro_browser_connection.json")
+	OS.kill(int(browser.pid))
+	var paths:Dictionary=link.discover()
+	var browser_pid:=OS.create_process(OS.get_environment("METRO_EDITOR_PYTHON"),PackedStringArray([paths.editor_root.path_join("server.py"),"--project",paths.project,"--port","0","--no-browser"]))
+	check(await wait_for(func():return link.read_json("res://.godot/metro_browser_connection.json").get("pid",-1)==browser_pid),"browser can start after Godot")
+	var new_browser:Dictionary=link.read_json("res://.godot/metro_browser_connection.json")
+	check(await wait_for(func():return label.text.contains(str(new_browser.get("url","missing")))),"Godot-first discovery links the new browser session")
+	OS.kill(browser_pid)
 	open.pressed.emit()
 	if not await wait_for(func():return label.text.contains("独立编辑器已打开")):
 		check(false,"desktop launch: "+label.text);finish();return
-	var link=load("res://addons/metro_content_editor/project_link.gd")
 	var info:Dictionary=link.read_json("res://.godot/metro_editor_connection.json");desktop_pid=int(info.pid)
 	check(info.kind=="desktop","Godot launches a desktop program, not a browser or embedded Godot main screen")
 	var manifest:Dictionary=await request_json(info.url+"/api/bridge")

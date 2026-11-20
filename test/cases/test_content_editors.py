@@ -192,6 +192,43 @@ console.log('EDITOR_MODELS_OK');
             self.assertEqual(editor.linked_project(),ROOT/'Game')
         finally:editor.WEB=original
 
+    def test_browser_service_registration_and_link_validation(self):
+        original=editor.WEB;previous=dict(editor.SERVICE)
+        service=None;thread=None
+        try:
+            editor.WEB=Path(self.temp.name)/'tools/editors';editor.WEB.mkdir(parents=True)
+            connection=self.game/'.godot/metro_browser_connection.json'
+            editor.publish_service('http://127.0.0.1:8765','browser',connection)
+            manifest=editor.bridge_manifest()
+            self.assertEqual(manifest['kind'],'browser')
+            self.assertEqual(editor.read(connection)['session_id'],manifest['session_id'])
+            self.assertEqual(editor.read(self.game/'content/editor-settings.local.json')['integration'],'browser')
+            editor.Handler.token='link-test'
+            service=editor.ThreadingHTTPServer(('127.0.0.1',0),editor.Handler)
+            thread=threading.Thread(target=service.serve_forever,daemon=True);thread.start()
+            url=f'http://127.0.0.1:{service.server_port}'
+            def post(path,data,token='link-test'):
+                request=urllib.request.Request(url+path,data=json.dumps(data).encode(),headers={'Content-Type':'application/json','X-Editor-Token':token})
+                with urllib.request.urlopen(request) as response:return json.load(response)
+            payload={'project':str(self.game),'godot_executable':'/local/godot'}
+            with self.assertRaises(urllib.error.HTTPError):post('/api/link',payload,'wrong-token')
+            with self.assertRaises(urllib.error.HTTPError):post('/api/link',{**payload,'project':str(self.game.parent)})
+            result=post('/api/link',{**payload,'editor_root':'/untrusted/injected'})
+            self.assertEqual(result['settings']['editor_root'],str(editor.WEB))
+            reverse=editor.read(editor.WEB/'.projects.local.json')
+            self.assertEqual(next(iter(reverse['projects'].values()))['godot_executable'],'/local/godot')
+            post('/api/settings',{'godot_executable':'/updated/godot'})
+            self.assertEqual(next(iter(editor.read(editor.WEB/'.projects.local.json')['projects'].values()))['godot_executable'],'/updated/godot')
+            editor.atomic(connection,{'session_id':'another-session'})
+            editor.unpublish_service(connection);self.assertTrue(connection.exists())
+            editor.atomic(connection,manifest)
+            editor.unpublish_service(connection);self.assertFalse(connection.exists())
+            for invalid in ['http://127.0.0.1:80@other.test','http://127.0.0.1:0','http://127.0.0.1:65536','http://localhost:8765']:
+                self.assertFalse(editor.valid_service_url(invalid))
+        finally:
+            if service:service.shutdown();service.server_close();thread.join()
+            editor.WEB=original;editor.SERVICE.clear();editor.SERVICE.update(previous)
+
     def test_network_roundtrip_conflicts_and_validation(self):
         document=editor.network_document();revision=editor.network_revision()
         document['stations']['编辑测试站']={'position':[300,250],'label':[10,-20]}

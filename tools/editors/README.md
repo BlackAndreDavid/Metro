@@ -21,7 +21,23 @@ Godot 插件只保留启动、偏好和资源刷新。所有地图、客户、�
 python -m pip install -r tools/editors/requirements-desktop.txt
 ```
 
-若 Godot 使用的 Python 与安装依赖的 Python 不同，在右侧面板展开“启动设置”，填写对应解释器完整路径。正常目录保持仓库下 `Game/` 与 `tools/` 并列即可。
+Godot 右侧面板的“启动设置”留空即可自动查找 Python，依次检查仓库根目录 `.venv-editor`、`.venv`、`tools/editors/.venv`，然后检查 PATH。Windows 使用环境内的 `Scripts/python.exe`，其他系统使用 `bin/python`。也可手填可信解释器覆盖自动选择。正常目录保持仓库下 `Game/` 与 `tools/` 并列即可。
+
+推荐在每台电脑的仓库根目录执行一次（Windows）：
+
+```powershell
+py -3 -m venv .venv-editor
+.\.venv-editor\Scripts\python.exe -m pip install -r tools/editors/requirements-desktop.txt
+```
+
+macOS / Linux 对应命令：
+
+```sh
+python3 -m venv .venv-editor
+.venv-editor/bin/python -m pip install -r tools/editors/requirements-desktop.txt
+```
+
+虚拟环境不提交，也不要跨电脑复制；在各电脑重建后，启动设置仍可保持为空。自动查找不会安装依赖。
 
 也可直接双击 `启动内容编辑器.cmd`，或运行：
 
@@ -43,21 +59,34 @@ python tools/editors/desktop.py --project /path/to/Game
 python tools/editors/server.py
 ```
 
-Windows 可用 `启动浏览器编辑器.cmd`。这部分只需 `requirements.txt` 中的 Pillow。未指定 `--project` 时优先读取最近保存的反向项目路径；显式指定 `--project` 优先。浏览器模式默认端口8765，桌面程序使用空闲本机端口，无需手动配置。
+Windows 可用 `编辑器（浏览器端）.cmd`。这部分只需 `requirements.txt` 中的 Pillow。未指定 `--project` 时优先读取最近保存的反向项目路径；显式指定 `--project` 优先。浏览器模式默认端口8765，桌面程序使用空闲本机端口，无需手动配置。
 
 ## 2. 自动双向路径与复用结构
 
 | 本机配置 | 内容 |
 | --- | --- |
-| `Game/content/editor-settings.local.json` | `project` 当前游戏路径、`editor_root` 编辑器目录、当前 `godot_executable`、`integration:desktop` |
+| `Game/content/editor-settings.local.json` | `project` 当前游戏路径、`editor_root` 编辑器目录、当前 `godot_executable`、`integration:desktop/browser`、两个服务的会话信息 |
 | `tools/editors/.projects.local.json` | `active_project` 最近使用的游戏，以及按项目保存的双向路径 |
 | `Game/.godot/metro_editor_connection.json` | 当前独立程序的本机地址、进程号、协议版本及窗口类型 |
+| `Game/.godot/metro_browser_connection.json` | 浏览器服务的本机地址、项目、会话与运行时路径 |
 | `Game/.godot/metro-editor/window.ini` | 桌面程序的窗口尺寸/位置 |
 | Godot 项目元数据 | 自动启动选项、非默认 Python 路径 |
 
 这些配置均不提交到远端。协作者下载后首次打开程序会生成自己机器上的路径；移动仓库后再次从 Godot 启动会自动更新。共享服务的 `register_project()` 是双向路径的唯一写入实现，保留原有设置字段，避免两端重复维护写入规则。
 
 “总设置 / Godot”可查看项目与引擎路径；从独立编辑器打开 Godot、运行游戏和预览关卡时使用自动记录的引擎。Godot 面板的“刷新 Godot 工程资源”直接调用引擎资源扫描；通常切回 Godot 后引擎也会自行发现文件变化。
+
+### 自动查找与双向关联
+
+启用 Godot 插件后，每两秒读取当前项目的连接记录。浏览器或独立窗口任一服务先启动，或者 Godot 先启动，均可关联；无需开启“自动启动”。浏览器服务启动时也调用同一套 `register_project()`，在“总设置”保存 Godot 路径时同步反向登记。Godot 核验 `/api/bridge` 中的协议、项目和会话后，通过带编辑令牌的 `/api/link` 回写实际运行的 Godot 路径。面板显示关联类型、服务地址及双方程序路径；临时连接失败时可点“重新查找并关联”。
+
+浏览器和独立窗口使用各自的连接文件，可同时运行。退出后保留的路径仅供下次查找，必须核验实际服务才会关联；移动项目后重新启动服务会写入新地址。
+
+### 风险和实现边界
+
+本功能只读取已知项目内的连接文件并访问 `127.0.0.1`，不扫描全盘、局域网，不接受 HTTP 重定向。路径和会话检查能避免误连另一个项目；它们不是抵御本机恶意软件的身份认证机制。具有当前用户文件权限的程序仍可伪造连接记录，因此只应使用可信项目及本机程序。
+
+自动关联只登记路径，不自动执行对端报送的 Python 或项目外脚本。点击“打开独立编辑器窗口”才使用项目环境 / PATH / 手动指定的解释器运行仓库内工具。**自动执行任意外部编辑器路径可能以当前用户权限运行恶意代码**，本次未开放该行为。若将来需要此功能，建议增加逐个路径的显式信任授权。浏览器原有的“打开 Godot / 预览”属于用户主动执行操作，所填 Godot 路径也应可信。
 
 ### 保留功能对照
 
