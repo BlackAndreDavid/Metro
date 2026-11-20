@@ -21,7 +21,7 @@ python test/tools/run_tests.py --godot "C:\Godot\Godot_v4.7.2-stable_win64.exe"
 
 ## 用例与工具
 
-统一入口目前包含16组：导入、12组 Godot 流程、临时素材、美术工具、内容编辑器。内容编辑器组还会在隔离 Game 副本中进行资源导入、Godot 关卡预览和剧情运行检查。
+统一入口目前包含18组：导入、13组 Godot 流程、临时素材、美术工具、内容编辑器和 Godot 停靠面板接入。内容编辑器组还会在隔离 Game 副本中进行资源导入、Godot 关卡预览和剧情运行检查。
 
 | 用例 | 覆盖内容 |
 | --- | --- |
@@ -79,3 +79,13 @@ Godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Du
 新增目录的真实鼠标检查：`python test/tools/check_content_catalogs_browser.py`。同样使用隔离项目，截图输出至 `results/catalog-ui/`。
 
 `exploration_hud` 覆盖全屏/背包键及鼠标按钮、主动位换装与容量失败、16版存档及15版迁移、空格使用、暗处/室外拾取、自动关灯、敌人绘制顺序和循环脚步声。界面截图位于 `results/exploration-hud/`。
+
+`cases/test_network_runtime.gd` 验证 JSON 地图读取、原有路线、修改连接、折点与环线及贴图加载。`cases/test_content_editors.py` 另验证地图接口校验、过期写入保护及隔离工程中的 Godot 数据契约。
+
+```sh
+python test/tools/check_network_editor_browser.py
+```
+
+该工具在临时工程中验证真实鼠标拖动/新增/删除结点、线路增删与撤销、贴图导入/缩放/旋转/排序、保存重读、多窗口冲突和 Godot 连接清单。截图保存在 `test/results/network-editor/`。
+
+`python test/tools/check_godot_editor_bridge.py` 在临时 Godot 工程中触发真实插件的启动/停止按钮回调，验证 Python 服务发现、HTTP 协议与工程路径检查及进程清理；该检查也已加入统一测试入口。

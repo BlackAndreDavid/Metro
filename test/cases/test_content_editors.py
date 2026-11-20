@@ -23,6 +23,7 @@ class ContentEditors(unittest.TestCase):
         self.game=Path(self.temp.name)/'Game'
         shutil.copytree(ROOT/'Game/content',self.game/'content')
         shutil.copytree(ROOT/'Game/assets/textures',self.game/'assets/textures')
+        shutil.copytree(ROOT/'Game/assets/maps',self.game/'assets/maps')
         self.original=editor.GAME;editor.GAME=self.game
     def tearDown(self):
         editor.GAME=self.original;self.temp.cleanup()
@@ -177,6 +178,37 @@ console.log('EDITOR_MODELS_OK');
                 with urllib.request.urlopen(request) as response:self.assertTrue(json.load(response)['ok'])
                 saved=next(c for c in editor.catalog('customers','customers') if c['id']=='editor_test');self.assertEqual(saved['deleted'],deleted)
         finally:server.shutdown();server.server_close();thread.join()
+    def test_network_roundtrip_conflicts_and_validation(self):
+        document=editor.network_document();revision=editor.network_revision()
+        document['stations']['编辑测试站']={'position':[300,250],'label':[10,-20]}
+        document['lines'].append([99,'aabbcc',['邮电新村',[100,100],'编辑测试站','四平路']])
+        document['textures'][0].update(rotation=15,opacity=.5)
+        result=editor.save_network(document,revision)
+        self.assertNotEqual(result['revision'],revision)
+        self.assertEqual(editor.station_map(),document)
+        self.assertIn('编辑测试站',editor.read(self.game/'content/stations.json'))
+        with self.assertRaises(ValueError):editor.save_network(document,revision)
+        for mutate in [lambda d:d['lines'][-1][2].append('不存在站点'),lambda d:d['stations'].pop('邮电新村'),lambda d:d['textures'][0].update(texture='res://../outside.png'),lambda d:d['textures'][0].update(opacity=2),lambda d:d['lines'][-1].__setitem__(2,['邮电新村','邮电新村','四平路']),lambda d:d['textures'][0].update(rotation=float('nan'))]:
+            bad=copy.deepcopy(document);mutate(bad)
+            with self.assertRaises(ValueError):editor.validate_network(bad)
+        self.assertEqual(editor.bridge_manifest()['resources']['network'],'res://content/network_map.json')
+
+    def test_saved_network_is_consumed_by_godot(self):
+        godot=os.environ.get('METRO_GODOT')
+        if not godot:self.skipTest('METRO_GODOT required')
+        # Only this isolated project's data changes; no write to the live Game tree.
+        doc=editor.network_document();doc['stations']['编辑测试站']={'position':[120,140],'label':[10,-20]}
+        doc['lines']=[[99,'aabbcc',['邮电新村',[100,100],'编辑测试站','四平路']]]
+        editor.save_network(doc,editor.network_revision())
+        scripts=self.game/'scripts/content';scripts.mkdir(parents=True)
+        shutil.copy2(ROOT/'Game/scripts/content/network_catalog.gd',scripts/'network_catalog.gd')
+        (self.game/'project.godot').write_text('config_version=5\n[application]\nconfig/name="Network Contract Test"\n',encoding='utf-8')
+        test=self.game/'contract.gd';test.write_text('extends SceneTree\nfunc _initialize():\n var map=load("res://scripts/content/network_catalog.gd").read_network()\n assert(map.stations["编辑测试站"][0]==Vector2(120,140))\n assert(map.lines[0][2][1]==Vector2(100,100))\n assert(map.lines[0][2][2]=="编辑测试站")\n print("NETWORK_CONTRACT_OK")\n quit()\n',encoding='utf-8')
+        result=subprocess.run([godot,'--headless','--path',str(self.game),'--script',str(test)],capture_output=True,text=True,timeout=20)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertIn('NETWORK_CONTRACT_OK',result.stdout)
+        self.assertNotIn('SCRIPT ERROR',result.stderr)
+
     def test_loose_outdoor_points_and_active_effect_validation(self):
         level=self.level();level['npcs']=[]
         level['spawn_points']=[dict(id='street_drop',row=2,x=400,container='loose',chance=1,rolls=1,choices=[dict(kind='water',weight=1)])]

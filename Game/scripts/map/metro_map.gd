@@ -95,6 +95,7 @@ func show_news() -> void:
 	action(card, "关闭并查看线路图", Rect2(28, 293, 588, 47), show_map, true)
 
 func show_map() -> void:
+	Rail.reload_network()
 	begin_page("map")
 	overlay(view, Color("1a1728"))
 	label(view, "上海地铁线路图", Rect2(40, 25, 420, 46), 34)

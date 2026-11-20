@@ -22,9 +22,11 @@ Game/
 ├─ assets/
 │  ├─ source/                   Aseprite、客户原图与生成记录
 │  ├─ textures/                 运行时 PNG，客户每位独立保存
+│  ├─ maps/                     地图背景及编辑器上传素材
 │  ├─ shaders/                  描边及地表照明
 │  └─ icons/                    图标
 ├─ addons/godot_ai/             第三方插件，保留内部依赖
+├─ addons/metro_content_editor/ Godot 内容编辑器停靠面板
 └─ saves/legacy_demo/           旧调试存档归档
 ```
 
@@ -58,6 +60,7 @@ Game/
 | `commerce/trade_drag_item.gd`、`order_drop_zone.gd` | 原生商品拖放与订单接收区域 |
 | `content/exploration_building.gd` | 建筑实例类，封装门、楼梯和占用边界几何 |
 | `commerce/meeting_dialogue.gd` | 封装一次见面中的 NPC 轮次和玩家回答，供交易/探索共用 |
+| `content/network_catalog.gd` | 双层线路图 JSON 的运行时读取；坐标转换与图层数据 |
 | `content/content_registry.gd` | JSON 读取、站点到关卡和场景的映射 |
 | `content/npc_interaction.gd`、`preview_level.gd` | 探索 NPC 对话窗口、隔离的关卡预览会话 |
 | `ui/exploration_setup.gd`、`exploration.gd` | 整备界面和探索场景接线 |
@@ -96,7 +99,7 @@ Home 持有同一个 cabin_state 对象。交易、整备和探索由 Home 加�
 | 站内报价 UI | `show_map_market()/map_quote_column()` |
 | 目的地与前往 | `select_station()/set_map_tab()/travel()` |
 | 站点设施与供需 | `cabin_markets.gd` |
-| 路线、站点坐标与情报 | `cabin_map.gd` |
+| 路线、站点坐标与情报 | `content/network_map.json` 编辑几何与连接；`cabin_map.gd` 负责运行时绘图和情报 |
 
 屏幕家具 `action=none`，显示站名、日期、天气并提供悬浮提示；电脑承担线路图入口。
 
@@ -168,3 +171,5 @@ HomeBackdrop 仍使用原窗户热点，不显示客户。客户窗口448×360�
 当前版本16保存主动位、家具布局 `{car,x,y}`（挂点另有 mount）、独立储物物品与朝向、订单、剧情进度、关系与事件。兼容1～15版，加载先验证再更新状态；家具迁移保留车厢/收纳/挂点，冲突时按旧版规则就近安放。
 
 主菜单存档和设置路径见 [游戏 README](README.md#存档与设置)，关系与来访记录的迁移边界见 [编辑器 README](../tools/editors/README.md#7-存档与生效时机)。测试分组、命令与日志统一见 [test/README.md](../test/README.md)。
+
+地铁总地图统一存储在 `content/network_map.json`：线路层为站点/折点/线路连接，贴图层为地图素材、坐标、尺寸、旋转及透明度。`cabin_map.gd` 不再保存站点及线路坐标常量，游戏重新打开地图时刷新数据，线路变化同时影响路径计算。编辑器与 Godot 面板的操作及协议见 [编辑器 README](../tools/editors/README.md#从-godot-接入当前编辑器)。

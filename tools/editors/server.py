@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Local customer and station editor. Binds only to loopback; writes validated game content."""
 import argparse
-import ast
 import base64
 import copy
 import hashlib
@@ -13,6 +12,7 @@ from pathlib import Path
 import re
 import secrets
 import tempfile
+import threading
 import os
 import webbrowser
 import subprocess
@@ -270,15 +270,58 @@ def save_level(station,data):
     atomic(GAME/'content/registry.json',registry)
     return registry['stations'][station]
 
+NETWORK_LOCK = threading.Lock()
+def network_document():
+    path=GAME/'content/network_map.json'
+    return read(path if path.exists() else ROOT/'Game/content/network_map.json')
+
+def network_revision():
+    return hashlib.sha256(json.dumps(network_document(),ensure_ascii=False,sort_keys=True).encode()).hexdigest()
+
 def station_map():
-    # Reuse the game's diagram geometry; no separate station coordinate table to drift.
-    source=(GAME/'scripts/cabin_map.gd')
-    if not source.exists(): source=ROOT/'Game/scripts/cabin_map.gd'
-    text=source.read_text(encoding='utf-8')
-    stations={name:{'position':[int(x),int(y)],'label':[int(dx),int(dy)]} for name,x,y,dx,dy in re.findall(r'"([^"\n]+)": \[Vector2\((-?\d+), (-?\d+)\), Vector2\((-?\d+), (-?\d+)\)\]',text)}
-    section=text.split('const LINES := ',1)[1].split('const OTHER_LINES',1)[0].strip()
-    lines=ast.literal_eval(re.sub(r'Vector2\(([^)]+)\)',r'[\1]',section))
-    return {'stations':stations,'lines':lines}
+    return network_document()
+
+def validate_network(data):
+    require(isinstance(data,dict) and data.get('version')==1,'线路图版本无效')
+    canvas=data.get('canvas',{})
+    require(all(number(canvas.get(k),200,8000) for k in ('width','height')),'画布尺寸须为200～8000')
+    def vector(value,low=-8000,high=8000):
+        return isinstance(value,list) and len(value)==2 and all(number(v,low,high) for v in value)
+    stations=data.get('stations',{})
+    require(isinstance(stations,dict) and 1<=len(stations)<=500,'站点数量须为1～500')
+    for name,entry in stations.items():
+        require(isinstance(name,str) and 0<len(name)<=40 and isinstance(entry,dict),'站点名称无效')
+        require(vector(entry.get('position'),0,8000) and vector(entry.get('label',[]),-500,500),'站点位置或文字偏移无效')
+    # Existing gameplay references and save destinations must remain resolvable.
+    require(set(read(GAME/'content/stations.json'))<=set(stations),'已有游戏站点不能删除或更名；可从线路移除连接节点')
+    lines=data.get('lines',[]);require(isinstance(lines,list) and len(lines)<=100,'线路最多100条')
+    numbers=set()
+    for line in lines:
+        require(isinstance(line,list) and len(line)==3 and integer(line[0],1,999) and line[0] not in numbers,'线路编号须为1～999且不可重复');numbers.add(line[0])
+        require(isinstance(line[1],str) and re.fullmatch(r'[0-9a-fA-F]{6}',line[1]),'线路颜色须为六位色值')
+        route=line[2];require(isinstance(route,list) and 2<=len(route)<=1000,'每条线路至少两个节点，最多1000个')
+        require(all((point in stations if isinstance(point,str) else vector(point,0,8000)) for point in route),'线路引用了不存在的站点或无效坐标')
+        stops=[point for point in route if isinstance(point,str)]
+        unique=stops[:-1] if len(stops)>1 and stops[0]==stops[-1] else stops
+        require(len(unique)==len(set(unique)),'同一线路不可重复经过同一站点（首尾闭环除外）')
+    textures=data.get('textures',[]);require(isinstance(textures,list) and len(textures)<=100,'地图贴图最多100张')
+    ids=set()
+    for image in textures:
+        require(isinstance(image,dict) and ID.fullmatch(image.get('id','')) and image['id'] not in ids,'贴图ID无效或重复');ids.add(image['id'])
+        validate_texture(image.get('texture',''))
+        require(vector(image.get('position')) and vector(image.get('size'),1,8000),'贴图位置或尺寸无效')
+        require(number(image.get('rotation',0),-360,360) and number(image.get('opacity',1),0,1) and isinstance(image.get('visible',True),bool),'贴图旋转、透明度或显示状态无效')
+
+def save_network(data,revision):
+    with NETWORK_LOCK:
+        require(revision==network_revision(),'线路图已被其他窗口修改，请重新读取后再编辑')
+        validate_network(data)
+        atomic(GAME/'content/network_map.json',data)
+        atomic(GAME/'content/stations.json',list(data['stations']))
+        return {'ok':True,'revision':network_revision(),'definition':data}
+
+def bridge_manifest():
+    return {'protocol':'metro-editor','version':1,'project':str(GAME),'network':'/api/network-map','resources':{'network':'res://content/network_map.json','stations':'res://content/stations.json','registry':'res://content/registry.json'},'layers':['textures','lines'],'writes':'X-Editor-Token required','runtime':'Godot reads local JSON directly; reload when reopening map'}
 
 def editor_settings():
     path=GAME/'content/editor-settings.local.json'
@@ -306,10 +349,12 @@ class Handler(BaseHTTPRequestHandler):
     token=''
     def log_message(self,*args): pass
     def respond(self,value,code=200):
-        data=json.dumps(value,ensure_ascii=False).encode(); self.send_response(code); self.send_header('Content-Type','application/json; charset=utf-8'); self.send_header('Cache-Control','no-store'); self.end_headers(); self.wfile.write(data)
+        data=json.dumps(value,ensure_ascii=False).encode(); self.send_response(code); self.send_header('Content-Type','application/json; charset=utf-8'); self.send_header('Cache-Control','no-store'); self.send_header('Content-Length',str(len(data))); self.end_headers(); self.wfile.write(data)
     def do_GET(self):
         route=urlparse(self.path)
         try:
+            if route.path=='/api/network-map':return self.respond({'definition':network_document(),'revision':network_revision()})
+            if route.path=='/api/bridge':return self.respond(bridge_manifest())
             if route.path=='/api/project': return self.respond({'enemies':catalog('enemies','enemies'),'items':catalog('items','items'),'art':read(ROOT/'Game/assets/source/temp/manifest.json')['sprites'],'station_map':station_map(),'building_templates':read(GAME/'content/building_templates.json' if (GAME/'content/building_templates.json').exists() else ROOT/'Game/content/building_templates.json')['templates'],'settings':editor_settings(),'token':self.token,'stations':read(GAME/'content/stations.json'),'customers':read(GAME/'content/customers.json')['customers'],'registry':read(GAME/'content/registry.json'),'categories':{'supplies':'生活补给','power':'电力用品','materials':'工业材料','documents':'文书旧物'}})
             if route.path=='/api/level':
                 station=parse_qs(route.query).get('station',['邮电新村'])[0]; entry=read(GAME/'content/registry.json')['stations'].get(station)
@@ -317,16 +362,23 @@ class Handler(BaseHTTPRequestHandler):
             if route.path=='/asset':
                 path=resource(parse_qs(route.query).get('path',[''])[0]); require(path.suffix.lower()=='.png','只能预览PNG'); data=path.read_bytes(); mime='image/png'
             else:
-                file={'/':'index.html','/editor.js':'editor.js','/style.css':'style.css','/enhancements.js':'enhancements.js','/models.js':'models.js','/workspace.js':'workspace.js','/catalogs.js':'catalogs.js'}.get(route.path)
+                file={'/':'index.html','/editor.js':'editor.js','/style.css':'style.css','/enhancements.js':'enhancements.js','/models.js':'models.js','/workspace.js':'workspace.js','/catalogs.js':'catalogs.js','/network_editor.js':'network_editor.js'}.get(route.path)
                 if not file: return self.respond({'error':'未找到'},404)
                 path=WEB/file; data=path.read_bytes(); mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'}[path.suffix]
-            self.send_response(200); self.send_header('Content-Type',mime); self.end_headers(); self.wfile.write(data)
+            self.send_response(200); self.send_header('Content-Type',mime); self.send_header('Content-Length',str(len(data))); self.end_headers(); self.wfile.write(data)
         except (ValueError,KeyError,TypeError,FileNotFoundError) as error: self.respond({'error':str(error)},400)
     def do_POST(self):
         try:
             require(self.headers.get('X-Editor-Token')==self.token,'编辑令牌无效，请刷新页面')
             length=int(self.headers.get('Content-Length','0')); require(0<length<=16*1024*1024,'请求体过大或为空')
             data=json.loads(self.rfile.read(length))
+            if self.path=='/api/network-map':return self.respond(save_network(data.get('definition'),data.get('revision')))
+            if self.path=='/api/network-image':
+                require(ID.fullmatch(data.get('id','')),'贴图ID无效')
+                image=Image.open(io.BytesIO(base64.b64decode(data.get('data','').split(',')[-1],validate=True)))
+                require(0<image.width*image.height<=16*1024*1024,'图片尺寸过大')
+                path='res://assets/maps/'+data['id']+'.png';target=resource(path);target.parent.mkdir(parents=True,exist_ok=True);image.convert('RGBA').save(target)
+                return self.respond({'ok':True,'texture':path,'size':list(image.size)})
             if self.path=='/api/enemy':validate_enemy(data);upsert_catalog('enemies','enemies',data);return self.respond({'ok':True})
             if self.path=='/api/item':validate_item(data);upsert_catalog('items','items',data);return self.respond({'ok':True})
             if self.path=='/api/catalog/archive':
@@ -373,12 +425,15 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     global GAME
-    parser=argparse.ArgumentParser(description=__doc__); parser.add_argument('--port',type=int,default=8765); parser.add_argument('--no-browser',action='store_true'); parser.add_argument('--project',type=Path,default=GAME); args=parser.parse_args()
+    parser=argparse.ArgumentParser(description=__doc__); parser.add_argument('--connection-file',type=Path); parser.add_argument('--port',type=int,default=8765); parser.add_argument('--no-browser',action='store_true'); parser.add_argument('--project',type=Path,default=GAME); args=parser.parse_args()
     GAME=args.project.resolve()
     require((GAME/'project.godot').is_file(),'项目目录内找不到 project.godot')
     Handler.token=secrets.token_urlsafe(24)
     server=ThreadingHTTPServer(('127.0.0.1',args.port),Handler)
     url=f'http://127.0.0.1:{server.server_port}'; print('Metro editors: '+url,flush=True)
+    if args.connection_file:
+        require(args.connection_file.resolve().is_relative_to(GAME.resolve()),'连接文件必须位于工程内')
+        atomic(args.connection_file,{'url':url,'pid':os.getpid(),'protocol':'metro-editor','version':1})
     if not args.no_browser: webbrowser.open(url)
     try: server.serve_forever()
     except KeyboardInterrupt: pass
