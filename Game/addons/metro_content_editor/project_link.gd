@@ -48,4 +48,13 @@ static func python_runtime(project:String,override:String="")->String:
 		for name in names:
 			var candidate:String=folder.path_join(name)
 			if FileAccess.file_exists(candidate):return candidate
+	# Standard Windows installations may exist without an interpreter entry in PATH.
+	if OS.get_name()=="Windows":
+		for parent in [OS.get_environment("LOCALAPPDATA").path_join("Programs/Python"),OS.get_environment("ProgramFiles"),OS.get_environment("ProgramFiles(x86)")]:
+			if parent.is_empty() or not DirAccess.dir_exists_absolute(parent):continue
+			var versions:=DirAccess.get_directories_at(parent);versions.sort();versions.reverse()
+			for folder in versions:
+				if not folder.to_lower().begins_with("python"):continue
+				var candidate:String=parent.path_join(folder).path_join("python.exe")
+				if FileAccess.file_exists(candidate):return candidate
 	return ""

@@ -70,6 +70,16 @@ with tempfile.TemporaryDirectory(prefix='metro-desktop-ui-') as scratch:
     click('#settingsTab');wait('document.querySelector("#godotPath").value==="/newly-linked/godot"')
     assert evaluate('document.querySelector("#editorService").value')==url
     assert evaluate('document.querySelector("#editorPath").value')==str(base/'tools/editors')
+    def link_godot(path):
+     request=urllib.request.Request(url+'/api/link',data=json.dumps({'project':str(game),'godot_executable':path}).encode(),headers={'Content-Type':'application/json','X-Editor-Token':token})
+     with urllib.request.urlopen(request,timeout=5) as r:assert json.load(r)['ok']
+    link_godot('/auto-refilled/godot')
+    wait('document.querySelector("#godotPath").value==="/auto-refilled/godot"')
+    fill('#godotPath','/manual-draft/godot')
+    link_godot('/changed-while-editing/godot')
+    wait('S.project.settings.godot_executable==="/changed-while-editing/godot"')
+    assert evaluate('document.querySelector("#godotPath").value')=='/manual-draft/godot'
+    click('#saveSettings');wait('document.querySelector("#dirty").textContent.includes("已保存")')
     click('#networkTab');wait('Boolean(document.querySelector("#networkCanvas svg"))')
     fill('#networkWidth','1550');click('#networkSave');wait('!N.dirty')
     assert json.loads((game/'content/network_map.json').read_text())['canvas']['width']==1550

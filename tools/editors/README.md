@@ -21,7 +21,7 @@ Godot 插件只保留启动、偏好和资源刷新。所有地图、客户、�
 python -m pip install -r tools/editors/requirements-desktop.txt
 ```
 
-Godot 右侧面板的“启动设置”留空即可自动查找 Python，依次检查仓库根目录 `.venv-editor`、`.venv`、`tools/editors/.venv`，然后检查 PATH。Windows 使用环境内的 `Scripts/python.exe`，其他系统使用 `bin/python`。也可手填可信解释器覆盖自动选择，支持完整路径或相对仓库根目录的路径（例如 Windows 的 `.venv-editor/Scripts/python.exe`）。如果保存的路径已失效，启动时会清除旧覆盖值并重新自动查找。正常目录保持仓库下 `Game/` 与 `tools/` 并列即可。
+Godot 右侧面板的“启动设置”默认开启“自动查找并填充启动路径”，启用插件时和运行期间都会自动填入当前有效的 Python 路径，依次检查仓库根目录 `.venv-editor`、`.venv`、`tools/editors/.venv`，然后检查 PATH；Windows 还会检查当前用户和 Program Files 下的标准 Python 安装目录。Windows 使用环境内的 `Scripts/python.exe`，其他系统使用 `bin/python`。自动模式下路径栏只读，显示实际采用的地址；项目、Godot、编辑器目录和服务地址同时显示在启动设置中。取消自动模式后，可手填可信解释器覆盖自动选择，支持完整路径或相对仓库根目录的路径（例如 Windows 的 `.venv-editor/Scripts/python.exe`）。如果保存的路径已失效，插件初始化或启动时会恢复自动模式、清除旧覆盖值并重新查找和填充，不需要用户先清空。自动探测结果另行缓存，不会变为锁定旧机器地址的手动覆盖值。正常目录保持仓库下 `Game/` 与 `tools/` 并列即可。
 
 推荐在每台电脑的仓库根目录执行一次（Windows）：
 
@@ -37,9 +37,9 @@ python3 -m venv .venv-editor
 .venv-editor/bin/python -m pip install -r tools/editors/requirements-desktop.txt
 ```
 
-报错 `Could not create child process` 时，先核对错误中的 Python 路径与当前仓库位置。如果仍指向旧目录，请清空 Godot 插件的“启动设置”后重试。若当前环境不存在，使用上面的命令在新目录重建；若文件存在但仍无法启动，也应重建环境，以排除虚拟环境内部记录的旧 Python 安装位置。`godot-ai` 的 MCP 警告不属于内容编辑器启动错误。
+报错 `Could not create child process` 时，先核对错误中的 Python 路径与当前仓库位置。如果仍指向旧目录，新版插件会自动重新查找、填入当前路径；也可点击“重新查找并关联”立即刷新。若当前环境不存在，使用上面的命令在新目录重建；若文件存在但仍无法启动，也应重建环境，以排除虚拟环境内部记录的旧 Python 安装位置。`godot-ai` 的 MCP 警告不属于内容编辑器启动错误。
 
-虚拟环境不提交，也不要跨电脑复制；在各电脑重建后，启动设置仍可保持为空。自动查找不会安装依赖。
+虚拟环境不提交，也不要跨电脑复制；在各电脑重建后，保留默认自动模式即可，无需填写启动路径。自动查找不会安装依赖。
 
 也可直接双击 `启动内容编辑器.cmd`，或运行：
 
@@ -80,7 +80,7 @@ Windows 可用 `编辑器（浏览器端）.cmd`。这部分只需 `requirements
 
 ### 自动查找与双向关联
 
-启用 Godot 插件后，每两秒读取当前项目的连接记录。浏览器或独立窗口任一服务先启动，或者 Godot 先启动，均可关联；无需开启“自动启动”。浏览器服务启动时也调用同一套 `register_project()`，在“总设置”保存 Godot 路径时同步反向登记。Godot 核验 `/api/bridge` 中的协议、项目和会话后，通过带编辑令牌的 `/api/link` 回写实际运行的 Godot 路径。面板显示关联类型、服务地址及双方程序路径；临时连接失败时可点“重新查找并关联”。
+启用 Godot 插件后，每两秒读取当前项目的连接记录。浏览器或独立窗口任一服务先启动，或者 Godot 先启动，均可关联；无需开启“自动启动”。浏览器服务启动时也调用同一套 `register_project()`，在“总设置”保存 Godot 路径时同步反向登记。Godot 核验 `/api/bridge` 中的协议、项目和会话后，通过带编辑令牌的 `/api/link` 回写实际运行的 Godot 路径。面板显示关联类型、服务地址及双方程序路径；浏览器“总设置”打开时及显示期间每两秒自动更新路径，正在输入的手动修改不会被后台刷新覆盖；临时连接失败时可点“重新查找并关联”。
 
 浏览器和独立窗口使用各自的连接文件，可同时运行。退出后保留的路径仅供下次查找，必须核验实际服务才会关联；移动项目后重新启动服务会写入新地址。
 

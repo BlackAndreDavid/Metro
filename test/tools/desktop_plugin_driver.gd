@@ -25,6 +25,8 @@ func run()->void:
 	var dock:Node=EditorInterface.get_base_control().find_child("Metro内容编辑器",true,false)
 	var label:Label
 	var open:Button
+	var python:LineEdit=dock.get_node("PythonPath")
+	var auto_python:CheckBox=dock.get_node("AutoPython")
 	for child in dock.get_children():
 		if child is LineEdit:child.text="D:/Metro-missing/.venv-editor/Scripts/python.exe"
 		if child is Label:label=child
@@ -35,6 +37,8 @@ func run()->void:
 	check(await wait_for(func():return label.text.contains("浏览器编辑器已关联")),"browser-first discovery registers both paths without launching a desktop")
 	check(link.read_json("res://content/editor-settings.local.json").get("godot_executable","")==OS.get_executable_path(),"browser handshake learns the running Godot executable")
 	check(link.python_runtime(ProjectSettings.globalize_path("res://").trim_suffix("/")).contains(".venv-editor"),"relocated local Python environment is discovered with blank startup setting")
+	check(await wait_for(func():return auto_python.button_pressed and not python.editable and python.text.contains(".venv-editor")),"automatic discovery visibly fills the Python field without user input")
+	check(EditorInterface.get_editor_settings().get_project_metadata("metro_editor","python_resolved","")==python.text,"automatically filled runtime is persisted separately from manual overrides")
 	var project_root:=ProjectSettings.globalize_path("res://").trim_suffix("/")
 	var runtime:String=link.python_runtime(project_root)
 	check(link.python_runtime(project_root,"D:/Metro-missing/.venv-editor/Scripts/python.exe")==runtime,"stale absolute override falls back to this checkout's environment")
@@ -51,7 +55,10 @@ func run()->void:
 	var new_browser:Dictionary=link.read_json("res://.godot/metro_browser_connection.json")
 	check(await wait_for(func():return label.text.contains(str(new_browser.get("url","missing")))),"Godot-first discovery links the new browser session")
 	OS.kill(browser_pid)
+	# No manual clearing: an invalid override is repaired and visibly refilled on launch.
+	auto_python.button_pressed=false;python.text="D:/Metro-missing/.venv-editor/Scripts/python.exe"
 	open.pressed.emit()
+	check(auto_python.button_pressed and python.text==runtime,"launch restores automatic mode and fills the current runtime after a stale manual path")
 	if not await wait_for(func():return label.text.contains("独立编辑器已打开")):
 		check(false,"desktop launch: "+label.text);finish();return
 	check(EditorInterface.get_editor_settings().get_project_metadata("metro_editor","python_override","missing")=="","invalid saved override is cleared after successful automatic launch")

@@ -88,7 +88,7 @@ python test/tools/check_network_editor_browser.py
 
 该工具在临时工程中验证真实鼠标拖动/新增/删除结点、线路增删与撤销、贴图导入/缩放/旋转/排序、保存重读、多窗口冲突和 Godot 连接清单。截图保存在 `test/results/network-editor/`。
 
-`python test/tools/check_godot_editor_bridge.py` 在隔离 Godot 工程中测试真实启动按钮、自动启动偏好、独立 Qt 窗口、浏览器先启动与 Godot 先启动的双向路径关联、项目环境自动查找、非法服务地址拦截、重复唤起、禁用插件时保留程序，以及窗口关闭后的清理。测试驱动为 `tools/desktop_plugin_driver.gd`。该检查也纳入统一入口。
+`python test/tools/check_godot_editor_bridge.py` 在隔离 Godot 工程中测试真实启动按钮、自动启动偏好、独立 Qt 窗口、浏览器先启动与 Godot 先启动的双向路径关联、项目环境自动查找与路径栏自动填充、失效覆盖路径恢复和缓存保存、非法服务地址拦截、重复唤起、禁用插件时保留程序，以及窗口关闭后的清理。测试驱动为 `tools/desktop_plugin_driver.gd`。该检查也纳入统一入口。
 
 独立窗口内部的编辑/保存可额外验证：
 
