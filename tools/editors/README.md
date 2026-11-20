@@ -21,7 +21,7 @@ Godot 插件只保留启动、偏好和资源刷新。所有地图、客户、�
 python -m pip install -r tools/editors/requirements-desktop.txt
 ```
 
-Godot 右侧面板的“启动设置”留空即可自动查找 Python，依次检查仓库根目录 `.venv-editor`、`.venv`、`tools/editors/.venv`，然后检查 PATH。Windows 使用环境内的 `Scripts/python.exe`，其他系统使用 `bin/python`。也可手填可信解释器覆盖自动选择。正常目录保持仓库下 `Game/` 与 `tools/` 并列即可。
+Godot 右侧面板的“启动设置”留空即可自动查找 Python，依次检查仓库根目录 `.venv-editor`、`.venv`、`tools/editors/.venv`，然后检查 PATH。Windows 使用环境内的 `Scripts/python.exe`，其他系统使用 `bin/python`。也可手填可信解释器覆盖自动选择，支持完整路径或相对仓库根目录的路径（例如 Windows 的 `.venv-editor/Scripts/python.exe`）。如果保存的路径已失效，启动时会清除旧覆盖值并重新自动查找。正常目录保持仓库下 `Game/` 与 `tools/` 并列即可。
 
 推荐在每台电脑的仓库根目录执行一次（Windows）：
 
@@ -36,6 +36,8 @@ macOS / Linux 对应命令：
 python3 -m venv .venv-editor
 .venv-editor/bin/python -m pip install -r tools/editors/requirements-desktop.txt
 ```
+
+报错 `Could not create child process` 时，先核对错误中的 Python 路径与当前仓库位置。如果仍指向旧目录，请清空 Godot 插件的“启动设置”后重试。若当前环境不存在，使用上面的命令在新目录重建；若文件存在但仍无法启动，也应重建环境，以排除虚拟环境内部记录的旧 Python 安装位置。`godot-ai` 的 MCP 警告不属于内容编辑器启动错误。
 
 虚拟环境不提交，也不要跨电脑复制；在各电脑重建后，启动设置仍可保持为空。自动查找不会安装依赖。
 

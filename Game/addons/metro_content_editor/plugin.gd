@@ -40,9 +40,15 @@ func open_editor()->void:
 	links=Link.discover()
 	if links.has("error"):status.text=links.error;return
 	if links.get("external",false):status.text="发现项目外编辑器："+links.editor_root+"。为避免自动执行外部脚本，请将可信工具放回仓库 tools/editors。";return
+	var stale_override:=""
+	if not python.text.strip_edges().is_empty() and Link.resolve_python_override(links.project,python.text).is_empty():
+		stale_override=python.text;python.text=""
 	get_editor_interface().get_editor_settings().set_project_metadata("metro_editor","python_override",python.text.strip_edges())
 	var executable:=Link.python_runtime(links.project,python.text)
-	if executable.is_empty():status.text="未找到 Python。请安装 Python 和 requirements-desktop.txt，或在启动设置填写解释器。";return
+	if executable.is_empty():
+		status.text="未找到可用的 Python。请在当前仓库创建 .venv-editor 并安装 requirements-desktop.txt，或填写有效解释器路径。"
+		if not stale_override.is_empty():status.text+="\n旧路径已失效："+stale_override
+		return
 	activate=true
 	if owned_pid>0 and OS.is_process_running(owned_pid):
 		if linked_kind=="desktop" and not base_url.is_empty():send("activate-token","/api/project")
@@ -50,8 +56,10 @@ func open_editor()->void:
 		return
 	var args:=PackedStringArray([links.editor_root.path_join("desktop.py"),"--project",links.project,"--godot-executable",OS.get_executable_path(),"--connection-file",ProjectSettings.globalize_path(connection)])
 	owned_pid=OS.create_process(executable,args,false)
-	if owned_pid<=0:activate=false;status.text="Python 启动失败："+executable;return
-	attempts=0;status.text="正在打开独立编辑器…\nPython："+executable;poll.start()
+	if owned_pid<=0:activate=false;status.text="无法创建 Python 子进程："+executable+"\n请确认文件可运行；若移动过虚拟环境，请在当前仓库重新创建并安装依赖。";return
+	attempts=0;status.text="正在打开独立编辑器…\nPython："+executable
+	if not stale_override.is_empty():status.text+="\n旧路径已失效，已切换为自动查找。"
+	poll.start()
 func discover_service()->void:
 	if not action.is_empty() or not poll.is_stopped():return
 	var project:=ProjectSettings.globalize_path("res://").simplify_path().trim_suffix("/")

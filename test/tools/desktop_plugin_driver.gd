@@ -26,7 +26,7 @@ func run()->void:
 	var label:Label
 	var open:Button
 	for child in dock.get_children():
-		if child is LineEdit:child.text=""
+		if child is LineEdit:child.text="D:/Metro-missing/.venv-editor/Scripts/python.exe"
 		if child is Label:label=child
 		if child is Button and child.text=="打开独立编辑器窗口":open=child
 		if child is CheckBox:child.button_pressed=true
@@ -35,6 +35,11 @@ func run()->void:
 	check(await wait_for(func():return label.text.contains("浏览器编辑器已关联")),"browser-first discovery registers both paths without launching a desktop")
 	check(link.read_json("res://content/editor-settings.local.json").get("godot_executable","")==OS.get_executable_path(),"browser handshake learns the running Godot executable")
 	check(link.python_runtime(ProjectSettings.globalize_path("res://").trim_suffix("/")).contains(".venv-editor"),"relocated local Python environment is discovered with blank startup setting")
+	var project_root:=ProjectSettings.globalize_path("res://").trim_suffix("/")
+	var runtime:String=link.python_runtime(project_root)
+	check(link.python_runtime(project_root,"D:/Metro-missing/.venv-editor/Scripts/python.exe")==runtime,"stale absolute override falls back to this checkout's environment")
+	check(link.resolve_python_override(project_root,'"'+runtime+'"')==runtime,"quoted interpreter path is normalized")
+	check(link.resolve_python_override(project_root,runtime.trim_prefix(project_root.get_base_dir()+"/"))==runtime,"repository-relative interpreter resolves independently of working directory")
 	for invalid in ["http://127.0.0.1:80@evil.test","http://127.0.0.1:0","http://127.0.0.1:99999","http://localhost:80","http://192.168.1.2:80"]:
 		check(not link.valid_url(invalid),"reject non-loopback or invalid service URL: "+invalid)
 	# Restart a browser after Godot is already open, using a fresh session on another port.
@@ -49,6 +54,7 @@ func run()->void:
 	open.pressed.emit()
 	if not await wait_for(func():return label.text.contains("独立编辑器已打开")):
 		check(false,"desktop launch: "+label.text);finish();return
+	check(EditorInterface.get_editor_settings().get_project_metadata("metro_editor","python_override","missing")=="","invalid saved override is cleared after successful automatic launch")
 	var info:Dictionary=link.read_json("res://.godot/metro_editor_connection.json");desktop_pid=int(info.pid)
 	check(info.kind=="desktop","Godot launches a desktop program, not a browser or embedded Godot main screen")
 	var manifest:Dictionary=await request_json(info.url+"/api/bridge")

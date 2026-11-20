@@ -18,9 +18,25 @@ static func valid_url(url:String)->bool:
 	var matched:=pattern.search(url)
 	return matched!=null and int(matched.get_string(1))>0 and int(matched.get_string(1))<=65535
 
+static func resolve_python_override(project:String,override:String)->String:
+	var value:=override.strip_edges().trim_prefix('"').trim_suffix('"').replace("\\","/")
+	if value.is_empty():return ""
+	if value.is_absolute_path():return value if FileAccess.file_exists(value) else ""
+	if value.contains("/"):
+		# Relative overrides belong to the repository, not Godot's working directory.
+		var candidate:=project.get_base_dir().path_join(value).simplify_path()
+		return candidate if FileAccess.file_exists(candidate) else ""
+	for folder in OS.get_environment("PATH").split(";" if OS.get_name()=="Windows" else ":"):
+		if folder.is_empty() or folder.to_lower().contains("windowsapps"):continue
+		for name in [value,value+".exe"] if OS.get_name()=="Windows" else [value]:
+			var candidate:String=folder.path_join(name)
+			if FileAccess.file_exists(candidate):return candidate
+	return ""
+
 static func python_runtime(project:String,override:String="")->String:
 	# Only inspect known local paths/PATH. Discovery never executes a candidate.
-	if not override.strip_edges().is_empty():return override.strip_edges()
+	var selected:=resolve_python_override(project,override)
+	if not selected.is_empty():return selected
 	var root:=project.get_base_dir()
 	var suffix:="Scripts/python.exe" if OS.get_name()=="Windows" else "bin/python"
 	for folder in [root.path_join(".venv-editor"),root.path_join(".venv"),root.path_join("tools/editors/.venv")]:
