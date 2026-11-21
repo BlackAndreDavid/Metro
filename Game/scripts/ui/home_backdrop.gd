@@ -94,7 +94,7 @@ func furniture_rect(kind: String, placement: Dictionary) -> Rect2:
 
 func make_grid(parent: Control, hanging: bool) -> void:
 	var grid = preload("res://scripts/construction/placement_grid.gd").new()
-	grid.name = "MountGrid" if hanging else "FurnitureGrid"
+	grid.name = "MountPoints" if hanging else "FurnitureGrid"
 	grid.cars = train_count
 	grid.hanging = hanging
 	grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -173,18 +173,25 @@ func configure_world(home: Control) -> void:
 			continue
 		var bounds := Catalog.visual_rect(kind, furniture_rect(kind, placement))
 		var data: Resource = DEFINITIONS[kind]
-		var item = FURNITURE.instantiate()
-		item.name = kind.capitalize()
-		var raw := Vector2(data.texture.get_size())
-		var pixel_scale := bounds.size / raw
-		item.size = (raw + Vector2(4, 4)) * pixel_scale
-		item.position = bounds.position - Vector2(2, 2) * pixel_scale
-		(hanging_layer if data.placement_type == "hanging" else wall_layer if data.floor_cells.is_empty() and not data.wall_cells.is_empty() else floor_layer).add_child(item)
-		home.construction.register_furniture(item, data)
-		item.configure(data, home, self)
-		if home.construction.moving and home.construction.selected_id == kind:
-			item.modulate.a = 0.25
-			item.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var planes: Array=[2,1] if data.placement_type!="hanging" and not data.floor_cells.is_empty() and not data.wall_cells.is_empty() else [0]
+		var depth_views: Array=[]
+		for plane in planes:
+			var item = FURNITURE.instantiate()
+			item.render_plane=plane
+			depth_views.append(item)
+			item.name = kind.capitalize()
+			var raw := Vector2(data.texture.get_size())
+			var pixel_scale := bounds.size / raw
+			item.size = (raw + Vector2(4, 4)) * pixel_scale
+			item.position = bounds.position - Vector2(2, 2) * pixel_scale
+			(hanging_layer if data.placement_type == "hanging" else wall_layer if plane==2 or (data.floor_cells.is_empty() and not data.wall_cells.is_empty()) else floor_layer).add_child(item)
+			home.construction.register_furniture(item, data)
+			item.configure(data, home, self)
+			if home.construction.moving and home.construction.selected_id == kind:
+				item.modulate.a = 0.25
+				item.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if depth_views.size()==2:
+			depth_views[0].depth_partner=weakref(depth_views[1]);depth_views[1].depth_partner=weakref(depth_views[0])
 	make_preview(hanging_layer, "HangingPreview")
 	_apply_offset()
 

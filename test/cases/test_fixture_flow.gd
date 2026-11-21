@@ -32,7 +32,7 @@ func run() -> void:
 	check(not state.place_furniture("locker", {"car":0,"mount":0,"x":0,"y":0}).is_empty(), "ground furniture cannot use mounting plane")
 	for mount in range(4):
 		check(state.place_furniture("screen", {"car":0,"mount":mount,"x":0,"y":0}).is_empty(), "four independent mounts")
-	check(not state.place_furniture("screen", {"car":0,"mount":0,"x":1,"y":0}).is_empty(), "mount maximum 4x3")
+	check(not state.place_furniture("screen", {"car":0,"mount":0,"x":1,"y":0}).is_empty(), "hanging placement uses a centered mount without grid offsets")
 	check(state.place_furniture("computer", {"car":0,"x":23,"y":10}).is_empty(), "floor independent of hanging screen")
 	var before := state.save_data()
 	before.furniture_layout.computer.x = 14
@@ -60,7 +60,7 @@ func run() -> void:
 	for mount in range(4):
 		var rect := Catalog.mount_rect(0,mount)
 		var hook: Vector2 = Vector2(154,144) + (Catalog.HANGING_ORIGINS[mount] + Vector2(14,0)) * 4
-		check(is_equal_approx(rect.get_center().x,hook.x) and is_equal_approx(rect.position.y,hook.y), "larger screen centered beneath hook")
+		check(rect.get_center().is_equal_approx(hook) and Catalog.visual_rect("screen",Catalog.placement_rect("screen",{"car":0,"mount":mount,"x":0,"y":0})).get_center().is_equal_approx(hook), "artwork and pointer target are centered on the hook")
 	screen.use()
 	check(home.screen == "cabin" and not is_instance_valid(home.map_scene), "screen has no map action")
 	screen.set_highlighted(true)

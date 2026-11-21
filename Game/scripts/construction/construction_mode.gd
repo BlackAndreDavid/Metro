@@ -17,7 +17,7 @@ var _previous_current_scene: Node
 var active := false
 var selected_id := ""
 var moving := false
-const HOLD_SECONDS := 1.0
+const HOLD_SECONDS := 0.5
 var hold_kind := ""
 var hold_elapsed := 0.0
 var hold_cancelled := false
@@ -39,6 +39,7 @@ var build_panel: Control
 @onready var place_button: Button = $Warehouse/Center/Panel/Margin/Items/Buttons/Place
 
 func _ready() -> void:
+	mouse_filter=Control.MOUSE_FILTER_PASS
 	_setup_theme()
 	$Expansion/Center/Panel/Margin/Items/Buttons/Confirm.pressed.connect(confirm_expansion)
 	$Expansion/Center/Panel/Margin/Items/Buttons/Back.pressed.connect(func(): _refresh(""))
@@ -78,6 +79,7 @@ func _setup_theme() -> void:
 	theme = ui_theme
 
 func register_furniture(item: Node, data: Resource) -> void:
+	forward_inventory_drop(item)
 	item.build_controller = self
 	item.selection_requested.connect(select_furniture)
 	registered[data.id] = weakref(item)
@@ -143,7 +145,7 @@ func select_furniture(kind: String) -> void:
 	selected_id = kind
 	building_new=false
 	moving = false
-	_refresh("已选中%s，长按1秒拖动；右上角可查看储物、收纳或分解。" % Catalog.DEFINITIONS[kind].display_name)
+	_refresh("已选中%s，长按0.5秒拖动；右上角可查看储物、收纳或分解。" % Catalog.DEFINITIONS[kind].display_name)
 
 func can_place_at(placement: Dictionary) -> bool:
 	return active and moving and not selected_id.is_empty() and (not building_new or state.build_requirements_problem(selected_id).is_empty()) and state.furniture_placement_problem(selected_id, placement).is_empty()
@@ -213,6 +215,7 @@ func cancel_selection() -> void:
 	_refresh("")
 
 func request_expansion() -> void:
+	close_storage_dock()
 	clear_gesture()
 	if not active:
 		return
@@ -221,9 +224,11 @@ func request_expansion() -> void:
 	show_expansion()
 
 func open_warehouse() -> void:
+	close_storage_dock()
 	show_furniture_list("temporary")
 func open_build_menu() -> void:
 	if not active:return
+	close_storage_dock()
 	cancel_selection();$Warehouse.hide()
 	if is_instance_valid(build_panel):build_panel.queue_free()
 	build_panel=preload("res://scripts/construction/build_panel.gd").new();add_child(build_panel);build_panel.configure(self)
@@ -274,9 +279,9 @@ func refresh_ui() -> void:
 	if not visible:
 		return
 	var has_selection := not selected_id.is_empty()
-	actions.get_node("Selection").text = "装修 · " + (("移动中：" if moving else "已选中：") + Catalog.DEFINITIONS[selected_id].display_name if has_selection else "长按家具1秒后拖动，或点击选中拆除")
+	actions.get_node("Selection").text = "装修 · " + (("移动中：" if moving else "已选中：") + Catalog.DEFINITIONS[selected_id].display_name if has_selection else "长按家具0.5秒后拖动，或点击选中拆除")
 	var at: Variant=state.furniture_layout.get(selected_id)
-	context_panel.visible=has_selection and at!=null and not moving and not $Warehouse.visible and not is_instance_valid(storage_panel)
+	context_panel.visible=has_selection and at!=null and not moving and not $Warehouse.visible
 	if context_panel.visible:
 		context_actions.get_node("Storage").visible=Catalog.DEFINITIONS[selected_id].storage!=Vector2i.ZERO
 		context_actions.get_node("PackItem").visible=not Catalog.DEFINITIONS[selected_id].item_id.is_empty()
@@ -300,6 +305,7 @@ func _refresh(message: String) -> void:
 	backdrop = BACKDROP.instantiate()
 	$World.add_child(backdrop)
 	backdrop.configure_world(self)
+	forward_inventory_drop(backdrop)
 	$Message.text = message
 	$Toolbar.show()
 	show()
@@ -368,6 +374,7 @@ func press_furniture(kind: String, at: Vector2) -> void:
 	if not active or screen != "construction" or moving:
 		return
 	building_new=false
+	if is_instance_valid(storage_panel):storage_panel.clear_selection()
 	hold_kind = kind
 	hold_elapsed = 0
 	hold_cancelled = false
@@ -429,6 +436,13 @@ func update_drag_preview() -> void:
 	backdrop.update_preview(selected_id, candidate, not candidate.is_empty() and can_place_at(candidate))
 
 func finish_drag() -> void:
+	if is_instance_valid(storage_panel) and storage_panel.contains_point(pointer):
+		var cell: Vector2i=storage_panel.furniture_cell_at(pointer)
+		var problem: String="请拖入左侧储物格。" if cell.x<0 else state.Renovation.pack_item_at(state,selected_id,storage_panel.target,cell)
+		moving=false;clear_gesture()
+		if problem.is_empty():selected_id="";storage_panel.redraw()
+		_refresh("家具已收纳为物品。" if problem.is_empty() else problem)
+		return
 	var placement := target_at(pointer)
 	if not placement.is_empty() and can_place_at(placement):
 		place_at(placement)
@@ -438,10 +452,12 @@ func finish_drag() -> void:
 		_refresh("落点无效，已保留原位置。")
 
 func _input(event: InputEvent) -> void:
-	if not active or screen != "construction" or $Warehouse.visible or $Expansion.visible or is_instance_valid(storage_panel) or is_instance_valid(build_panel) or (is_instance_valid(dismantle_dialog) and dismantle_dialog.visible):
+	if not active or screen != "construction" or $Warehouse.visible or $Expansion.visible or is_instance_valid(build_panel) or (is_instance_valid(dismantle_dialog) and dismantle_dialog.visible):
 		return
 	if event is InputEventMouse:
 		pointer = event.position
+		if is_instance_valid(storage_panel) and storage_panel.contains_point(pointer) and not dragging_furniture and hold_kind.is_empty():return
+	if get_viewport().gui_is_dragging():return
 	if event is InputEventMouseMotion:
 		if not hold_kind.is_empty() and pointer.distance_to(press_position) > 8 and hold_elapsed < HOLD_SECONDS:
 			hold_cancelled = true
@@ -468,7 +484,63 @@ func _input(event: InputEvent) -> void:
 func edit_storage() -> void:
 	if selected_id.is_empty() or Catalog.DEFINITIONS[selected_id].storage==Vector2i.ZERO:return
 	clear_gesture()
+	close_storage_dock()
 	storage_panel=preload("res://scripts/construction/storage_editor.gd").new();add_child(storage_panel)
 	storage_panel.configure(self,selected_id,true,false)
 	context_panel.hide()
 	storage_panel.tree_exited.connect(refresh_ui)
+
+# Native inventory drags can leave the left dock and become upright furniture.
+func inventory_furniture(payload: Variant) -> String:
+	if not is_instance_valid(storage_panel) or not payload is Dictionary or payload!=storage_panel.selection:return ""
+	var entry: Dictionary=state.picked(payload.get("source",""),int(payload.get("id",-1)))
+	if entry.is_empty():return ""
+	for id in Catalog.IDS:
+		var definition: Resource=Catalog.DEFINITIONS[id]
+		if definition.enabled and not definition.item_id.is_empty() and state.ItemCatalog.runtime_id(definition.item_id)==entry.kind:return id
+	return ""
+
+func inventory_drop_target(at: Vector2,id: String) -> Dictionary:
+	var previous:=selected_id;var previous_grab:=grab_cell
+	selected_id=id;grab_cell=Vector2i.ZERO
+	var result:=target_at(at)
+	selected_id=previous;grab_cell=previous_grab
+	return result
+
+func _can_drop_data(at: Vector2,payload: Variant) -> bool:
+	at=pointer # Use the last viewport event, also valid for injected/remote drags.
+	if not active:return false
+	var id:=inventory_furniture(payload)
+	if id.is_empty() or storage_panel.contains_point(at):return false
+	id=state.Renovation.next_id(state,id)
+	var target:=inventory_drop_target(at,id)
+	return not target.is_empty() and state.furniture_placement_problem(id,target).is_empty()
+
+func _drop_data(at: Vector2,payload: Variant) -> void:
+	at=pointer
+	var base:=inventory_furniture(payload)
+	if base.is_empty():return
+	var id: String=state.Renovation.next_id(state,base)
+	# Select the exact dragged item, rather than consuming a different instance.
+	var entry: Dictionary=state.picked(payload.source,payload.id)
+	var target:=inventory_drop_target(at,id)
+	var problem: String=state.furniture_placement_problem(id,target)
+	if problem.is_empty():
+		state.entries(payload.source).erase(entry)
+		if id not in state.furniture_owned:state.furniture_owned.append(id)
+		state.temporary_furniture.append(id)
+		problem=state.place_furniture(id,target)
+		if not problem.is_empty():
+			state.entries(payload.source).append(entry);state.furniture_owned.erase(id);state.temporary_furniture.erase(id)
+		else:selected_id=id;storage_panel.clear_selection();storage_panel.redraw()
+
+	_refresh("物品已摆放为家具，朝向已恢复。" if problem.is_empty() else problem)
+
+func forward_inventory_drop(control: Control) -> void:
+	control.set_drag_forwarding(Callable(),func(at: Vector2,payload: Variant):return _can_drop_data(control.get_global_transform_with_canvas()*at,payload),func(at: Vector2,payload: Variant):_drop_data(control.get_global_transform_with_canvas()*at,payload))
+
+func close_storage_dock() -> void:
+	if not is_instance_valid(storage_panel):return
+	var previous:=storage_panel
+	storage_panel=null
+	remove_child(previous);previous.queue_free()

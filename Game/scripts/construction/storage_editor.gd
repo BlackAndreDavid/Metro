@@ -12,30 +12,33 @@ var width_input: SpinBox
 var height_input: SpinBox
 var grid_layer: Control
 var show_backpack := true
+var owner_mode: Control
+var panel: Panel
 
 func configure(owner_ui: Control, furniture_kind: String, allow_resize: bool, show_bag: bool = true) -> void:
-	state=owner_ui.state;font=owner_ui.font;kind=furniture_kind;target=state.storage_container(kind);show_backpack=show_bag;z_index=110
-	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);mouse_filter=Control.MOUSE_FILTER_STOP
-	var veil:=ColorRect.new();veil.color=Color("100e1cdd");veil.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(veil)
-	var panel:=Panel.new();panel.position=Vector2(130,84);panel.size=Vector2(1020,550);add_child(panel)
+	owner_mode=owner_ui;state=owner_ui.state;font=owner_ui.font;kind=furniture_kind;target=state.storage_container(kind);show_backpack=show_bag;z_index=110
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);mouse_filter=Control.MOUSE_FILTER_STOP if show_backpack else Control.MOUSE_FILTER_IGNORE
+	if show_backpack:
+		var veil:=ColorRect.new();veil.color=Color("100e1cdd");veil.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(veil)
+	panel=Panel.new();panel.name="StorageDock";panel.position=Vector2(130,84) if show_backpack else Vector2(0,78);panel.size=Vector2(1020,550) if show_backpack else Vector2(336,550);panel.mouse_filter=Control.MOUSE_FILTER_STOP;add_child(panel)
 	var title:=Label.new();title.text=state.Furniture.DEFINITIONS[kind].display_name+" · 储物格";title.position=Vector2(24,20);panel.add_child(title)
-	var close:=Button.new();close.text="关闭";close.position=Vector2(920,16);panel.add_child(close);close.pressed.connect(queue_free)
+	var close:=Button.new();close.text="关闭";close.position=Vector2(920 if show_backpack else 264,16);panel.add_child(close);close.pressed.connect(queue_free)
 	if allow_resize:
 		width_input=SpinBox.new();height_input=SpinBox.new()
 		var dimensions: Vector2i=state.grid_size(target)
-		for input in [width_input,height_input]:input.min_value=1;input.max_value=16;input.step=1;panel.add_child(input)
+		for input in [width_input,height_input]:input.custom_minimum_size.x=82;input.min_value=1;input.max_value=16;input.step=1;panel.add_child(input)
 		width_input.position=Vector2(24,65);width_input.value=dimensions.x
-		height_input.position=Vector2(174,65);height_input.value=dimensions.y
-		var resize_button:=Button.new();resize_button.text="应用储物格宽 × 高";resize_button.position=Vector2(324,65);panel.add_child(resize_button)
+		height_input.position=Vector2(174 if show_backpack else 132,65);height_input.value=dimensions.y
+		var resize_button:=Button.new();resize_button.text="应用储物格宽 × 高";resize_button.position=Vector2(324,65) if show_backpack else Vector2(24,104);panel.add_child(resize_button)
 		resize_button.pressed.connect(func():
 			var problem: String=state.resize_furniture_storage(kind,Vector2i(int(width_input.value),int(height_input.value)))
 			message.text="储物格已调整，缩小时不会删除物品。" if problem.is_empty() else problem
 			if problem.is_empty():selection={};rebuild_grids())
 	if not show_backpack:
-		var take:=Button.new();take.name="TakeSelected";take.text="取出选中到背包";take.position=Vector2(24,450);panel.add_child(take);take.pressed.connect(take_selected_to_bag)
-		var take_all:=Button.new();take_all.name="TakeAll";take_all.text="取出全部到背包";take_all.position=Vector2(240,450);panel.add_child(take_all);take_all.pressed.connect(take_all_to_bag)
-	grid_layer=Control.new();grid_layer.position=Vector2(24,126);panel.add_child(grid_layer);rebuild_grids()
-	message=Label.new();message.position=Vector2(24,492);message.size=Vector2(970,45);message.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;message.text="拖拽调整当前家具内部物品 · R/滚轮旋转 · F镜像 · Shift+点击整理" if not show_backpack else "拖拽在家具与背包之间转移 · R/滚轮旋转 · F镜像 · Shift+点击快速转移";panel.add_child(message)
+		var take:=Button.new();take.name="TakeSelected";take.text="取出选中到背包";take.position=Vector2(16,440);panel.add_child(take);take.pressed.connect(take_selected_to_bag)
+		var take_all:=Button.new();take_all.name="TakeAll";take_all.text="全部取出";take_all.position=Vector2(208,440);panel.add_child(take_all);take_all.pressed.connect(take_all_to_bag)
+	grid_layer=Control.new();grid_layer.position=Vector2(24,126) if show_backpack else Vector2(16,155);panel.add_child(grid_layer);rebuild_grids()
+	message=Label.new();message.position=Vector2(24 if show_backpack else 16,492);message.size=Vector2(970 if show_backpack else 304,45);message.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;message.text="家具长按0.5秒后拖入格子收纳；格内物品可拖回车厢摆放。R旋转 · F镜像" if not show_backpack else "拖拽在家具与背包之间转移 · R/滚轮旋转 · F镜像 · Shift+点击快速转移";panel.add_child(message)
 
 func rebuild_grids() -> void:
 	for child in grid_layer.get_children():child.queue_free()
@@ -44,9 +47,9 @@ func rebuild_grids() -> void:
 		var grid=preload("res://scripts/cargo_grid.gd").new();grid_layer.add_child(grid)
 		grid.position=Vector2(0 if container==target else 590,0)
 		var dimensions: Vector2i=state.grid_size(container)
-		var cell_size:=mini(38,mini((540 if show_backpack else 940)/dimensions.x,(310 if not show_backpack else 350)/dimensions.y))
+		var cell_size:=mini(38,mini((540 if show_backpack else 304)/dimensions.x,(270 if not show_backpack else 350)/dimensions.y))
 		grid.setup(self,container,cell_size)
-		if not show_backpack:grid.position.x=(972-grid.size.x)/2
+		if not show_backpack:grid.position.x=(304-grid.size.x)/2
 		grids.append(grid)
 
 func _input(event: InputEvent) -> void:
@@ -96,3 +99,12 @@ func take_all_to_bag() -> void:
 	for entry in state.entries(target).duplicate():
 		if state.auto_place({"source":target,"id":entry.id,"rotated":entry.rotated},"bag").is_empty():count+=1
 	clear_selection();message.text="已取出%d件物品；背包装不下的物品仍在原处。" % count;redraw()
+
+func contains_point(at: Vector2) -> bool:
+	return panel.get_global_rect().has_point(at)
+
+func furniture_cell_at(at: Vector2) -> Vector2i:
+	if grids.is_empty():return Vector2i(-1,-1)
+	var grid: Control=grids[0]
+	if not grid.get_global_rect().has_point(at):return Vector2i(-1,-1)
+	return grid.cell_at(grid.get_global_transform_with_canvas().affine_inverse()*at)

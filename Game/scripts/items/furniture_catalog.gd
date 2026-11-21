@@ -8,7 +8,6 @@ const CELL_SIDE := 956.0 / 35.0
 const CELL_SIZE := Vector2(CELL_SIDE, CELL_SIDE)
 const GRID_ORIGIN := INTERIOR_RECT.position
 const CARRIAGE_PITCH := 972.0
-const MOUNT_SIZE := Vector2i(4, 3)
 const HANGING_ORIGINS := [Vector2(28, 22), Vector2(87, 22), Vector2(130, 20), Vector2(204, 21)]
 const LEGACY_IDS := ["bed","computer","locker","door","screen"]
 static var IDS: Array = []
@@ -26,13 +25,21 @@ static func reload() -> void:
 static func floor_rect(car: int) -> Rect2:
 	return Rect2(GRID_ORIGIN + Vector2(car * CARRIAGE_PITCH, 0), Vector2(GRID_SIZE) * CELL_SIZE)
 
+static func mount_position(car: int,mount: int) -> Vector2:
+	return Vector2(154+car*CARRIAGE_PITCH,144)+(HANGING_ORIGINS[mount]+Vector2(14,0))*4
+
+# This rectangle is a pointer hit target, never a storage/occupancy capacity.
 static func mount_rect(car: int, mount: int) -> Rect2:
-	var hook: Vector2 = HANGING_ORIGINS[mount] + Vector2(14, 0)
-	return Rect2(Vector2(154 + car * CARRIAGE_PITCH, 144) + hook * 4 - Vector2(MOUNT_SIZE.x * CELL_SIZE.x / 2, 0), Vector2(MOUNT_SIZE) * CELL_SIZE)
+	return Rect2(mount_position(car,mount)-Vector2(20,20),Vector2(40,40))
 
 static func placement_rect(kind: String, placement: Dictionary) -> Rect2:
-	var plane := mount_rect(int(placement.car), int(placement.mount)) if placement.has("mount") else floor_rect(int(placement.car))
-	return Rect2(plane.position + Vector2(placement.x, placement.y) * CELL_SIZE, Vector2(DEFINITIONS[kind].grid_size) * CELL_SIZE)
+	var data: Resource=DEFINITIONS[kind]
+	if placement.has("mount"):
+		var binding: Dictionary=data.texture_binding
+		var extent:=Vector2(binding.get("width",data.texture.get_width()/32.0),binding.get("height",data.texture.get_height()/32.0))
+		var offset:=Vector2(binding.get("x",0),binding.get("y",0))
+		return Rect2(mount_position(int(placement.car),int(placement.mount))-(offset+extent/2)*CELL_SIZE,Vector2(data.grid_size)*CELL_SIZE)
+	return Rect2(floor_rect(int(placement.car)).position+Vector2(placement.x,placement.y)*CELL_SIZE,Vector2(data.grid_size)*CELL_SIZE)
 
 static func default_placement(kind: String, car: int = 0) -> Dictionary:
 	var value: Variant = DEFINITIONS[kind].default_placement
@@ -99,9 +106,10 @@ static func valid_placement(kind: String, p: Variant, count: int, version: int =
 			return false
 	if p.car < 0 or p.car >= count:
 		return false
-	var bounds := (Vector2i(2, 2) if version <= 8 else (Vector2i(3, 3) if version == 9 else MOUNT_SIZE)) if hanging else (Vector2i(16, 12) if version == 6 else (Vector2i(34, 12) if version == 7 else GRID_SIZE))
+	var bounds := (Vector2i(2, 2) if version <= 8 else (Vector2i(3, 3) if version == 9 else Vector2i(4,3))) if hanging else (Vector2i(16, 12) if version == 6 else (Vector2i(34, 12) if version == 7 else GRID_SIZE))
 	if hanging and (not integer(p.get("mount")) or p.mount < 0 or p.mount >= HANGING_ORIGINS.size()):
 		return false
+	if version>=19 and hanging:return int(p.x)==0 and int(p.y)==0
 	if version>=19 and not hanging:
 		var occupied:=cells(kind,p,"floor_cells")+cells(kind,p,"wall_cells")
 		if occupied.is_empty():return false
@@ -115,6 +123,7 @@ static func overlaps(a_kind: String, a: Dictionary, b_kind: String, b: Dictionar
 		return false
 	if a.has("mount") and int(a.mount) != int(b.mount):
 		return false
+	if a.has("mount") and version>=19:return true
 	if version < 18 or a.has("mount"):
 		return Rect2i(Vector2i(int(a.x),int(a.y)),footprint(a_kind,version)).intersects(Rect2i(Vector2i(int(b.x),int(b.y)),footprint(b_kind,version)))
 	for plane in ["floor_cells","wall_cells"]:
@@ -223,6 +232,8 @@ static func distance_problem(layout: Dictionary) -> String:
 				if rule.target_type=="effect" and rule.target not in DEFINITIONS[other].effects:continue
 				if int(layout[kind].car)!=int(layout[other].car):continue
 				var a:=placement_rect(kind,layout[kind]);var b:=placement_rect(other,layout[other])
+				if layout[kind].has("mount"):a=visual_rect(kind,a)
+				if layout[other].has("mount"):b=visual_rect(other,b)
 				var gap:=Vector2(maxf(0,maxf(a.position.x-b.end.x,b.position.x-a.end.x)),maxf(0,maxf(a.position.y-b.end.y,b.position.y-a.end.y)))/CELL_SIDE
 				if (gap.length()<=float(rule.distance)+0.0001 if rule.relation=="require" else gap.length()<float(rule.distance)-0.0001):matches=true
 			if rule.relation=="require" and not matches:return data.display_name+"需要在 %s 格内靠近 %s。" % [rule.distance,rule.target]

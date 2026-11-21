@@ -41,6 +41,19 @@ static func pack_item(state: RefCounted,id: String) -> String:
 			return ""
 	return "没有储物空间，家具保持原状。"
 
+static func pack_item_at(state: RefCounted,id: String,target: String,cell: Vector2i) -> String:
+	if not Catalog.DEFINITIONS.has(id):return "家具不存在。"
+	var definition: Resource=Catalog.DEFINITIONS[id]
+	if definition.item_id.is_empty():return "该家具没有物品属性。"
+	var problem:=removal_problem(state,id,true)
+	if not problem.is_empty():return problem
+	if target==state.storage_container(id) or target not in state.available_storage_containers():return "请选择其他已放置家具的储物格。"
+	if not state.fits_item(state.entries(target),state.grid_size(target),state.ItemCatalog.runtime_id(definition.item_id),cell,false):return "此处空间不足，家具保留原位。"
+	state.entries(target).append(state.make_entry(definition.item_id,cell,false))
+	state.furniture_layout[id]=null;state.furniture_owned.erase(id);state.temporary_furniture.erase(id)
+	state.furniture_storage.erase(id);state.storage_sizes.erase(id)
+	return ""
+
 static func recipe_problem(state: RefCounted,recipe: Dictionary) -> String:
 	for kind in recipe:
 		if state.material_count(kind)<int(recipe[kind]):return "材料不足：%s × %d（拥有%d）。" % [state.item_name(kind),int(recipe[kind]),state.material_count(kind)]

@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory(prefix='metro-catalog-browser-') as scratch:
    defs=json.loads((game/'content/furniture.json').read_text())['furniture'];assert next(v for v in defs if v['id']=='preparation')['distance_rules'][0]['distance']==4
    page.click('#newCatalog');page.locator('#catalogForm input[data-field=id]').fill('browser_furniture');page.locator('#catalogForm input[data-field=name]').fill('动画储物家具')
    page.get_by_role('button',name='墙面占位',exact=True).click();grid=page.locator('#furnitureMask');grid.scroll_into_view_if_needed();grid.click(position={'x':5,'y':5})
-   assert page.evaluate('C.data.wall_cells.length===1&&C.data.floor_cells.length===4')
+   assert page.evaluate('C.data.wall_cells.length===1&&C.data.floor_cells.length===3')
    page.locator('#catalogForm select[data-field=item_id]').select_option('water');page.locator('#catalogForm select[data-field=interaction]').select_option('storage')
    page.get_by_text('具有储物功能',exact=True).locator('input').check()
    from PIL import Image
@@ -39,15 +39,25 @@ with tempfile.TemporaryDirectory(prefix='metro-catalog-browser-') as scratch:
    b=page.evaluate('structuredClone(C.data.texture_binding)');center=page.evaluate('furnitureCenter(furnitureBinding())');corner=[center[0]+b['width']*16,center[1]+b['height']*16];drag_texture(corner,[corner[0]+6,corner[1]+6]);scaled=page.evaluate('structuredClone(C.data.texture_binding)');assert scaled['width']>b['width'] and abs(scaled['width']/scaled['height']-b['width']/b['height'])<.01
    center=page.evaluate('furnitureCenter(furnitureBinding())');handle=[center[0],center[1]-scaled['height']*16-18];drag_texture(handle,[center[0]+scaled['height']*16+18,center[1]]);bound=page.evaluate('structuredClone(C.data.texture_binding)');assert abs(bound['rotation']-90)<2
    page.get_by_role('button',name='墙面占位',exact=True).click();grid=page.locator('#furnitureMask');grid.scroll_into_view_if_needed();r=grid.bounding_box();grid.click(position={'x':56*r['width']/560,'y':8*r['height']/192});assert page.evaluate('C.data.width===4') and page.evaluate('structuredClone(C.data.texture_binding)')==bound
+   assert page.evaluate("!C.data.wall_cells.some(w=>C.data.floor_cells.some(f=>f[0]===w[0]&&f[1]===w[1]))")
    page.click('#saveAll');page.wait_for_function('!EditorSession.hasChanges()&&!EditorSession.busy')
    defs=json.loads((game/'content/furniture.json').read_text())['furniture'];furniture=next(v for v in defs if v['id']=='browser_furniture');assert furniture['storage']=={'width':4,'height':4} and furniture['item_id']=='water' and furniture['texture_binding']==bound
    items=json.loads((game/'content/items.json').read_text())['items'];water=next(v for v in items if v['id']=='water');assert water['furniture_kind']=='browser_furniture' and water['texture']!=furniture['texture']
    page.locator('#catalogPreview').screenshot(path=str(OUTPUT/'animated-furniture.png'))
    broken={**furniture,'distance_rules':[{'target_type':'furniture','target':'missing','relation':'require','distance':3}]};response=page.request.post(url+'/api/furniture',data=broken,headers={'X-Editor-Token':page.evaluate('S.project.token')});assert response.status==400
+   conflict={**furniture,'wall_cells':furniture['wall_cells']+[furniture['floor_cells'][0]]};response=page.request.post(url+'/api/furniture',data=conflict,headers={'X-Editor-Token':page.evaluate('S.project.token')});assert response.status==400
    page.reload();page.wait_for_selector('#customerCards button');page.click('#furnitureTab');page.locator('#catalogCards [data-catalog-id=browser_furniture]').click();assert page.evaluate('C.data.animation.frames===3&&C.data.wall_cells.length===2')
    assert page.evaluate('C.data.texture_binding.rotation')==bound['rotation']
    dock=page.locator('#saveAll').bounding_box();assert abs(dock['width']-285)<1 and abs(dock['x']+dock['width']-1584)<1
    page.set_viewport_size({'width':900,'height':650});dock=page.locator('#saveAll').bounding_box();assert abs(dock['width']-285)<1 and abs(dock['x']+dock['width']-884)<1 and dock['y']>550
+   page.check('#furnitureHanging');assert page.get_by_role('button',name='参考格',exact=True).count()==1 and page.get_by_role('button',name='实物占位',exact=True).count()==0 and page.get_by_role('button',name='墙面占位',exact=True).count()==0
+   grid=page.locator('#furnitureMask');grid.scroll_into_view_if_needed();r=grid.bounding_box();grid.click(position={'x':104*r['width']/560,'y':40*r['height']/192})
+   assert page.evaluate('C.data.width===7&&C.data.floor_cells.length===0&&C.data.wall_cells.length===0&&C.data.reference_cells.some(c=>c[0]===6&&c[1]===2)')
+   assert page.evaluate("(()=>{const p=document.getElementById('furnitureMask').getContext('2d').getImageData(104,40,1,1).data;return p[0]===p[1]&&p[1]===p[2]&&p[0]>200})()")
+   page.click('#saveAll');page.wait_for_function('!EditorSession.hasChanges()&&!EditorSession.busy')
+   hanging=next(v for v in json.loads((game/'content/furniture.json').read_text())['furniture'] if v['id']=='browser_furniture');assert hanging['placement_type']=='hanging' and hanging['width']==7 and hanging['reference_cells'] and not hanging['floor_cells'] and not hanging['wall_cells']
+   invalid={**hanging,'floor_cells':[[0,0]]};response=page.request.post(url+'/api/furniture',data=invalid,headers={'X-Editor-Token':page.evaluate('S.project.token')});assert response.status==400
+   page.uncheck('#furnitureHanging');assert page.get_by_role('button',name='参考格',exact=True).count()==0 and page.get_by_role('button',name='实物占位',exact=True).count()==1 and page.evaluate('C.data.reference_cells.length===0')
    assert not errors,errors
    print('FURNITURE_EDITOR_OK: dual masks, generic distance rules, storage, item linkage, GIF grid animation, manual texture drag/scale/rotate, stable binding, right save dock, validation and persistence')
    browser.close()

@@ -21,14 +21,14 @@ python test/tools/run_tests.py --godot "C:\Godot\Godot_v4.7.2-stable_win64.exe"
 
 ## 用例与工具
 
-统一入口目前包含24组：导入、16组 Godot 流程、临时素材、美术工具、内容编辑器、Godot 独立编辑器启动接入和原生测试器接入。内容编辑器组还会在隔离 Game 副本中进行资源导入、Godot 关卡预览和剧情运行检查。
+统一入口目前包含25组：导入、17组 Godot 流程、临时素材、美术工具、内容编辑器、Godot 独立编辑器启动接入和原生测试器接入。内容编辑器组还会在隔离 Game 副本中进行资源导入、Godot 关卡预览和剧情运行检查。
 
 | 用例 | 覆盖内容 |
 | --- | --- |
 | `cases/test_state.gd`、`test_menu_flow.gd` | 经济、许可证、存档、主菜单与三栏位；状态检查由菜单用例加载 |
 | `cases/test_cabin_smoke.gd`、`test_home_flow.gd` | 规则页、Home 初始化、视角、电脑、设置与地表流程 |
 | `cases/test_build_flow.gd`、`test_fixture_flow.gd` | 家具布局、边界、挂点、高亮、扩建耗电和迁移 |
-| `cases/test_construction_flow.gd` | 独立装修场景、1秒蓄力、真实拖放、仓库、拆除、退出 |
+| `cases/test_construction_flow.gd` | 独立装修场景、0.5秒蓄力、真实拖放、仓库、拆除、退出 |
 | `cases/test_item_map_flow.gd`、`test_settings_input.gd` | 电脑收纳/旋转、地图往返、真实鼠标点击设置 |
 | `cases/test_customer_orders.gd`、`test_commerce_flow.gd` | 类别订单、预算、原子结算、拖放、送客、去重和日结 |
 | `cases/test_art_tools.py` | 区域中位数、像素块多数色、动画帧对齐、筛选和文生图离线契约 |
@@ -124,3 +124,9 @@ python test/tools/check_desktop_editor.py
 部分既有家具规则用例使用 `cases/support/furniture_fixtures.gd` 的进程内窗户墙面基准，隔离美术占位变化；不修改工程定义。新增装修用例保留实际窗户地面格，负责当前内容布局和迁移兼容检查。
 
 `python test/tools/check_preview_layers_browser.py` 检查物品/家具占位和建筑碰撞箱实际像素叠放、隐藏开关与数据不变；截图在 `results/preview-layers/`。`python test/tools/check_furniture_editor_browser.py` 同时验证家具贴图绑定、动画、双平面占位和保存。
+
+`cases/test_renovation_dock.gd` 覆盖非模态左侧储物格、0.5秒长按、场景→储物格→场景的真实鼠标拖放、精确物品消耗、失败落点原子性及旧双重占位归一化，已纳入统一入口。既有家具规则基准也固定预备仓库几何，实际修改后的目录仍由装修工作流覆盖。
+
+装修停靠面板也可使用实际渲染验证：设置有效的 `DISPLAY` 与 `METRO_TEST_RESULTS`，运行 Godot 的 `--display-driver x11 --rendering-method gl_compatibility --path Game --script ../test/cases/test_renovation_dock.gd`。通过后会生成 `renovation-dock.png`，用于检查两层蒙版着色器和左侧布局。
+
+装修停靠回归还覆盖悬挂物参考范围超过旧容量、参考格不影响实机贴图、中心对齐和单挂点单物体；家具界面回归覆盖白色参考格、悬挂属性切换、两种编辑模式互斥与服务端校验。

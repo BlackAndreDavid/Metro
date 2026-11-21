@@ -132,11 +132,13 @@ def validate_furniture(data):
     require(all(isinstance(data[key],bool) for key in ['enabled','default_owned','support_surface','fill_grid','initial_placed','known'] if key in data),'家具开关字段须为布尔值')
     require(isinstance(data.get('function_text',''),str) and len(data.get('function_text',''))<=200,'家具功能说明无效')
     require(data.get('placement_type','floor') in ['floor','hanging'],'家具摆放类型无效')
-    for plane in ['floor_cells','wall_cells']:
+    for plane in ['floor_cells','wall_cells','reference_cells']:
         cells=data.get(plane,[])
-        require(isinstance(cells,list) and all(isinstance(c,list) and len(c)==2 and integer(c[0],0,data['width']-1) and integer(c[1],0,data['height']-1) for c in cells) and len({tuple(c) for c in cells})==len(cells),'家具墙面/地面占位格无效或重复')
+        require(isinstance(cells,list) and all(isinstance(c,list) and len(c)==2 and integer(c[0],0,data['width']-1) and integer(c[1],0,data['height']-1) for c in cells) and len({tuple(c) for c in cells})==len(cells),'家具实物、墙面或参考格无效或重复')
+    require(not ({tuple(c) for c in data.get('floor_cells',[])} & {tuple(c) for c in data.get('wall_cells',[])}),'同一家具的实物格和墙面格不能重复')
     require(data.get('floor_cells') or data.get('wall_cells') or data.get('placement_type')=='hanging','家具至少需要一种占位格')
-    if data.get('placement_type')=='hanging':require(data['width']<=4 and data['height']<=3,'吊杆挂件不能超过4×3')
+    if data.get('placement_type')=='hanging':require(not data.get('floor_cells') and not data.get('wall_cells'),'悬挂物只能使用参考格')
+    else:require(not data.get('reference_cells'),'非悬挂物不能使用参考格')
     require(data.get('interaction','none') in ['none','rest','news','gear','locker','trade','map','preparation','storage'],'家具互动功能无效')
     animation=data.get('animation',{'frames':1,'columns':1,'fps':6})
     require(isinstance(animation,dict) and integer(animation.get('frames'),1,128) and integer(animation.get('columns'),1,animation['frames']) and number(animation.get('fps'),.1,60),'动画帧数、列数或帧率无效')
@@ -165,8 +167,9 @@ def validate_furniture(data):
         for other in definitions.values():require(other['id']==data['id'] or not other.get('item_id') or other.get('item_id') not in item_names(items[item_id]),'该物品已关联其他家具')
     placement=data.get('default_placement')
     if placement is not None:
-        require(isinstance(placement,dict) and integer(placement.get('car'),0,2) and integer(placement.get('x'),0,35-data['width']) and integer(placement.get('y'),0,12-data['height']),'默认家具位置超出车厢')
-        if data.get('placement_type')=='hanging':require(integer(placement.get('mount'),0,3) and placement['x']+data['width']<=4 and placement['y']+data['height']<=3,'默认挂点位置无效')
+        require(isinstance(placement,dict) and integer(placement.get('car'),0,2),'默认家具车厢无效')
+        if data.get('placement_type')=='hanging':require(integer(placement.get('mount'),0,3) and placement.get('x')==0 and placement.get('y')==0,'悬挂物仅记录挂点，不使用格子偏移')
+        else:require(integer(placement.get('x'),0,35-data['width']) and integer(placement.get('y'),0,12-data['height']),'默认家具位置超出车厢')
     if 'texture_binding' in data:validate_binding(data)
 
 def validate_item(data):

@@ -9,10 +9,13 @@ func _draw() -> void:
 		var planes: Array[Rect2] = []
 		if hanging:
 			for mount in range(Catalog.HANGING_ORIGINS.size()):
-				planes.append(Catalog.mount_rect(car, mount))
-		else:
-			planes.append(Catalog.floor_rect(car))
-		var dimensions := Catalog.MOUNT_SIZE if hanging else Catalog.GRID_SIZE
+				var at:=Catalog.mount_position(car,mount)
+				draw_circle(at,7,color,false,2)
+				draw_line(at-Vector2(11,0),at+Vector2(11,0),color)
+				draw_line(at-Vector2(0,11),at+Vector2(0,11),color)
+			continue
+		planes.append(Catalog.floor_rect(car))
+		var dimensions:=Catalog.GRID_SIZE
 		for plane in planes:
 			draw_rect(plane, Color(color, 0.04), true)
 			for x in range(dimensions.x + 1):

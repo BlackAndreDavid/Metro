@@ -27,6 +27,7 @@ func perform(home: Control) -> void:
 
 var floor_cells: Array[Vector2i] = []
 var wall_cells: Array[Vector2i] = []
+var reference_cells: Array[Vector2i] = []
 var storage := Vector2i.ZERO
 var item_id := ""
 var effects: Array = []
@@ -78,7 +79,11 @@ static func from_data(data: Dictionary) -> Resource:
 	result.grid_size=Vector2i(int(data.width),int(data.height))
 	result.placement_type=data.get("placement_type","floor")
 	for cell in data.get("floor_cells",[]):result.floor_cells.append(Vector2i(cell[0],cell[1]))
-	for cell in data.get("wall_cells",[]):result.wall_cells.append(Vector2i(cell[0],cell[1]))
+	for cell in data.get("wall_cells",[]):
+		var at:=Vector2i(cell[0],cell[1])
+		if at not in result.floor_cells:result.wall_cells.append(at)
+	if result.placement_type=="hanging":result.floor_cells.clear();result.wall_cells.clear()
+	for cell in data.get("reference_cells",[]):result.reference_cells.append(Vector2i(cell[0],cell[1]))
 	var container: Variant=data.get("storage")
 	if container is Dictionary:result.storage=Vector2i(int(container.width),int(container.height))
 	result.item_id=data.get("item_id","");result.effects=data.get("effects",[]).duplicate()
@@ -90,4 +95,29 @@ static func from_data(data: Dictionary) -> Resource:
 	result.enabled=data.get("enabled",true) and not data.get("deleted",false)
 	result.initial_placed=data.get("initial_placed",data.get("default_placement")!=null)
 	result.default_placement=data.get("default_placement");result.default_owned=data.get("default_owned",true) and result.enabled
+	return result
+
+var _physical_masks: Dictionary = {}
+func physical_plane_mask(frame_size: Vector2i) -> Texture2D:
+	if _physical_masks.has(frame_size):return _physical_masks[frame_size]
+	var image:=Image.create(frame_size.x+4,frame_size.y+4,false,Image.FORMAT_RGBA8)
+	var binding:=texture_binding
+	var extent:=Vector2(binding.get("width",frame_size.x/32.0),binding.get("height",frame_size.y/32.0))
+	var center:=Vector2(binding.get("x",0),binding.get("y",0))+extent/2
+	var angle:=deg_to_rad(float(binding.get("rotation",0)))
+	var occupied: Dictionary={}
+	for cell in wall_cells:occupied[cell]=false
+	for cell in floor_cells:occupied[cell]=true
+	for y in range(image.get_height()):
+		for x in range(image.get_width()):
+			var point:=center+((Vector2(x-2+.5,y-2+.5)/Vector2(frame_size)-Vector2(.5,.5))*extent).rotated(angle)
+			var cell:=Vector2i(point.floor())
+			var physical: bool=occupied.get(cell,false)
+			if not occupied.has(cell):
+				var distance:=INF
+				for candidate in occupied:
+					var gap:=point.distance_squared_to(Vector2(candidate)+Vector2(.5,.5))
+					if gap<distance:distance=gap;physical=occupied[candidate]
+			image.set_pixel(x,y,Color.WHITE if physical else Color.BLACK)
+	var result:=ImageTexture.create_from_image(image);_physical_masks[frame_size]=result
 	return result

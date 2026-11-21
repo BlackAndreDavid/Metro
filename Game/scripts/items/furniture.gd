@@ -5,6 +5,10 @@ var definition: Resource
 var home: Control
 var build_controller: Node
 var is_selected := false
+var render_plane := 0 # 0: whole, 1: physical, 2: wall
+var plane_mask_image: Image
+var depth_partner: WeakRef
+var direct_hover := false
 
 func configure(data: Resource, owner_home: Control, surface: Control) -> void:
 	rotation = 0.0 # Storage rotation never becomes a furniture rotation.
@@ -15,7 +19,8 @@ func configure(data: Resource, owner_home: Control, surface: Control) -> void:
 	home = owner_home
 	var building: bool = build_controller != null and build_controller.active
 	is_selected = building and build_controller.selected_id == data.id
-	set_item(data.texture, data.display_name + " · 长按1秒移动" if building else data.function_text, surface)
+	set_item(data.texture, data.display_name + " · 长按0.5秒移动" if building else data.function_text, surface)
+	apply_depth_mask()
 	set_highlighted(false)
 	activated.connect(use)
 	if data.id.get_slice("#",0) == "screen":
@@ -55,9 +60,17 @@ func use() -> void:
 		definition.perform(home)
 
 func set_highlighted(value: bool) -> void:
-	super.set_highlighted(value or is_selected)
-	# Selection keeps the outline; only the hovered object shows a caption.
-	caption.visible = value
+	direct_hover=value
+	refresh_depth_highlight()
+	var peer: Control=depth_partner.get_ref() if depth_partner!=null else null
+	if is_instance_valid(peer):peer.refresh_depth_highlight()
+
+func refresh_depth_highlight() -> void:
+	var peer: Control=depth_partner.get_ref() if depth_partner!=null else null
+	hovered=direct_hover or (is_instance_valid(peer) and peer.direct_hover)
+	if visual.material!=null:visual.material.set_shader_parameter("highlighted",hovered or is_selected)
+	# Both depth pieces share one silhouette, but only the actual hit shows a label.
+	caption.visible=direct_hover and show_function_label
 
 func _gui_input(event: InputEvent) -> void:
 	if build_controller != null and build_controller.active and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
@@ -83,4 +96,19 @@ func _process(_delta: float) -> void:
 	animation_frame=frame
 	var text:=caption.text
 	set_item(definition.frame_at(elapsed),text,drag_surface)
-	set_highlighted(hovered)
+	apply_depth_mask()
+	refresh_depth_highlight()
+
+func apply_depth_mask() -> void:
+	if render_plane==0:return
+	var mask: Texture2D=definition.physical_plane_mask(padded_image.get_size()-Vector2i(4,4))
+	plane_mask_image=mask.get_image()
+	visual.material.set_shader_parameter("furniture_plane",render_plane)
+	visual.material.set_shader_parameter("furniture_physical_mask",mask)
+
+func _has_point(point: Vector2) -> bool:
+	if not super._has_point(point):return false
+	if render_plane==0 or plane_mask_image==null:return true
+	var pixel:=Vector2i(point/size*Vector2(plane_mask_image.get_size()))
+	var physical:=plane_mask_image.get_pixelv(pixel).r>.5
+	return physical if render_plane==1 else not physical
