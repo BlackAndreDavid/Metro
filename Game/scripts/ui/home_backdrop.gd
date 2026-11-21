@@ -181,6 +181,17 @@ func configure_world(home: Control) -> void:
 		if home.construction.moving and home.construction.selected_id == kind:
 			item.modulate.a = 0.25
 			item.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# The departure chest is attached to the door rather than occupying movable furniture cells.
+	var door: Variant = home.state.furniture_layout.door
+	if door != null:
+		var bounds := furniture_rect("door",door)
+		var chest = FURNITURE.instantiate()
+		chest.name = "PreparationWarehouse"
+		chest.position = Vector2(bounds.end.x + 8,bounds.end.y - 96)
+		chest.size = Vector2(128,96)
+		floor_layer.add_child(chest)
+		chest.configure(preload("res://resources/furniture/preparation.tres"),home,self)
+		if home.construction.active:chest.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	make_preview(hanging_layer, "HangingPreview")
 	_apply_offset()
 

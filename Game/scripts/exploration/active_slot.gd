@@ -7,14 +7,14 @@ func configure(controller: Control) -> void:
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	var column := HBoxContainer.new();add_child(column)
 	icon = TextureRect.new();icon.custom_minimum_size = Vector2(40,40);icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE;icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED;icon.mouse_filter = Control.MOUSE_FILTER_IGNORE;column.add_child(icon)
-	caption = Label.new();caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER;caption.add_theme_font_size_override("font_size",12);caption.mouse_filter = Control.MOUSE_FILTER_IGNORE;column.add_child(caption)
+	caption = Label.new();caption.clip_text=true;caption.custom_minimum_size=Vector2(160,38);caption.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER;caption.add_theme_font_size_override("font_size",12);caption.mouse_filter = Control.MOUSE_FILTER_IGNORE;column.add_child(caption)
 	refresh()
 func refresh() -> void:
 	if home == null: return
 	var entry: Dictionary = home.state.active_item
 	icon.texture = null if entry.is_empty() else home.state.ITEM_DEFINITIONS[entry.kind].texture
 	caption.text = "主动 [空格]\n"+("未装备" if entry.is_empty() else home.state.item_name(entry.kind))
-	tooltip_text = "在背包中选中道具后装备；空格使用。"
+	tooltip_text = "打开背包后拖入道具，或从这里拖回背包；空格使用。"
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		if home.view.pack_open and home.selection.get("source") == "bag": home.equip_selected_active()

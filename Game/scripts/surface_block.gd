@@ -176,6 +176,7 @@ func setup(owner_state: RefCounted, ui_font: Font) -> void:
 	hero_view.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	hero_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(hero_view)
+	move_child(shade,get_child_count()-1) # One light overlay covers world, actors, interactables and outlines.
 	update_hero_visual()
 
 func apply_level(data: Dictionary) -> void:
@@ -593,6 +594,7 @@ func add_interaction_visual(target: Dictionary, placement: Dictionary, texture: 
 	var control = preload("res://scenes/items/highlightable_item.tscn").instantiate()
 	add_child(control)
 	control.size = display_size
+	control.automatic_hover=false;control.show_function_label=false;control.focus_mode=Control.FOCUS_NONE
 	control.set_item(texture,"[ E ] "+target.caption)
 	control.caption.position.y = -48
 	control.visual.material.set_shader_parameter("outline_only",outline_only)
@@ -644,9 +646,8 @@ func update_interaction_visuals() -> void:
 		if entry.target.kind == "pickup" and state.ground_kind(int(entry.target.slot)).is_empty(): control.hide()
 		if not control.visible: continue
 		control.position = Vector2(float(point.x)-camera_offset()-entry.size.x/2,GROUND-floor_elevation()-float(point.get("drop_height",0))-entry.size.y+render_offset_y())
-		var local := control.get_local_mouse_position()
-		var hover: bool = control.get_rect().has_point(control.position+local) and control._has_point(local)
-		control.set_highlighted(key == active_key or hover)
+		var nearby:bool=absf(player_x-float(point.x))<=REACH
+		control.set_highlighted(nearby)
 	update_enemy_visuals()
 	update_hero_visual()
 	var current_prompt := active_key if has_visual_target(interaction()) else ""
@@ -698,5 +699,5 @@ func update_footsteps() -> void:
 	footstep_audio.stop()
 	if not mode.is_empty():
 		footstep_audio.stream = footstep_streams[mode]
-		footstep_audio.volume_db = -12 if mode == "run" else -9
+		footstep_audio.volume_db = (-12.0 if mode=="run" else -9.0)+linear_to_db(1.25 if mode=="run" else .75)
 		footstep_audio.play()

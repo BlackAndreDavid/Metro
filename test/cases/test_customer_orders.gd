@@ -20,6 +20,8 @@ func run() -> void:
 	var weighted := Orders.weighted_items(state,{"water":10,"ration":0,"meds":0},"supplies","weighted-test")
 	check(weighted=={"water":2},"weighted orders exclude zero-weight goods and cap repeated stock")
 	check(Orders.weighted_items(state,{"water":0},"supplies","weighted-test").is_empty(),"empty weighted catalogue cannot spawn goods")
+	check(Orders.quantity_range({"sell_item_counts":{"supplies":{"water":{"min":1,"max":7}}}},"supplies","water")=={"min":1,"max":7},"per-item seller quantity range resolves")
+	check(Orders.quantity_range({},"supplies","water")=={"min":2,"max":2},"old customers retain fixed two-item stock")
 	var order := Orders.ensure(state)
 	check(order.side == "buy" and order.category == "supplies" and Orders.record(state).arrived == 1, "first customer buys a category rather than exact item")
 	check(Orders.ensure(state).id == order.id and Orders.record(state).arrived == 1, "reopening does not reroll order or consume another slot")

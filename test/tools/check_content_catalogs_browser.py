@@ -79,8 +79,11 @@ with tempfile.TemporaryDirectory(prefix='metro-catalog-browser-') as scratch:
    page.locator('#sellCategories details[data-trade-category=supplies] summary').click()
    page.locator('#sellCategories input[data-trade-item=water]').fill('7')
    page.locator('#sellCategories input[data-trade-item=ration]').fill('0')
+   page.locator('#sellCategories input[data-count-item=water][data-trade-count=min]').fill('1')
+   page.locator('#sellCategories input[data-count-item=water][data-trade-count=max]').fill('6')
    page.locator('#sellCategories').screenshot(path=str(OUTPUT/'customer-item-list.png'));customer_id=page.evaluate('S.customer.id');page.click('#saveCustomer');page.wait_for_function("S.project.customers.find(c=>c.id===S.customer.id)?.sell_item_weights?.supplies?.water===7")
    saved_customer=next(c for c in json.loads((game/'content/customers.json').read_text())['customers'] if c['id']==customer_id)
+   assert saved_customer['sell_item_counts']['supplies']['water']=={'min':1,'max':6}
    assert saved_customer['sell_item_weights']['supplies']['water']==7 and saved_customer['sell_item_weights']['supplies']['ration']==0
    page.click('#customerTab');page.get_by_role('button',name='－ 删除当前顾客（归档）').click();page.wait_for_function("[...document.querySelectorAll('button')].some(b=>b.textContent==='恢复当前顾客')");page.get_by_role('button',name='恢复当前顾客').click()
    assert not errors,errors;print('CONTENT_CATALOG_BROWSER_OK: monster/item/building CRUD, sprite selection, weighted cabinets, offset +/- controls, monster placement, building instance editing, customer archival');browser.close()

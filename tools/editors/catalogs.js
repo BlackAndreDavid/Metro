@@ -79,12 +79,18 @@ function renderCustomerTradeItems(){
   const box=$(side+'Categories');box.querySelectorAll('details').forEach(e=>{const label=e.querySelector('label[data-trade-category-label]');if(label)box.append(label);e.remove()});
   for(const category of Object.keys(S.project.categories)){
    const details=document.createElement('details'),summary=document.createElement('summary');const label=box.querySelector(`input[data-category][value="${category}"]`)?.closest('label');if(label){label.dataset.tradeCategoryLabel=category;summary.append(label)}summary.append(document.createTextNode(' · 具体物品与权重'));details.dataset.tradeCategory=category;details.append(summary);
+   if(side==='sell'){const header=document.createElement('div');header.className='trade-sell-row';for(const text of ['物品','权重','最少','最多']){const cell=document.createElement('strong');cell.textContent=text;header.append(cell)}details.append(header)}
    const configured=S.customer[side+'_item_weights']?.[category];
    for(const item of S.project.items.filter(i=>i.category===category&&!i.deleted&&i.enabled!==false)){
     const label=document.createElement('label'),weight=document.createElement('input');weight.type='number';weight.min=0;weight.max=100000;weight.step=.1;weight.value=configured?(configured[itemNames(item).find(name=>Object.hasOwn(configured,name))]??0):1;weight.dataset.tradeItem=item.id;weight.dataset.tradeSide=side;
-    label.textContent=item.name;weight.oninput=()=>{S.customer[side+'_item_weights']??={};const weights=S.customer[side+'_item_weights'];if(!weights[category]){weights[category]={};for(const input of details.querySelectorAll('input[data-trade-item]'))weights[category][input.dataset.tradeItem]=+input.value}for(const name of itemNames(item))if(name!==item.id)delete weights[category][name];weights[category][item.id]=+weight.value;dirty()};label.append(weight);details.append(label);
+    label.textContent=item.name;weight.oninput=()=>{S.customer[side+'_item_weights']??={};const weights=S.customer[side+'_item_weights'];if(!weights[category]){weights[category]={};for(const input of details.querySelectorAll('input[data-trade-item]'))weights[category][input.dataset.tradeItem]=+input.value}for(const name of itemNames(item))if(name!==item.id)delete weights[category][name];weights[category][item.id]=+weight.value;dirty()};label.append(weight);
+    if(side==='sell'){
+     label.classList.add('trade-sell-row');const quantities=S.customer.sell_item_counts?.[category]||{},existing=quantities[itemNames(item).find(name=>Object.hasOwn(quantities,name))]||{min:2,max:2};
+     for(const key of ['min','max']){const input=document.createElement('input');input.type='number';input.min=0;input.max=100;input.step=1;input.value=existing[key];input.dataset.tradeCount=key;input.dataset.countItem=item.id;input.title=input.getAttribute('aria-label')||`${item.name} 数量${key==='min'?'下限':'上限'}`;input.setAttribute('aria-label',input.title);input.oninput=()=>{S.customer.sell_item_counts??={};S.customer.sell_item_counts[category]??={};const values=S.customer.sell_item_counts[category];values[item.id]??={...existing};values[item.id][key]=+input.value;for(const name of itemNames(item))if(name!==item.id)delete values[name];dirty()};label.append(input)}
+    }
+    details.append(label);
    }
-   const hint=document.createElement('p');hint.textContent='0 表示不买卖；每个订单按权重抽取3次，出售同种最多2件。未调整的类别沿用全部物品。';details.append(hint);box.append(details);
+   const hint=document.createElement('p');hint.textContent='权重0表示不参与。出售数量填写下限/上限，相同数值为固定数量；未设置时每种2件。';details.append(hint);box.append(details);
   }
  }
 }

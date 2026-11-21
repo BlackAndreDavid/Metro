@@ -491,6 +491,70 @@
         "height": 0.9565635444843661,
         "rotation": 0
       }
+    },
+    {
+      "id": "flashlight",
+      "name": "手电筒",
+      "width": 1,
+      "height": 2,
+      "price": 25,
+      "category": "materials",
+      "texture": "res://assets/textures/temp/items/lens_device.png",
+      "rarity": 0,
+      "enabled": true,
+      "protected": true,
+      "active_use": {
+        "action": "none",
+        "amount": 1
+      }
+    },
+    {
+      "id": "crowbar",
+      "name": "撬棍",
+      "width": 1,
+      "height": 3,
+      "price": 30,
+      "category": "materials",
+      "texture": "res://assets/textures/temp/items/scrap_metal.png",
+      "rarity": 0,
+      "enabled": true,
+      "protected": true,
+      "active_use": {
+        "action": "none",
+        "amount": 1
+      }
+    },
+    {
+      "id": "wrench",
+      "name": "扳手",
+      "width": 1,
+      "height": 2,
+      "price": 35,
+      "category": "materials",
+      "texture": "res://assets/textures/temp/items/metal_plate.png",
+      "rarity": 0,
+      "enabled": true,
+      "protected": true,
+      "active_use": {
+        "action": "none",
+        "amount": 1
+      }
+    },
+    {
+      "id": "large_backpack",
+      "name": "大背包",
+      "width": 2,
+      "height": 2,
+      "price": 50,
+      "category": "materials",
+      "texture": "res://assets/textures/temp/items/locked_case.png",
+      "rarity": 0,
+      "enabled": true,
+      "protected": true,
+      "active_use": {
+        "action": "none",
+        "amount": 1
+      }
     }
   ]
 }

@@ -13,6 +13,7 @@ func setup(owner_state: RefCounted, surface: Control, home: Control, id: String)
 	var title := Label.new();title.text = "储物柜 · 物资";title.add_theme_font_size_override("font_size",24);column.add_child(title)
 	var scroll := ScrollContainer.new();scroll.custom_minimum_size = Vector2(560,300);column.add_child(scroll)
 	contents = VBoxContainer.new();contents.size_flags_horizontal = Control.SIZE_EXPAND_FILL;scroll.add_child(contents)
+	var take_all:=Button.new();take_all.name="TakeAll";take_all.text="一键拾取全部";take_all.pressed.connect(take_all_items);column.add_child(take_all)
 	var close := Button.new();close.text = "关闭柜子";close.pressed.connect(finish);column.add_child(close)
 	street.inspecting_container = true
 	refresh()
@@ -37,3 +38,11 @@ func take_item(slot: int) -> void:
 func finish() -> void:
 	if is_instance_valid(street):street.inspecting_container = false
 	queue_free()
+
+func take_all_items()->void:
+	var slots:Array=[]
+	for slot in range(street.LOOT.size()):
+		if street.LOOT[slot].get("cabinet","")==cabinet:slots.append(slot)
+	var count:int=controller.quick_pickup_slots(slots)
+	controller.report("已拾取%d件，未装下的物资保留在柜子中。" % count)
+	refresh()

@@ -6,9 +6,9 @@
 
 | 文件 | 当前职责 | 调整入口 |
 | --- | --- | --- |
-| `scripts/home.gd` | 页面切换、整备选择、出发/撤离、输入桥接、背包和装备 UI、汽车面板、超时及设置暂停 | `confirm_departure`、`show_surface`、`update_surface_pack`、`check_trip_timeout` |
+| `scripts/home.gd` | 页面切换、整备仓库、出发/撤离、输入桥接、背包和装备 UI、汽车面板、超时及设置暂停 | `confirm_departure`、`show_surface`、`update_surface_pack`、`check_trip_timeout` |
 | `scripts/cabin_state.gd` | 背包/电池/租金/欠费/车电、探索时限、战利品与领取记录、拆车规则、存档 | `depart`、`roll_loot`、`pick_up_ground`、`salvage_vehicle_part`、`extract_at`、`fail_trip` |
-| `scenes/game/exploration_setup.tscn` + `scripts/ui/exploration_setup.gd` | 整备页面壳和动态控件：防护服、撬棍、扳手、背包、电池 | `panel_bounds`、`configure(home,message)` |
+| `scenes/game/exploration_setup.tscn` + `scripts/ui/exploration_setup.gd` | 整备页面壳和动态控件：防护服租赁、8×6预备仓库与背包拖拽、电池槽 | `panel_bounds`、`configure(home,message)` |
 | `scenes/game/exploration.tscn` + `scripts/exploration.gd` | 页面布局和信号接线；把场景中的标签、街区、背包锚点交给 Home | 场景 Control 布局、`configure(home)` |
 | `scripts/surface_block.gd` | 街区数据、人物位置、建筑/楼层/巷道切换、可交互目标、镜头、程序绘图与室内光照 | `BUILDINGS`、`LOOT`、`VEHICLES`、`JUNCTIONS`、`interaction`、`_draw` |
 | `scripts/content/content_registry.gd` | 读取站点登记和地图 JSON | `entry/level/scene` |
@@ -29,15 +29,16 @@ Home
 ├─ SettingsButton                         始终属于 Home
 └─ Exploration (exploration.tscn)
    ├─ Background
-   ├─ Timer                                剩余时间
+   ├─ Timer / TimeBattery                   左上剩余时间与电池形进度条（z=20）
    ├─ StreetFrame (clip_contents=true)     全屏1280×720裁切视窗
    │  └─ SurfaceBlock                     地表世界 Control
    │     └─ InteriorLight                 setup 时创建的室内暗幕
    ├─ Minimap                             根据地图行列数自适应的小地图
    ├─ InteractionPrompt                   当前唯一 E 交互提示
    ├─ PackAnchor                          右侧404×536叠加区域，默认隐藏
-   │  └─ 动态背包/装备/电池槽/扳手按钮
-   ├─ BackpackButton / ActiveSlot           背包开关与独立主动位
+   │  └─ 动态背包网格与一键操作
+   ├─ BackpackButton                        右边框居中的背包开关
+   ├─ LoadoutBar                            左上防护服、手电电池、扳手与可拖拽主动位
    ├─ StaminaLabel / Stamina                左下体力信息
    ├─ Status                              底部结果和错误提示
    ├─ VehicleParts                        检查汽车时由 Home 动态创建
@@ -65,7 +66,7 @@ sequenceDiagram
     Home->>Home: 更新背包、装备、时间及照明
 ```
 
-整备字典包含 `heavy/wide/light/crowbar/wrench`。State 校验已安装电池有电、必带手电、高辐射时使用加强防护服、背包边界合法，以及没有正在进行的探索。普通防护服租金30度、加强50度，走账户/欠费规则；与车厢电源余额分开。成功后设置装备、物资槽、出发站、真实时间截止点。
+新整备字典为 `heavy/inventory_tools`，`carried_tools()` 从背包与主动位实体工具推导 `wide/light/crowbar/wrench`。8×6 `preparation` 是基地储物容器，不计入携带能力，探索中禁止访问；旧版直接调用的配置接口仍供兼容使用。State 校验高辐射时使用加强防护服、背包边界合法，以及没有正在进行的探索。v17存档保存仓库，旧版本迁移补齐四件初始工具。普通防护服租金30度、加强50度，走账户/欠费规则；与车厢电源余额分开。成功后设置装备、物资槽、出发站、真实时间截止点。
 
 可行走街区由 `content/registry.json` 登记，Home 根据站点加载指定场景和地图 JSON。邮电新村、四平路、同济大学默认共用 `content/levels/postal.json`，从对应站口进入，并使用共同的 loot_station。五角场已有独立登记，后续可由编辑器继续扩展；未登记站点走 `Home.show_legacy_surface()` 简化搜刮。
 
@@ -169,3 +170,7 @@ Home 把 E 键转给 `SurfaceBlock.interact()`，B 切换背包，空格使用�
 建筑 `loot_points` 和关卡顶层 `spawn_points` 共用 `choices/chance/rolls`：`container` 为 `cabinet` 或 `loose`。建筑附属点可设 `outside:true`，改在该建筑所在街道地面生成；独立室外点的 x 是街道绝对坐标，建筑附属点 x 是相对建筑坐标。内容注册器展开后沿用原有领取槽索引，新增点采用稳定生成ID进行加权抽取。散落物资使用物品贴图与共用描边模块，领取后隐藏。室外或建筑 `light_level≥0.6` 会自动关手电；默认室内光照0.15。暗处同样允许按E或点击打开柜子、拾取物资。
 
 敌人由 `exploration/enemy_view.gd` 作为门交互控件之后的子节点绘制，避免被门遮挡；保持正常 z=0，使背包、对话和设置仍在其上。脚步音轨与生成说明见 [音频说明](assets/audio/footsteps/README.md)。
+
+## HUD 与照明调整
+
+倒计时原先比全屏 StreetFrame 更早绘制，被其背景覆盖；Timer 与电池形 TimeBattery 现设为 z=20，进度低于或等于50%黄色、15%红色。LoadoutBar 集中装备和主动位，复用 CargoGrid 与 ActiveSlot 拖放。世界的 InteriorLight 保持最后一个子节点，覆盖人物、怪物、可互动物品及描边；HUD 在世界之外。探索物品禁用鼠标自动高亮及浮动标签，接近时仅显示边框，交互提示仍由 InteractionPrompt 显示。

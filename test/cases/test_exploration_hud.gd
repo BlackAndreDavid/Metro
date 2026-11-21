@@ -19,6 +19,13 @@ func run() -> void:
 	var street=home.surface_block;street.set_process(false)
 	check(street.size==Vector2(1280,720) and not home.view.get_node("PackAnchor").visible,"full screen world, backpack collapsed")
 	check(not home.view.has_node("Location") and not home.view.has_node("Departure") and home.view.get_node("Stamina").position.y>650,"removed station/electric info; stamina bottom left")
+	check(home.view.get_node("Timer").z_index>home.view.get_node("StreetFrame").z_index and not home.time_label.text.is_empty(),"countdown remains above the full-screen world")
+	check(home.view.get_node("LoadoutBar").position.x<50 and home.view.get_node("LoadoutBar").position.y<120,"equipment and active slots share the top-left bar")
+	check(is_equal_approx(battery_center(home.view.get_node("BackpackButton")).y,360) and is_equal_approx(home.view.get_node("BackpackButton").get_global_rect().end.x,1280),"backpack button touches the right edge at vertical center")
+	home.view.update_countdown(500,1000);check(home.view.time_tint==Color("f0c96a"),"countdown turns yellow at 50 percent")
+	home.view.update_countdown(150,1000);check(home.view.time_tint==Color("ed7169"),"countdown turns red at 15 percent")
+	home.view.update_countdown(900,1000);check(home.view.time_tint==Color("82d9ad"),"countdown remains green above half")
+	check(street.shade.get_index()>street.hero_view.get_index(),"one lighting overlay covers actors, interactables and their outline")
 	key(KEY_B);await process_frame
 	check(home.view.pack_open and street.inspecting_pack and street.size==Vector2(1280,720),"B opens overlay without resizing world")
 	var b=home.view.get_node("BackpackButton");var at:Vector2=b.get_global_rect().get_center()
@@ -80,3 +87,5 @@ func run() -> void:
 	home.queue_free();await process_frame
 	print("EXPLORATION_HUD: %d checks, %d failures"%[checks,failures]);if failures==0:print("EXPLORATION_HUD_OK")
 	quit(1 if failures else 0)
+
+func battery_center(control:Control)->Vector2:return control.get_global_rect().get_center()

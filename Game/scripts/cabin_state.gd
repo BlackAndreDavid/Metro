@@ -29,7 +29,7 @@ const RARITY := {
 const RARITY_NAMES := ["普通", "少见", "稀有", "珍稀"]
 const RARITY_COLORS := [Color("bfc3ce"), Color("e4be76"), Color("ffa271"), Color("ff7873")]
 const EPOCH := "2026-07-11T00:00:00"
-const CABIN_SAVE_VERSION := 16
+const CABIN_SAVE_VERSION := 17
 const CustomerDialogue = preload("res://scripts/commerce/customer_dialogue.gd")
 const CustomerOrders = preload("res://scripts/commerce/customer_orders.gd")
 const ItemCatalog = preload("res://scripts/items/item_catalog.gd")
@@ -57,6 +57,9 @@ const BLACKOUT_INTERVAL := 5
 var carriage_count := 1
 var furniture_layout := Furniture.initial_layout()
 var station := START_STATION
+const PREPARATION := Vector2i(8, 6)
+const TOOL_CAPABILITIES := {"flashlight":"light", "crowbar":"crowbar", "wrench":"wrench", "large_backpack":"wide"}
+var preparation: Array[Dictionary] = []
 var locker: Array[Dictionary] = []
 var wide_bag := false
 var collected: Dictionary = {}
@@ -94,6 +97,7 @@ func _init() -> void:
 	account = ACCOUNT_START_POWER
 	give_starter_supplies()
 	add_supply("computer", "locker")
+	give_preparation_tools()
 
 func date_unix(extra_days: int = 0) -> int:
 	return Time.get_unix_time_from_datetime_string(EPOCH) + (day - 1 + extra_days) * 86400
@@ -197,11 +201,13 @@ func entries(container: String) -> Array[Dictionary]:
 		if installed_charge != NO_CELL:
 			slot.append({"id": NO_CELL, "kind": "aaa", "x": 0, "y": 0, "rotated": false, "charge": installed_charge})
 		return slot
+	if container == "preparation": return preparation
 	return locker if container == "locker" else inventory
 
 func grid_size(container: String) -> Vector2i:
 	if container == "battery":
 		return Vector2i.ONE
+	if container == "preparation": return PREPARATION
 	return LOCKER if container == "locker" else bag_size()
 
 func footprint(kind: String, rotated: bool = false) -> Vector2i:
@@ -270,7 +276,7 @@ func picked(container: String, id: int) -> Dictionary:
 	return find_entry(container, id)
 
 func can_place(selection: Dictionary, target: String, cell: Vector2i) -> bool:
-	if target not in ["bag", "locker", "battery"] or trip_active and target == "locker":
+	if target not in ["bag", "locker", "preparation", "battery"] or trip_active and (target in ["locker", "preparation"] or selection.source == "preparation"):
 		return false
 	var source: String = selection.source
 	if source == "ground" and remaining_ms() == 0:
@@ -283,6 +289,16 @@ func can_place(selection: Dictionary, target: String, cell: Vector2i) -> bool:
 		return source == "bag" and entry.kind == "aaa" and cell == Vector2i.ZERO
 	if source == "battery" and target != "bag":
 		return false
+	if not trip_active and (source == "preparation" or target == "preparation"):
+		var trial: Array[Dictionary] = inventory.duplicate(true)
+		if source == "bag":
+			for i in range(trial.size()-1,-1,-1):
+				if trial[i].id == id: trial.remove_at(i)
+		if target == "bag":
+			var incoming := entry.duplicate(true);incoming.x=cell.x;incoming.y=cell.y;incoming.rotated=selection.rotated;trial.append(incoming)
+		var bounds := LARGE if cargo_has_tool(trial,"wide") else SMALL
+		for item in trial:
+			if not Rect2i(Vector2i.ZERO,bounds).encloses(item_rect(item)):return false
 	return fits_item(entries(target),grid_size(target),entry.kind,cell,selection.rotated,selection.get("mirrored",entry.get("mirrored",false)),id if source==target else -1)
 
 func place(selection: Dictionary, target: String, cell: Vector2i) -> bool:
@@ -295,7 +311,8 @@ func place(selection: Dictionary, target: String, cell: Vector2i) -> bool:
 		install_battery(entry)
 		return true
 	if source == "battery":
-		var spare := make_entry("aaa", cell, false)
+		var spare := make_entry("aaa", cell, selection.rotated)
+		spare.mirrored=selection.get("mirrored",false)
 		spare.charge = installed_charge
 		inventory.append(spare)
 		installed_charge = NO_CELL
@@ -315,6 +332,8 @@ func place(selection: Dictionary, target: String, cell: Vector2i) -> bool:
 	entry.y = cell.y
 	entry.rotated = selection.rotated
 	entry.mirrored = selection.get("mirrored",entry.get("mirrored",false))
+	if source == "preparation" or target == "preparation": sync_carried_tools()
+	elif trip_active and gear.get("inventory_tools",false): sync_carried_tools()
 	return true
 
 func make_entry(kind: String, cell: Vector2i, rotated: bool) -> Dictionary:
@@ -431,7 +450,7 @@ func purchase(kind: String) -> String:
 	record_trade("stock", kind)
 	return ""
 
-func first_free_placement(kind: String, container: String) -> Dictionary:
+func first_free_placement(kind: String, container: String, mirrored:bool=false) -> Dictionary:
 	var bounds := grid_size(container)
 	var cargo := entries(container)
 	for rotated in [false, true]:
@@ -439,7 +458,7 @@ func first_free_placement(kind: String, container: String) -> Dictionary:
 		for y in range(bounds.y):
 			for x in range(bounds.x):
 				var cell := Vector2i(x, y)
-				if fits_item(cargo,bounds,kind,cell,rotated):
+				if fits_item(cargo,bounds,kind,cell,rotated,mirrored):
 					return {"cell": cell, "rotated": rotated}
 	return {}
 
@@ -467,7 +486,7 @@ func give_starter_supplies() -> void:
 func supply_count(kind: String) -> int:
 	kind = ItemCatalog.runtime_id(kind)
 	var count := 0
-	for entry in inventory + locker:
+	for entry in inventory + locker + preparation:
 		if entry.kind == kind:
 			count += 1
 	return count
@@ -478,7 +497,7 @@ func consume_supply(kind: String) -> String:
 	var water := kind == "water"
 	if (water and drank_today) or (not water and ate_today):
 		return "今日已%s。" % ("喝水" if water else "进食")
-	for cargo in [inventory, locker]:
+	for cargo in [inventory, locker, preparation]:
 		for entry in cargo:
 			if entry.kind == kind:
 				cargo.erase(entry)
@@ -525,6 +544,7 @@ func install_battery(entry: Dictionary) -> void:
 func toggle_flashlight() -> String:
 	if not trip_active or remaining_ms() == 0:
 		return "外出时间已用完。"
+	if gear.get("inventory_tools",false) and not carried_tools().light:return "没有携带手电筒。"
 	if installed_charge <= 0:
 		return "手电筒没有电，请装入有电的七号电池。"
 	flashlight_on = not flashlight_on
@@ -587,7 +607,9 @@ func suit_rent(heavy: bool) -> int:
 func depart(loadout: Dictionary, radiation: int, loot_station: String = "") -> String:
 	if trip_active or not game_over_reason.is_empty():
 		return "已经出发。"
-	if not loadout.get("light", false) or installed_charge <= 0:
+	loadout = loadout.duplicate(true)
+	if loadout.get("inventory_tools",false):loadout.merge(carried_tools(),true)
+	if not loadout.get("inventory_tools",false) and (not loadout.get("light", false) or installed_charge <= 0):
 		return "出站必须带手电筒并装入有电的七号电池。"
 	if radiation >= 3 and not loadout.heavy:
 		return "高辐射区需要加强防护服。"
@@ -674,7 +696,7 @@ func save_current(path: String) -> Error:
 func save_data() -> Dictionary:
 	return {
 		"base_name": base_name, "version": CABIN_SAVE_VERSION, "day": day, "account": account, "station": station,
-		"wide": wide_bag, "bag": inventory, "locker": locker, "active_item":active_item.duplicate(true),
+		"wide": wide_bag, "bag": inventory, "locker": locker, "preparation": preparation, "active_item":active_item.duplicate(true),
 		"installed_charge": installed_charge, "debt": debt,
 		"days_in_debt": days_in_debt, "days_without_water": days_without_water,
 		"days_without_food": days_without_food, "drank_today": drank_today,
@@ -759,7 +781,7 @@ func load_cabin(path: String, known_stations: Array) -> bool:
 
 func load_data(data: Dictionary, known_stations: Array) -> bool:
 	var version: Variant = data.get("version")
-	if version != 1 and version != 2 and version != 3 and version != 4 and version != 5 and version != 6 and version != 7 and version != 8 and version != 9 and version != 10 and version != 11 and version != 12 and version != 13 and version != 14 and version != 15 and version != CABIN_SAVE_VERSION:
+	if version != 1 and version != 2 and version != 3 and version != 4 and version != 5 and version != 6 and version != 7 and version != 8 and version != 9 and version != 10 and version != 11 and version != 12 and version != 13 and version != 14 and version != 15 and version != 16 and version != CABIN_SAVE_VERSION:
 		return false
 	if version >= 15 and not CustomerDialogue.valid_social(data):
 		return false
@@ -787,6 +809,8 @@ func load_data(data: Dictionary, known_stations: Array) -> bool:
 	var loaded_locker := read_cargo(data.get("locker"), LOCKER)
 	if loaded_bag.is_empty() or loaded_locker.is_empty():
 		return false
+	var loaded_preparation := read_cargo(data.get("preparation"),PREPARATION) if version >= 17 else {"entries":[]}
+	if loaded_preparation.is_empty():return false
 	var loaded_active := {}
 	if version >= 16:
 		var raw_active: Variant = data.get("active_item")
@@ -799,18 +823,20 @@ func load_data(data: Dictionary, known_stations: Array) -> bool:
 			loaded_active = active_check.entries[0]
 	var loaded_layout := Furniture.copy_layout(data.furniture_layout) if version == CABIN_SAVE_VERSION else migrate_furniture(data, int(version))
 	var computers := 1 if loaded_layout.computer != null else 0
-	for entry in loaded_bag.entries + loaded_locker.entries + ([loaded_active] if not loaded_active.is_empty() else []):
+	for entry in loaded_bag.entries + loaded_locker.entries + loaded_preparation.entries + ([loaded_active] if not loaded_active.is_empty() else []):
 		if entry.kind == "computer": computers += 1
 	if computers > 1:
 		return false
 	inventory.assign(loaded_bag.entries)
 	locker.assign(loaded_locker.entries)
+	preparation.assign(loaded_preparation.entries)
 	active_item = loaded_active
 	# Reissue runtime IDs across both grids after validating the saved placements.
 	next_id = 1
-	for entry in inventory + locker + ([active_item] if not active_item.is_empty() else []):
+	for entry in inventory + locker + preparation + ([active_item] if not active_item.is_empty() else []):
 		entry.id = next_id
 		next_id += 1
+	if version < 17: give_preparation_tools()
 	carriage_count = int(data.carriage_count) if version >= 4 else 1
 	furniture_layout = loaded_layout
 	if version < 6 and furniture_layout.computer == null and material_count("computer") == 0:
@@ -901,7 +927,7 @@ func place_furniture(kind: String, placement: Variant) -> String:
 		return problem
 	if kind == "computer" and furniture_layout.computer == null:
 		var consumed := false
-		for cargo in [locker, inventory]:
+		for cargo in [locker, inventory, preparation]:
 			for entry in cargo:
 				if entry.kind == "computer":
 					cargo.erase(entry)
@@ -926,7 +952,7 @@ func store_furniture(kind: String) -> String:
 func material_count(kind: String) -> int:
 	kind = ItemCatalog.runtime_id(kind)
 	var count := 0
-	for entry in inventory + locker:
+	for entry in inventory + locker + preparation:
 		if entry.kind == kind:
 			count += 1
 	return count
@@ -948,7 +974,7 @@ func expand_carriage() -> String:
 	# Check the whole recipe first, then consume each unique entry once.
 	for kind in EXPANSION_COST:
 		var remaining: int = EXPANSION_COST[kind]
-		for cargo in [locker, inventory]:
+		for cargo in [locker, inventory, preparation]:
 			for index in range(cargo.size() - 1, -1, -1):
 				if remaining > 0 and cargo[index].kind == kind:
 					cargo.remove_at(index)
@@ -996,7 +1022,7 @@ func valid_home_layout(data: Dictionary, version: int = CABIN_SAVE_VERSION) -> b
 	return true
 
 func migrate_furniture(data: Dictionary, version: int) -> Dictionary:
-	if version in [11,12,13,14,15]:
+	if version in [11,12,13,14,15,16]:
 		return Furniture.copy_layout(data.furniture_layout)
 	if version in [6, 7, 8, 9, 10]:
 		return Furniture.migrate_grid_layout(data.furniture_layout, version)
@@ -1048,7 +1074,7 @@ func equip_active(id: int) -> String:
 
 func unequip_active() -> String:
 	if active_item.is_empty(): return "主动位为空。"
-	var placement := first_free_placement(active_item.kind,"bag")
+	var placement := first_free_placement(active_item.kind,"bag",active_item.get("mirrored",false))
 	if placement.is_empty(): return "背包没有足够空间。"
 	active_item.x = placement.cell.x; active_item.y = placement.cell.y; active_item.rotated = placement.rotated
 	inventory.append(active_item)
@@ -1058,6 +1084,11 @@ func unequip_active() -> String:
 func use_active() -> String:
 	if active_item.is_empty(): return "主动位为空，可在背包中装备道具。"
 	if not game_over_reason.is_empty(): return "当前无法使用主动道具。"
+	var capability: String = TOOL_CAPABILITIES.get(active_item.kind,"")
+	if capability == "light":return toggle_flashlight()
+	if capability == "wrench":
+		toggle_wrench();return ""
+	if capability in ["crowbar","wide"]:return "该工具在携带时自动生效。"
 	var action: String = ItemCatalog.definition(active_item.kind).get("active_use",{}).get("action","none")
 	match action:
 		"drink":
@@ -1072,3 +1103,60 @@ func use_active() -> String:
 		_: return "这件道具没有主动使用效果。"
 	active_item = {}
 	return ""
+
+## Quick actions share the same masks, clocks and ownership rules as drag placement.
+func auto_place(selection:Dictionary,target:String)->String:
+	if selection.is_empty():return "请先选择物品。"
+	var entry:=picked(selection.get("source",""),int(selection.get("id",-999)))
+	if entry.is_empty():return "物品已失效。"
+	var placement:=first_free_placement(entry.kind,target,selection.get("mirrored",entry.get("mirrored",false)))
+	if placement.is_empty():return "目标容器没有足够空间。"
+	var choice:=selection.duplicate();choice.rotated=placement.rotated
+	return "" if place(choice,target,placement.cell) else "当前不能放置到该容器。"
+
+func sort_container(container:String)->String:
+	if container not in ["bag","locker","preparation"] or (trip_active and (container in ["locker","preparation"] or remaining_ms()==0)):return "当前不能整理该容器。"
+	var original:Array[Dictionary]=entries(container)
+	var ordered:Array[Dictionary]=original.duplicate(true)
+	ordered.sort_custom(func(a,b):return item_cells(a).size()>item_cells(b).size())
+	var trial:Array[Dictionary]=[]
+	for entry in ordered:
+		var placed:=false
+		for rotated in [entry.rotated,not entry.rotated]:
+			for y in range(grid_size(container).y):
+				for x in range(grid_size(container).x):
+					if not placed and fits_item(trial,grid_size(container),entry.kind,Vector2i(x,y),rotated,entry.get("mirrored",false)):
+						entry.x=x;entry.y=y;entry.rotated=rotated;trial.append(entry);placed=true
+			if placed:break
+		if not placed:return "暂时无法整理为更紧凑布局，原摆放已保留。"
+	original.assign(trial)
+	return ""
+
+
+func give_preparation_tools() -> void:
+	for kind in TOOL_CAPABILITIES:
+		add_supply(kind,"preparation")
+
+func cargo_has_tool(cargo: Array[Dictionary], capability: String) -> bool:
+	for entry in cargo:
+		if TOOL_CAPABILITIES.get(entry.kind,"") == capability:return true
+	return not active_item.is_empty() and TOOL_CAPABILITIES.get(active_item.kind,"") == capability
+
+func carried_tools() -> Dictionary:
+	var result := {}
+	for capability in ["light","crowbar","wrench","wide"]:result[capability]=cargo_has_tool(inventory,capability)
+	return result
+
+func sync_carried_tools() -> void:
+	var carried := carried_tools()
+	# Legacy large bags may be full before their owner first carries the new physical backpack.
+	# Keep their grid accessible until reorganized; depart() still checks the actual carried capacity.
+	var can_shrink := true
+	for entry in inventory:
+		if not Rect2i(Vector2i.ZERO,SMALL).encloses(item_rect(entry)):can_shrink=false
+	wide_bag = carried.wide or not can_shrink
+	if trip_active and gear.get("inventory_tools",false):
+		gear.merge(carried,true)
+		gear.wrench = carried.wrench and auto_repair_level > 0
+		if not gear.wrench:gear.wrench_equipped=false
+		if not carried.light:flashlight_on=false

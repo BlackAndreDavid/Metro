@@ -200,6 +200,12 @@ def validate_customer(data):
         for category,weights in groups.items():
             require(isinstance(weights,dict) and all(kind in items and items[kind].get('category')==category and number(weight,0,100000) for kind,weight in weights.items()),'具体物品或权重无效')
             if category in data[side+'_categories'] and data.get('enabled') and data.get('trade_enabled',True):require(any(weight>0 for weight in weights.values()),'启用的买卖类别至少需要一个正权重物品')
+    quantities=data.get('sell_item_counts',{})
+    require(isinstance(quantities,dict) and set(quantities)<=CATEGORIES,'出售数量类别无效')
+    for category,entries in quantities.items():
+        require(isinstance(entries,dict),'出售数量配置无效')
+        for kind,bounds in entries.items():
+            require(kind in items and items[kind].get('category')==category and isinstance(bounds,dict) and integer(bounds.get('min'),0,100) and integer(bounds.get('max'),0,100) and bounds['min']<=bounds['max'],'出售数量须为0～100且下限不大于上限')
     require(data['buy_categories'] or data['sell_categories'] or not data['enabled'] or not data.get('trade_enabled',True),'启用顾客至少需要一个买入或卖出类别')
     require(set(data.get('stations',[]))<=set(read(GAME/'content/stations.json')),'顾客站点无效')
     require(isinstance(data.get('stories',[]),list),'剧情须为数组')

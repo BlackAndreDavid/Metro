@@ -79,7 +79,7 @@ func run() -> void:
 	check(street.interaction().get("kind") == "cabinet" and street.interaction_visuals.has(key),"building point is exposed as an interactable storage cabinet")
 	var visual = street.interaction_visuals[key].control
 	check(visual.visual.material.shader == preload("res://assets/shaders/item_outline.gdshader") and visual.hovered,"nearby cabinet reuses common outline/highlight module")
-	check(home.surface_prompt.text.is_empty() and visual.caption.visible and street.hero_view.is_visible_in_tree(),"shared highlight owns the only interaction hint while hero remains visible indoors")
+	check(home.surface_prompt.text.is_empty() and not visual.caption.visible and street.hero_view.is_visible_in_tree(),"nearby interaction shows only its outline and keeps the hero visible indoors")
 	var expected: String = home.state.ground_kind(0);home.state.inventory.clear();street.interact();await process_frame
 	var panel = home.view.get_child(home.view.get_child_count()-1)
 	check(street.inspecting_container and panel.cabinet == point.cabinet,"cabinet opens its own contents UI")

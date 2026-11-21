@@ -23,6 +23,10 @@ func _gui_input(event: InputEvent) -> void:
 		queue_redraw()
 	if event is InputEventMouseButton and not event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT:
+			if event.shift_pressed:
+				var entry:Dictionary=host.state.entry_at(container,cell_at(event.position))
+				if not entry.is_empty():host.select_cargo(container,entry.id);host.quick_place_selected()
+				accept_event();return
 			host.click_cell(container, cell_at(event.position))
 			accept_event()
 		elif event.button_index == MOUSE_BUTTON_RIGHT:

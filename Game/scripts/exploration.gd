@@ -2,16 +2,19 @@ extends Control
 ## Instanced by Home with its existing state. Edit the .tscn for page layout.
 var controller: Control
 var pack_open := false
+var time_fill:StyleBoxFlat
+var time_tint:=Color.TRANSPARENT
 
 func configure(home: Control) -> void:
 	controller = home
 	home.surface_location = null
 	home.time_label = $Timer
+	setup_clock()
 	home.surface_prompt = $InteractionPrompt
 	home.status = $Status
 	home.surface_block = $StreetFrame/SurfaceBlock
 	$BackpackButton.pressed.connect(toggle_pack)
-	$ActiveSlot.configure(home)
+	$LoadoutBar.configure(home)
 	$StreetFrame/SurfaceBlock.setup(home.state, home.font)
 	$StreetFrame/SurfaceBlock.pickup_requested.connect(home.pick_up_surface_item)
 	$StreetFrame/SurfaceBlock.extraction_requested.connect(home.extract_from_block)
@@ -60,17 +63,31 @@ func set_pack_open(value: bool) -> void:
 		controller.battery_slot_open = false
 
 func refresh_active() -> void:
-	$ActiveSlot.refresh()
+	$LoadoutBar.refresh()
 
 func configure_legacy(home: Control) -> void:
 	controller = home
 	home.surface_location = null
 	home.time_label = $Timer
+	setup_clock()
 	home.status = $Status
 	$BackpackButton.pressed.connect(toggle_pack)
-	$ActiveSlot.configure(home)
+	$LoadoutBar.configure(home)
 	$StreetFrame/SurfaceBlock.hide()
 	$Minimap.hide()
 	$InteractionPrompt.hide()
 	$Stamina.hide()
 	$StaminaLabel.hide()
+
+func setup_clock() -> void:
+	if time_fill!=null:return
+	var background:=StyleBoxFlat.new();background.bg_color=Color("172027");background.border_color=Color("dce6df");background.set_border_width_all(2);background.set_corner_radius_all(3)
+	time_fill=StyleBoxFlat.new();time_fill.bg_color=Color("82d9ad");time_fill.set_corner_radius_all(2)
+	$TimeBattery.add_theme_stylebox_override("background",background);$TimeBattery.add_theme_stylebox_override("fill",time_fill)
+
+func update_countdown(remaining:int,total:int) -> void:
+	setup_clock()
+	$TimeBattery.max_value=maxi(1,total);$TimeBattery.value=remaining
+	var ratio:=float(remaining)/maxi(1,total)
+	time_tint=Color("ed7169") if ratio<=.15 else Color("f0c96a") if ratio<=.5 else Color("82d9ad")
+	time_fill.bg_color=time_tint;$Timer.add_theme_color_override("font_color",time_tint)

@@ -272,8 +272,9 @@ func use_hotspot(kind: String) -> void:
 			trade_supplies = false
 			show_trade()
 		"rest": show_rest()
-		"gear":
-			loadout = {"heavy": false, "wide": state.wide_bag, "light": true, "crowbar": true, "wrench": state.auto_repair_level > 0}
+		"gear", "preparation":
+			loadout = {"heavy": false, "inventory_tools":true}
+			state.sync_carried_tools()
 			show_gear()
 		"news":
 			show_news()
@@ -292,7 +293,7 @@ func show_rules(message: String) -> void:
 	var panel := modal("简要规则", Rect2(302, 99, 676, 522), dismiss_rules)
 	var rules := [
 		["用电与欠费", "行车每站耗 %d 度，车厢每日结算耗 %d 度。充电、购物和租防护服时，余额不足可挂账。七号电池在车内充。" % [state.travel_cost_per_stop(), state.daily_power_cost()]],
-		["限时探索", "每次出站限时 %d 秒。出站必带装有七号电池的手电筒，按 1 开关照明。" % state.trip_limit()],
+		["限时探索", "每次出站限时 %d 秒。门旁预备仓库可拖拽携带工具，手电筒按 1 开关照明。" % state.trip_limit()],
 		["超时赔偿", "超时丢失随身物品。普通防护服赔偿 300 度，加强型 500 度，余额不足记作欠费。"],
 		["每日生存", "每天喝水、进食，睡觉时结算。连续两天未喝水或欠费、连续三天未进食都会结束本轮。"],
 	]
@@ -536,6 +537,9 @@ func show_locker(message: String = "") -> void:
 	label(panel, cargo_title("locker"), Rect2(516, 91, 450, 34), 21)
 	add_grid(panel, "bag", Vector2(40, 139), 52)
 	add_grid(panel, "locker", Vector2(516, 139), 52)
+	action(panel,"一键放置所选",Rect2(40,48,180,32),quick_place_selected)
+	action(panel,"整理背包",Rect2(230,48,140,32),sort_cargo.bind("bag"))
+	action(panel,"整理柜子",Rect2(516,48,140,32),sort_cargo.bind("locker"))
 	label(panel, "点选或拖动物品到目标格   /   滚轮或 R 旋转   /   F 镜像   /   右键取消", Rect2(40, 414, 930, 23), 16, MUTED)
 	status = label(panel, "", Rect2(40, 447, 936, 27), 16, AMBER)
 	report(message)
@@ -610,10 +614,11 @@ func move_cargo(target: String, cell: Vector2i) -> void:
 		return
 	if check_trip_timeout():
 		return
-	var container_name: String = {"locker": "柜子", "bag": "背包", "battery": "手电筒"}[target]
+	var container_name: String = {"locker": "柜子", "preparation":"预备仓库", "bag": "背包", "battery": "手电筒"}[target]
 	var message := "%s 已放入%s。" % [state.item_name(entry.kind), container_name]
 	if screen == "locker":
 		show_locker(message)
+	elif screen == "gear":show_gear(message)
 	else:
 		show_surface(message)
 
@@ -806,30 +811,14 @@ func update_surface_pack(walking: bool) -> void:
 	surface_pack = sidebar
 	label(sidebar, cargo_title("bag"), Rect2(24, 17, 354, 33), 22)
 	add_grid(sidebar, "bag", Vector2(24, 60), 48)
-	plate(sidebar, Rect2(24, 317, 356, 1), BORDER)
-	label(sidebar, "装备", Rect2(24, 323, 100, 28), 19)
-	var suit := plate(sidebar, Rect2(24, 358, 126, 44), Color("302b43"), BORDER)
-	label(suit, "加强防护服" if state.gear.heavy else "普通防护服", Rect2(0, 0, 126, 44), 15, TEXT, HORIZONTAL_ALIGNMENT_CENTER)
-	flashlight_button = action(sidebar, "", Rect2(160, 358, 220, 44), toggle_battery_slot)
-	flashlight_button.name = "Flashlight"
-	flashlight_button.focus_mode = Control.FOCUS_NONE
-	flashlight_button.tooltip_text = "点击打开电池槽。按 1 开关手电筒。"
-	battery_panel = plate(sidebar, Rect2(160, 409, 220, 61), Color("292539"), BORDER)
-	battery_panel.name = "BatterySlot"
-	add_grid(battery_panel, "battery", Vector2(7, 4), 52)
-	wrapped(battery_panel, "电池槽\n放入或取出七号电池", Rect2(68, 8, 145, 48), 14, MUTED)
-	battery_panel.visible = battery_slot_open
-	if walking:
-		wrench_button = action(sidebar, "", Rect2(24, 409, 126, 44), toggle_wrench)
-		wrench_button.name = "Wrench"
-		wrench_button.focus_mode = Control.FOCUS_NONE
-		wrench_button.disabled = not state.gear.wrench
-		wrench_button.tooltip_text = "点击装备或收起扳手。"
-	if walking:
-		action(sidebar,"装入主动位",Rect2(24,476,168,28),equip_selected_active).focus_mode = Control.FOCUS_NONE
-		action(sidebar,"收回主动道具",Rect2(202,476,178,28),unequip_active_item).focus_mode = Control.FOCUS_NONE
+	if view.has_node("LoadoutBar") and is_instance_valid(view.get_node("LoadoutBar").battery_grid):grids.append(view.get_node("LoadoutBar").battery_grid)
+	plate(sidebar,Rect2(24,317,356,1),BORDER)
+	action(sidebar,"一键拾取附近",Rect2(24,330,168,34),quick_pickup_nearby).focus_mode=Control.FOCUS_NONE
+	action(sidebar,"一键整理背包",Rect2(202,330,178,34),sort_cargo.bind("bag")).focus_mode=Control.FOCUS_NONE
+	action(sidebar,"一键放置所选",Rect2(24,374,356,34),quick_place_selected).focus_mode=Control.FOCUS_NONE
+	wrapped(sidebar,"装备与主动道具已合并至左上角。\n将背包物品拖入主动位，或拖回背包；七号电池拖入手电槽。",Rect2(24,420,356,56),14,MUTED)
 	var instructions := "B 背包 · 空格 主动 · R 旋转 · F 镜像 · 1 照明" if walking else "点击拾取或拖入背包 · R 旋转 · F 镜像 · 1 照明"
-	label(sidebar, instructions, Rect2(24, 508 if walking else 483, 356, 26), 14, MUTED)
+	label(sidebar, instructions, Rect2(24, 488 if walking else 483, 356, 26), 14, MUTED)
 	refresh_equipment()
 	if view.has_method("refresh_active"): view.refresh_active()
 
@@ -851,7 +840,8 @@ func refresh_equipment() -> void:
 	if not is_instance_valid(flashlight_button):
 		return
 	var caption := "手电筒 · %s · %s" % ["开" if state.flashlight_on else "关", installed_battery_text()]
-	flashlight_button.text = caption
+	flashlight_button.disabled = state.gear.get("inventory_tools",false) and not state.carried_tools().light
+	flashlight_button.text = "手电筒 · 未携带" if flashlight_button.disabled else caption
 	flashlight_button.add_theme_color_override("font_color", MINT if state.flashlight_on else TEXT)
 	if is_instance_valid(wrench_button) and is_instance_valid(surface_block):
 		var equipped: bool = state.gear.wrench_equipped
@@ -883,12 +873,14 @@ func return_to_cabin() -> void:
 	show_cabin("已返回 %s。" % state.station)
 
 func update_trip_clock() -> void:
+	if not is_instance_valid(time_label):return
+	if is_instance_valid(view) and view.has_method("update_countdown"):view.update_countdown(state.remaining_ms(),state.trip_limit()*1000)
 	var seconds := ceili(state.remaining_ms() / 1000.0)
-	var caption := "剩余 %d 秒" % seconds
+	var caption := "探索 %02d:%02d" % [seconds/60,seconds%60]
 	if time_label.text == caption:
 		return
 	time_label.text = caption
-	time_label.add_theme_color_override("font_color", Color("ff9188") if seconds <= 5 else AMBER)
+	if not view.has_method("update_countdown"):time_label.add_theme_color_override("font_color", Color("ff9188") if seconds <= 5 else AMBER)
 
 func check_trip_timeout() -> bool:
 	if not state.trip_active or state.remaining_ms() > 0:
@@ -982,3 +974,41 @@ func use_active_item() -> void:
 	if problem.is_empty():
 		clear_selection();update_surface_pack(true);report("已使用主动道具。")
 	else: report(problem)
+
+func sort_cargo(container:String)->void:
+	if check_trip_timeout():return
+	var problem:=state.sort_container(container)
+	clear_selection()
+	if screen=="locker":show_locker(problem if not problem.is_empty() else "整理完成，物品数量与状态已保留。")
+	elif screen=="gear":show_gear(problem if not problem.is_empty() else "整理完成。")
+	elif screen=="surface":update_surface_pack(true);report(problem if not problem.is_empty() else "背包整理完成。")
+
+func quick_place_selected()->void:
+	if check_trip_timeout():return
+	if selection.is_empty():report("先选中物品，再一键放置。也可 Shift+点击物品快速放置。");return
+	var source:String=selection.source
+	if source=="ground":pick_up_surface_item(int(selection.id));return
+	if screen=="surface" and source=="bag":equip_selected_active();return
+	var target:="locker" if screen=="locker" and source=="bag" else "preparation" if screen=="gear" and source=="bag" else "bag"
+	var problem:=state.auto_place(selection,target)
+	if problem.is_empty():clear_selection()
+	if screen=="locker":show_locker(problem if not problem.is_empty() else "物品已自动放置。")
+	elif screen=="gear":show_gear(problem if not problem.is_empty() else "物品已自动放置。")
+	elif screen=="surface":update_surface_pack(true);report(problem if not problem.is_empty() else "物品已自动放置。")
+
+func quick_pickup_nearby()->void:
+	if check_trip_timeout() or not is_instance_valid(surface_block):return
+	var slots:Array=[]
+	for slot in range(surface_block.LOOT.size()):
+		if not surface_block.LOOT[slot].has("cabinet") and surface_block.can_take(slot):slots.append(slot)
+	var count:=quick_pickup_slots(slots)
+	report("已拾取%d件物资；未装下或不在范围内的物资仍在原处。" % count)
+
+func quick_pickup_slots(slots:Array)->int:
+	if check_trip_timeout() or not is_instance_valid(surface_block):return 0
+	var count:=0
+	for slot in slots:
+		if surface_block.can_take(int(slot)) and state.pick_up_ground(int(slot)):count+=1
+	if count>0:
+		clear_selection();update_surface_pack(true);surface_block.update_interaction_visuals()
+	return count

@@ -5,14 +5,16 @@ const Outline = preload("res://assets/shaders/item_outline.gdshader")
 var drag_surface: Control
 var padded_image: Image
 var hovered := false
+var automatic_hover:=true
+var show_function_label:=true
 @onready var visual: TextureRect = $Texture
 @onready var caption: Label = $Function
 
 func _ready() -> void:
-	mouse_entered.connect(set_highlighted.bind(true))
-	mouse_exited.connect(set_highlighted.bind(false))
-	focus_entered.connect(set_highlighted.bind(true))
-	focus_exited.connect(set_highlighted.bind(false))
+	mouse_entered.connect(pointer_highlight.bind(true))
+	mouse_exited.connect(pointer_highlight.bind(false))
+	focus_entered.connect(pointer_highlight.bind(true))
+	focus_exited.connect(pointer_highlight.bind(false))
 
 func set_item(texture: Texture2D, function_text: String, surface: Control = null) -> void:
 	drag_surface = surface
@@ -31,11 +33,14 @@ func set_item(texture: Texture2D, function_text: String, surface: Control = null
 	caption.hide()
 	tooltip_text = ""
 
+func pointer_highlight(value:bool)->void:
+	if automatic_hover:set_highlighted(value)
+
 func set_highlighted(value: bool) -> void:
 	hovered = value
 	if visual.material != null:
 		visual.material.set_shader_parameter("highlighted", value)
-	caption.visible = value
+	caption.visible = value and show_function_label
 
 func _has_point(point: Vector2) -> bool:
 	if padded_image == null or size.x <= 0 or size.y <= 0:
@@ -46,7 +51,7 @@ func _has_point(point: Vector2) -> bool:
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		grab_focus()
+		if focus_mode!=Control.FOCUS_NONE:grab_focus()
 		if is_instance_valid(drag_surface):
 			drag_surface.start_drag(event.global_position, func(): activated.emit())
 		else:

@@ -5,8 +5,9 @@ const Items=preload("res://scripts/items/item_catalog.gd")
 const Orders=preload("res://scripts/commerce/customer_orders.gd")
 static func repair(raw: Dictionary, stations: Array) -> Dictionary:
 	var candidate:=raw.duplicate(true)
+	var containers: Array = ["bag","locker","preparation"] if int(raw.get("version",0)) >= 17 else ["bag","locker"]
 	var original:Dictionary={}
-	for name in ["bag","locker"]:
+	for name in containers:
 		if not raw.get(name) is Array:return {"error":"物品列表结构损坏，无法自动修复。"}
 		original[name]=raw[name].duplicate(true);candidate[name]=[]
 	var active:Variant=raw.get("active_item",{})
@@ -24,10 +25,10 @@ static func repair(raw: Dictionary, stations: Array) -> Dictionary:
 		notes.append("清理失效的当前订单，保留交易账目和已用顾客次数")
 	var validator:=State.new()
 	if not validator.load_data(candidate,stations):return {"error":"核心进度、家具或资金字段未通过校验，未修改原存档。请恢复匹配版本或使用备份。"}
-	var bag:Array[Dictionary]=[];var locker:Array[Dictionary]=[]
-	var packed:Dictionary={"bag":bag,"locker":locker}
+	var bag:Array[Dictionary]=[];var locker:Array[Dictionary]=[];var preparation:Array[Dictionary]=[]
+	var packed:Dictionary={"bag":bag,"locker":locker,"preparation":preparation}
 	var pending:Array=[]
-	for name in ["bag","locker"]:
+	for name in containers:
 		for source in original[name]:
 			var item:=checked_item(source,validator)
 			if item.has("error"):return item
@@ -36,8 +37,8 @@ static func repair(raw: Dictionary, stations: Array) -> Dictionary:
 	for item in pending:
 		var preferred:String=item.preferred;item.erase("preferred")
 		var placed:=false
-		for name in [preferred,"locker" if preferred=="bag" else "bag"]:
-			var bounds:Vector2i=validator.LOCKER if name=="locker" else (validator.LARGE if raw.wide else validator.SMALL)
+		for name in (["preparation"] if preferred=="preparation" else [preferred,"locker" if preferred=="bag" else "bag"]):
+			var bounds:Vector2i=validator.grid_size(name)
 			if name==preferred and validator.fits_item(packed[name],bounds,item.kind,Vector2i(item.x,item.y),item.rotated,item.mirrored):
 				packed[name].append(item);placed=true;break
 			for orientation in [item.rotated,not item.rotated]:
@@ -49,6 +50,7 @@ static func repair(raw: Dictionary, stations: Array) -> Dictionary:
 			if placed:break
 		if not placed:return {"error":"空间不足，无法完整保留物品“%s”。请先恢复旧占位定义，或缩小该物品占位；原文件未修改。" % item.kind}
 	candidate.bag=packed.bag;candidate.locker=packed.locker
+	if "preparation" in containers:candidate.preparation=packed.preparation
 	if not active.is_empty():
 		var item:=checked_item(active,validator)
 		if item.has("error"):return item

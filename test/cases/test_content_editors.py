@@ -228,6 +228,14 @@ console.log('EDITOR_MODELS_OK');
             invalid=copy.deepcopy(customer);invalid['sell_item_weights']['supplies']=weights
             with self.assertRaises(ValueError):editor.validate_customer(invalid)
 
+    def test_customer_quantity_ranges(self):
+        customer=self.customer();customer['sell_categories']=['supplies']
+        customer['sell_item_counts']={'supplies':{'water':{'min':1,'max':6}}}
+        editor.validate_customer(customer)
+        for bounds in [{'min':5,'max':2},{'min':-1,'max':2},{'min':1,'max':101},{'min':1.5,'max':3}]:
+            invalid=copy.deepcopy(customer);invalid['sell_item_counts']['supplies']['water']=bounds
+            with self.assertRaises(ValueError):editor.validate_customer(invalid)
+
     def test_browser_service_registration_and_link_validation(self):
         original=editor.WEB;previous=dict(editor.SERVICE)
         service=None;thread=None

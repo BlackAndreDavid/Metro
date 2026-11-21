@@ -1,36 +1,27 @@
 extends Control
 
-@export var panel_bounds := Rect2(150, 106, 980, 510)
+@export var panel_bounds := Rect2(70, 55, 1140, 610)
 
 func configure(home: Control, message: String) -> void:
 	var panel: Panel = home.modal("出站整备 · %s" % home.state.station, panel_bounds)
 	var radiation: int = home.Rail.station_info(home.state.station).radiation
-	home.label(panel, "区域辐射 · %s   /   外出上限 %d 秒" % [home.RADIATION[radiation], home.state.trip_limit()], Rect2(24, 83, 530, 28), 17, home.AMBER)
-	home.label(panel, "防护服租用", Rect2(24, 133, 260, 30), 20)
-	home.label(panel, "携带装备", Rect2(360, 133, 260, 30), 20)
-	home.label(panel, "背包规格", Rect2(692, 133, 260, 30), 20)
-	home.action(panel, "普通防护服    %d 度" % home.state.suit_rent(false), Rect2(24, 178, 263, 48), home.choose_gear.bind("heavy", false), not home.loadout.heavy)
-	home.action(panel, "加强防护服    %d 度" % home.state.suit_rent(true), Rect2(24, 236, 263, 48), home.choose_gear.bind("heavy", true), home.loadout.heavy)
-	home.wrapped(panel, "超时赔偿普通 300 度、加强 500 度。高辐射区需加强防护服。", Rect2(24, 305, 263, 62), 15, home.MUTED)
-	home.label(panel, "手电筒必带 · %s" % home.installed_battery_text(), Rect2(360, 176, 263, 26), 17, home.MINT)
-	home.swap_button(panel, Rect2(360, 211, 263, 39))
-	home.action(panel, "撬棍   %s" % ("已携带" if home.loadout.crowbar else "未携带"), Rect2(360, 259, 263, 40), home.choose_gear.bind("crowbar", not home.loadout.crowbar), home.loadout.crowbar)
-	var carry_wrench: bool = home.loadout.get("wrench", false)
-	var wrench: Button = home.action(panel, "扳手   %s" % ("已携带" if carry_wrench else "未携带"), Rect2(360, 309, 263, 40), home.choose_gear.bind("wrench", not carry_wrench), carry_wrench)
-	wrench.disabled = home.state.auto_repair_level == 0
-	wrench.tooltip_text = "完成同济大学汽修一级培训后获得。"
-	home.label(panel, "按 1 照明 · 每秒耗电 5%", Rect2(360, 353, 263, 24), 14, home.MUTED)
-	home.action(panel, "小背包    5 × 4", Rect2(692, 178, 263, 48), home.choose_gear.bind("wide", false), not home.loadout.wide)
-	home.action(panel, "大背包    6 × 5", Rect2(692, 236, 263, 48), home.choose_gear.bind("wide", true), home.loadout.wide)
-	home.wrapped(panel, "出发前可在柜子里腾出空间。", Rect2(692, 308, 263, 49), 15, home.MUTED)
-	home.plate(panel, Rect2(24, 385, 932, 1), home.BORDER)
-	home.label(panel, "电力余额  %s 度" % str(snappedf(home.state.account, 0.1)), Rect2(24, 429, 247, 44), 19, home.AMBER)
-	home.status = home.label(panel, "", Rect2(280, 421, 405, 60), 15, home.AMBER)
-	home.status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	home.action(panel, "普通防护服 · %d 度" % home.state.suit_rent(false), Rect2(24,82,250,44),home.choose_gear.bind("heavy",false),not home.loadout.heavy)
+	home.action(panel, "加强防护服 · %d 度" % home.state.suit_rent(true), Rect2(288,82,250,44),home.choose_gear.bind("heavy",true),home.loadout.heavy)
+	home.label(panel,"区域辐射 · %s / 外出上限 %d 秒" % [home.RADIATION[radiation],home.state.trip_limit()],Rect2(562,89,550,30),17,home.AMBER)
+	home.label(panel,"预备仓库 · 8 × 6 · 留在基地",Rect2(24,147,390,30),20)
+	home.label(panel,"随身背包 · 带去探索",Rect2(500,147,370,30),20)
+	home.add_grid(panel,"preparation",Vector2(24,188),44)
+	home.add_grid(panel,"bag",Vector2(500,188),44)
+	home.label(panel,"手电电池",Rect2(834,188,245,26),18)
+	home.add_grid(panel,"battery",Vector2(834,228),44)
+	home.wrapped(panel,"拖拽携带或留下物品。\n滚轮旋转 / F 镜像\nShift+点击自动转移\n\n大背包随身携带时扩容；收回前请将物品移入小背包边界。",Rect2(834,290,268,174),15,home.MUTED)
+	var carried: Dictionary=home.state.carried_tools()
+	home.wrapped(panel,"随身工具：%s%s%s%s" % ["手电筒 " if carried.light else "", "撬棍 " if carried.crowbar else "", "扳手（拆解仍需技能） " if carried.wrench else "", "大背包" if carried.wide else ""],Rect2(500,423,310,50),15,home.MINT)
+	home.action(panel,"整理仓库",Rect2(24,478,150,38),home.sort_cargo.bind("preparation"))
+	home.action(panel,"整理背包",Rect2(500,478,140,38),home.sort_cargo.bind("bag"))
+	home.action(panel,"一键转移选中",Rect2(656,478,150,38),home.quick_place_selected)
+	home.status=home.label(panel,"",Rect2(24,536,774,54),15,home.AMBER)
+	home.status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	home.report(message)
-	var rent: int = home.state.suit_rent(home.loadout.heavy)
-	var shortfall: float = home.state.credit_shortfall(rent)
-	var caption := "确认出发 · %d 度" % rent
-	if shortfall > 0.0:
-		caption += " · 欠 %s 度" % home.energy_text(shortfall)
-	home.action(panel, caption, Rect2(700, 427, 256, 46), home.confirm_departure, true)
+	var rent: int=home.state.suit_rent(home.loadout.heavy)
+	home.action(panel,"确认出发 · %d 度" % rent,Rect2(834,536,278,46),home.confirm_departure,true)

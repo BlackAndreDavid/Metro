@@ -46,25 +46,43 @@ static func ensure(state: RefCounted) -> Dictionary:
 	var stock := {}
 	var configured: Dictionary = definition.get(side+"_item_weights",{})
 	if configured.has(category):
-		stock = weighted_items(state,configured[category],category,"order/%d/%s" % [index,side])
+		var weights:Dictionary=configured[category].duplicate()
+		if side=="sell":
+			for kind in weights:
+				if int(quantity_range(definition,category,kind).max)==0:weights[kind]=0
+		stock = weighted_items(state,weights,category,"order/%d/%s" % [index,side])
 	elif side == "sell":
 		var kinds: Array = CATEGORIES[category].items.duplicate()
 		for extra in ItemCatalog.in_category(category):
 			if extra not in kinds:kinds.append(extra)
 		for kind in kinds:
 			if kind in ItemCatalog.in_category(category):stock[kind] = 2
+	if side=="sell":
+		for kind in stock.keys():
+			var limits:=quantity_range(definition,category,kind)
+			stock[kind]=int(limits.min)+state.station_roll(state.station,"stock-count/%d/%s" % [index,kind],int(limits.max)-int(limits.min))
+			if stock[kind]==0:stock.erase(kind)
 	visits.active = {"id":"%d/%s/%d" % [state.day,state.station,index],"visitor":visitor,"side":side,"category":category,"budget":float(definition.get("base_budget",120)),"status":"open","stock":stock,"total":0.0}
 	state.daily_customer_ids[definition.id] = true
 	visits.arrived += 1
 	return visits.active
 
+static func quantity_range(definition:Dictionary,category:String,kind:String)->Dictionary:
+	var quantities:Dictionary=definition.get("sell_item_counts",{}).get(category,{})
+	var current:String=ItemCatalog.definition(kind).get("id",kind)
+	if quantities.has(current):return quantities[current]
+	for key in quantities:
+		if ItemCatalog.runtime_id(key)==ItemCatalog.runtime_id(kind):return quantities[key]
+	return {"min":2,"max":2}
+
 static func available_categories(definition: Dictionary, side: String) -> Array:
 	var allowed: Array = []
 	var configured: Dictionary = definition.get(side+"_item_weights",{})
 	for category in definition.get(side+"_categories",CATEGORIES.keys()):
-		if not configured.has(category):allowed.append(category);continue
 		for kind in ItemCatalog.in_category(category):
-			if ItemCatalog.item_weight(configured[category],kind) > 0:allowed.append(category);break
+			if configured.has(category) and ItemCatalog.item_weight(configured[category],kind)<=0:continue
+			if side=="sell" and int(quantity_range(definition,category,kind).max)<=0:continue
+			allowed.append(category);break
 	return allowed
 
 static func weighted_items(state: RefCounted, weights: Dictionary, category: String, seed_key: String) -> Dictionary:
@@ -224,6 +242,6 @@ static func valid_saved(raw: Variant, legacy: bool = false) -> bool:
 		if not o.stock is Dictionary: return false
 		for kind in o.stock:
 			var quantity: Variant = o.stock[kind]
-			if not kind is String or category_of(kind) != o.category or not (quantity is int or quantity is float) or not is_finite(quantity) or quantity != floor(quantity) or quantity < 0 or quantity > 2: return false
+			if not kind is String or category_of(kind) != o.category or not (quantity is int or quantity is float) or not is_finite(quantity) or quantity != floor(quantity) or quantity < 0 or quantity > 100: return false
 		if r.arrived < 1 or r.completed + dismissed != r.arrived - (1 if o.status == "open" else 0): return false
 	return true
