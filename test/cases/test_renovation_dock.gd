@@ -71,6 +71,25 @@ func run()->void:
 	check(Catalog.visual_rect("screen",Catalog.placement_rect("screen",hanging_at))==visual_bounds,"editing reference cells does not alter runtime size or placement")
 	check(Catalog.overlaps("screen",hanging_at,"screen",hanging_at) and not Catalog.overlaps("screen",hanging_at,"screen",{"car":1,"mount":2,"x":0,"y":0}),"one attachment point takes one object independent of reference size")
 	screen.grid_size=original_size;screen.reference_cells.assign(original_reference)
+	var definition_type=load("res://scripts/items/furniture_definition.gd")
+	var platform=definition_type.from_data({"id":"platform_probe","name":"贴墙承托物","texture":"res://assets/textures/Locker.png","width":3,"height":2,"occupancy_grid":[[2,0,0],[1,1,1]],"support_surface":false})
+	Catalog.IDS.append("platform_probe");Catalog.DEFINITIONS.platform_probe=platform;state.furniture_layout.platform_probe={"car":1,"x":4,"y":8};state.furniture_owned.append("platform_probe")
+	check(state.place_furniture("computer",{"car":1,"x":4,"y":7}).is_empty(),"wall-anchored furniture physical cells support another physical furniture without a separate switch")
+	check(not state.place_furniture("platform_probe",{"car":1,"x":8,"y":8}).is_empty(),"moving mixed support cannot leave an upper physical furniture floating")
+	check(not state.temporarily_store_furniture("platform_probe").is_empty(),"temporary removal preserves occupied support")
+	var distance_target=definition_type.from_data({"id":"distance_target","name":"空心目标","texture":"res://assets/textures/Locker.png","width":5,"height":1,"occupancy_grid":[[1,0,0,0,1]],"effects":["light"]})
+	var distance_probe=definition_type.from_data({"id":"distance_probe","name":"距离探针","texture":"res://assets/textures/Locker.png","width":1,"height":1,"occupancy_grid":[[2]],"distance_rules":[{"target_type":"furniture","target":"distance_target","relation":"require","distance":.5}]})
+	Catalog.DEFINITIONS.distance_target=distance_target;Catalog.DEFINITIONS.distance_probe=distance_probe
+	var distance_layout: Dictionary={"distance_target":{"car":1,"x":0,"y":5},"distance_probe":{"car":1,"x":2,"y":5}}
+	check(is_equal_approx(Catalog.nearest_occupancy_distance("distance_target",distance_layout.distance_target,"distance_probe",distance_layout.distance_probe),1),"distance uses nearest actual cell edges instead of the bounding-box hole")
+	check(not Catalog.distance_problem(distance_layout).is_empty(),"a bounding rectangle cannot falsely satisfy a near requirement")
+	distance_probe.distance_rules[0].distance=1
+	check(Catalog.distance_problem(distance_layout).is_empty(),"exact nearest-cell distance is accepted at the boundary")
+	distance_probe.distance_rules[0].target_type="effect";distance_probe.distance_rules[0].target="light"
+	check(Catalog.distance_problem(distance_layout).is_empty(),"effect distance uses the provider's occupied cells")
+	distance_probe.distance_rules[0].relation="exclude";distance_probe.distance_rules[0].distance=.5
+	check(Catalog.distance_problem(distance_layout).is_empty(),"empty bounding-box space does not falsely trigger exclusion")
+	check(not mode.context_actions.has_node("PackItem") and not mode.get_node("Warehouse/Center/Panel/Margin/Items/Buttons").has_node("PackItem"),"item furniture has no dedicated packing buttons")
 	if DisplayServer.get_name()!="headless" and not OS.get_environment("METRO_TEST_RESULTS").is_empty():
 		await process_frame
 		await RenderingServer.frame_post_draw
@@ -78,5 +97,17 @@ func run()->void:
 		root.get_texture().get_image().save_png(OS.get_environment("METRO_TEST_RESULTS").path_join("renovation-dock.png"))
 	mode.open_build_menu();await process_frame
 	check(not is_instance_valid(mode.storage_panel) and is_instance_valid(mode.build_panel),"opening a modal palette closes the dock instead of covering its controls")
+	mode.deactivate();home.process_mode=Node.PROCESS_MODE_INHERIT;home.show();home.loadout={"heavy":false,"inventory_tools":true};home.show_gear();await process_frame
+	var old_page: Control=home.view;var old_art: Control=home.home_backdrop
+	check(old_art.z_index+old_art.carriage.get_node("Rails").z_index<0 and old_art.z_index+old_art.carriage.get_node("FurnitureSlots").z_index<0,"exploration setup UI renders above rails and physical furniture")
+	if DisplayServer.get_name()!="headless" and not OS.get_environment("METRO_TEST_RESULTS").is_empty():
+		await process_frame
+		await RenderingServer.frame_post_draw
+		var setup_image:=root.get_texture().get_image()
+		setup_image.save_png(OS.get_environment("METRO_TEST_RESULTS").path_join("exploration-setup-above-cabin.png"))
+		check(setup_image.get_pixel(480,350).is_equal_approx(home.DARK),"rendered preparation panel pixel is not covered by the door or rail")
+	home.loadout={"heavy":false,"inventory_tools":true};home.confirm_departure();await process_frame
+	check(is_instance_valid(home.surface_block) and not is_instance_valid(home.home_backdrop),"actual exploration contains no cabin backdrop")
+	check(not is_instance_valid(old_page) or old_page.get_parent()==null,"page transition detaches the prior cabin artwork immediately")
 	home.queue_free();await process_frame
 	print("RENOVATION_DOCK_OK: %d checks, %d failures"%[checks,failures]);quit(1 if failures else 0)

@@ -54,9 +54,8 @@ func _ready() -> void:
 		$Message.text="检查通过，可以退出装修。" if problem.is_empty() else problem)
 	context_panel=PanelContainer.new();context_panel.name="FurnitureActions";context_panel.z_index=60;context_panel.hide();add_child(context_panel)
 	context_actions=VBoxContainer.new();context_panel.add_child(context_actions)
-	for spec in [["Storage","查看储物格",edit_storage],["Temporary","临时收纳",temporarily_store_selected],["PackItem","收纳为物品",pack_selected],["Dismantle","分解",dismantle]]:
+	for spec in [["Storage","查看储物格",edit_storage],["Temporary","临时收纳",temporarily_store_selected],["Dismantle","分解",dismantle]]:
 		var button:=Button.new();button.name=spec[0];button.text=spec[1];button.custom_minimum_size=Vector2(158,34);context_actions.add_child(button);button.pressed.connect(spec[2])
-	var temp_pack:=Button.new();temp_pack.name="PackItem";temp_pack.text="收进储物家具";$Warehouse/Center/Panel/Margin/Items/Buttons.add_child(temp_pack);temp_pack.pressed.connect(pack_selected_temporary)
 	var temp_decompose:=Button.new();temp_decompose.name="Decompose";temp_decompose.text="分解选中";$Warehouse/Center/Panel/Margin/Items/Buttons.add_child(temp_decompose);temp_decompose.pressed.connect(decompose_selected_temporary)
 	place_button.pressed.connect(take_from_warehouse)
 	$Warehouse/Center/Panel/Margin/Items/Buttons/Close.pressed.connect(func(): $Warehouse.hide())
@@ -187,22 +186,11 @@ func recipe_text(recipe: Dictionary) -> String:
 func temporarily_store_selected() -> void:
 	var problem: String=state.temporarily_store_furniture(selected_id)
 	if problem.is_empty():selected_id="";moving=false
-	_refresh("家具已临时收纳；完成装修前请放回、收纳为物品或分解。" if problem.is_empty() else problem)
-
-func pack_selected() -> void:
-	var problem: String=state.Renovation.pack_item(state,selected_id)
-	if problem.is_empty():selected_id="";moving=false
-	_refresh("家具已作为物品收进储物空间。" if problem.is_empty() else problem)
+	_refresh("家具已临时收纳；完成装修前请放回或分解；物品类家具可摆放后拖入储物格。" if problem.is_empty() else problem)
 
 func selected_temporary() -> String:
 	var selected:=inventory.get_selected_items()
 	return "" if selected.is_empty() else str(inventory.get_item_metadata(selected[0]))
-func pack_selected_temporary() -> void:
-	var id:=selected_temporary()
-	if id.is_empty():return
-	var problem: String=state.Renovation.pack_item(state,id)
-	if problem.is_empty():open_warehouse()
-	$Message.text="家具已收纳为物品。" if problem.is_empty() else problem
 func decompose_selected_temporary() -> void:
 	var id:=selected_temporary()
 	if not id.is_empty():request_decomposition(id)
@@ -256,7 +244,7 @@ func show_furniture_list(mode: String) -> void:
 	$Warehouse/Center/Panel/Margin/Items/Help.text="完成装修前必须清空；这些家具不会在分解后重新出现。" if mode=="temporary" else "放置成功后才消耗材料或对应物品。"
 	$Warehouse/Center/Panel/Margin/Items/Empty.visible=inventory.item_count==0
 	$Warehouse/Center/Panel/Margin/Items/Empty.text="临时收纳仓库为空。" if mode=="temporary" else "没有可建造的家具。"
-	for node in ["PackItem","Decompose"]:$Warehouse/Center/Panel/Margin/Items/Buttons.get_node(node).visible=mode=="temporary"
+	for node in ["Decompose"]:$Warehouse/Center/Panel/Margin/Items/Buttons.get_node(node).visible=mode=="temporary"
 	$Warehouse.show();context_panel.hide();inventory.grab_focus()
 
 func take_from_warehouse() -> void:
@@ -284,7 +272,6 @@ func refresh_ui() -> void:
 	context_panel.visible=has_selection and at!=null and not moving and not $Warehouse.visible
 	if context_panel.visible:
 		context_actions.get_node("Storage").visible=Catalog.DEFINITIONS[selected_id].storage!=Vector2i.ZERO
-		context_actions.get_node("PackItem").visible=not Catalog.DEFINITIONS[selected_id].item_id.is_empty()
 	update_context_position()
 
 func update_context_position() -> void:
@@ -447,9 +434,11 @@ func finish_drag() -> void:
 	if not placement.is_empty() and can_place_at(placement):
 		place_at(placement)
 	else:
+		var problem: String="指针不在可布置区域。" if placement.is_empty() else state.furniture_placement_problem(selected_id,placement)
+		if building_new and problem.is_empty():problem=state.build_requirements_problem(selected_id)
 		moving = false
 		clear_gesture()
-		_refresh("落点无效，已保留原位置。")
+		_refresh(problem+" 已保留原位置。")
 
 func _input(event: InputEvent) -> void:
 	if not active or screen != "construction" or $Warehouse.visible or $Expansion.visible or is_instance_valid(build_panel) or (is_instance_valid(dismantle_dialog) and dismantle_dialog.visible):

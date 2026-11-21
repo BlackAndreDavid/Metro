@@ -61,7 +61,10 @@ def art_sprites():
 
 def catalog(name,key):
     path=GAME/'content'/(name+'.json')
-    return read(path if path.exists() else ROOT/'Game/content'/(name+'.json')).get(key,[])
+    entries=read(path if path.exists() else ROOT/'Game/content'/(name+'.json')).get(key,[])
+    if name=='furniture':
+        for entry in entries:normalize_furniture_grid(entry)
+    return entries
 def item_ids(): return {name for v in catalog('items','items') for name in [v['id'],v.get('runtime_id',v['id']),*v.get('aliases',[])]}
 def upsert_catalog(name,key,data):
     entries=catalog(name,key);old=next((e for e in entries if e['id']==data['id']),None)
@@ -125,20 +128,45 @@ def validate_building_geometry(data):
 def item_names(item):
     return [item['id'],item.get('runtime_id',item['id']),*item.get('aliases',[])]
 
+def normalize_furniture_grid(data):
+    """Persist one three-state grid; accept legacy masks only at the read boundary."""
+    width,height=data.get('width'),data.get('height')
+    require(integer(width,1,35) and integer(height,1,12),'家具网格范围须在35×12内')
+    width,height=int(width),int(height);data['width']=width;data['height']=height
+    hanging=data.get('placement_type')=='hanging'
+    if 'occupancy_grid' in data:
+        require(not any(key in data for key in ['floor_cells','wall_cells']),'家具只能保存一份三态网格，不能混用旧占位数组')
+        grid=data['occupancy_grid']
+    else:
+        legacy=[]
+        for key in ['floor_cells','wall_cells']:
+            cells=data.get(key,[])
+            require(isinstance(cells,list) and all(isinstance(c,list) and len(c)==2 and integer(c[0],0,width-1) and integer(c[1],0,height-1) for c in cells) and len({tuple(c) for c in cells})==len(cells),'旧家具占位格无效或重复')
+            legacy.append(cells)
+        require(not hanging or not any(legacy),'悬挂物只能使用参考格')
+        grid=[] if hanging else [[0]*width for _ in range(height)]
+        if not hanging:
+            for state,cells in [(2,legacy[1]),(1,legacy[0])]:
+                for x,y in cells:grid[int(y)][int(x)]=state
+    if hanging:require(grid==[],'悬挂物只能使用参考格')
+    else:
+        require(isinstance(grid,list) and len(grid)==height and all(isinstance(row,list) and len(row)==width and all(isinstance(v,int) and not isinstance(v,bool) and v in (0,1,2) for v in row) for row in grid),'占位网格须为匹配宽高的三态矩阵：0空置、1实物、2墙面')
+        require(any(any(row) for row in grid),'家具至少需要一个实物格或墙面格')
+    reference=data.get('reference_cells',[])
+    require(isinstance(reference,list) and all(isinstance(c,list) and len(c)==2 and integer(c[0],0,width-1) and integer(c[1],0,height-1) for c in reference) and len({tuple(c) for c in reference})==len(reference),'家具参考格无效或重复')
+    require(hanging or not reference,'非悬挂物不能使用参考格')
+    require('support_surface' not in data or isinstance(data['support_surface'],bool),'旧家具支撑属性无效')
+    data['occupancy_grid']=grid
+    for key in ['floor_cells','wall_cells','support_surface']:data.pop(key,None)
+
 def validate_furniture(data):
     require(isinstance(data,dict) and ID.fullmatch(data.get('id','')) and isinstance(data.get('name'),str) and 0<len(data['name'])<=80,'家具ID或名称无效')
     require(integer(data.get('width'),1,35) and integer(data.get('height'),1,12),'家具占位范围须在35×12内')
     validate_texture(data.get('texture',''))
-    require(all(isinstance(data[key],bool) for key in ['enabled','default_owned','support_surface','fill_grid','initial_placed','known'] if key in data),'家具开关字段须为布尔值')
+    require(all(isinstance(data[key],bool) for key in ['enabled','default_owned','fill_grid','initial_placed','known'] if key in data),'家具开关字段须为布尔值')
     require(isinstance(data.get('function_text',''),str) and len(data.get('function_text',''))<=200,'家具功能说明无效')
     require(data.get('placement_type','floor') in ['floor','hanging'],'家具摆放类型无效')
-    for plane in ['floor_cells','wall_cells','reference_cells']:
-        cells=data.get(plane,[])
-        require(isinstance(cells,list) and all(isinstance(c,list) and len(c)==2 and integer(c[0],0,data['width']-1) and integer(c[1],0,data['height']-1) for c in cells) and len({tuple(c) for c in cells})==len(cells),'家具实物、墙面或参考格无效或重复')
-    require(not ({tuple(c) for c in data.get('floor_cells',[])} & {tuple(c) for c in data.get('wall_cells',[])}),'同一家具的实物格和墙面格不能重复')
-    require(data.get('floor_cells') or data.get('wall_cells') or data.get('placement_type')=='hanging','家具至少需要一种占位格')
-    if data.get('placement_type')=='hanging':require(not data.get('floor_cells') and not data.get('wall_cells'),'悬挂物只能使用参考格')
-    else:require(not data.get('reference_cells'),'非悬挂物不能使用参考格')
+    normalize_furniture_grid(data)
     require(data.get('interaction','none') in ['none','rest','news','gear','locker','trade','map','preparation','storage'],'家具互动功能无效')
     animation=data.get('animation',{'frames':1,'columns':1,'fps':6})
     require(isinstance(animation,dict) and integer(animation.get('frames'),1,128) and integer(animation.get('columns'),1,animation['frames']) and number(animation.get('fps'),.1,60),'动画帧数、列数或帧率无效')

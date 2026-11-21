@@ -988,7 +988,7 @@ func furniture_placement_problem(kind: String, placement: Variant) -> String:
 		return "超出网格边界或位置类型不匹配；屏幕只能放在独立挂点。"
 	for other in FURNITURE_IDS:
 		if other != kind and furniture_layout[other] != null and Furniture.overlaps(kind, placement, other, furniture_layout[other]):
-			return "家具格已被占用。"
+			return "此处占位格已被%s占用。" % Furniture.DEFINITIONS[other].display_name
 	var trial:=furniture_layout.duplicate(true);trial[kind]=Furniture.canonical(placement)
 	for other in trial:
 		if trial[other]!=null:
@@ -1285,7 +1285,7 @@ func furniture_completion_problem() -> String:
 	if not temporary_furniture.is_empty():
 		var names: PackedStringArray=[]
 		for id in temporary_furniture:names.append(Furniture.DEFINITIONS[id].display_name)
-		return "临时收纳仓库仍有家具："+"、".join(names)+"。请放回、收纳为物品或分解后再完成装修。"
+		return "临时收纳仓库仍有家具："+"、".join(names)+"。请放回或分解；物品类家具可摆放后拖入储物格。"
 	for base in ["door","window"]:
 		if Renovation.count_placed(self,base)<1:return "全车至少保留一个车门和一个车窗。"
 	for id in furniture_layout:

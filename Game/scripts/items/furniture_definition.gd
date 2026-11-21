@@ -25,8 +25,23 @@ func perform(home: Control) -> void:
 	else:
 		home.use_hotspot(action)
 
-var floor_cells: Array[Vector2i] = []
-var wall_cells: Array[Vector2i] = []
+# Only this grid owns cell state. Legacy selectors are computed views, not masks.
+var occupancy_grid: Array = []
+var floor_cells: Array[Vector2i]:
+	get:return cells_of_type(1)
+var wall_cells: Array[Vector2i]:
+	get:return cells_of_type(2)
+
+func cells_of_type(state: int) -> Array[Vector2i]:
+	var result: Array[Vector2i]=[]
+	for y in range(occupancy_grid.size()):
+		for x in range(occupancy_grid[y].size()):
+			if int(occupancy_grid[y][x])==state:result.append(Vector2i(x,y))
+	return result
+
+func cell_state(at: Vector2i) -> int:
+	if at.y<0 or at.y>=occupancy_grid.size() or at.x<0 or at.x>=occupancy_grid[at.y].size():return 0
+	return int(occupancy_grid[at.y][at.x])
 var reference_cells: Array[Vector2i] = []
 var storage := Vector2i.ZERO
 var item_id := ""
@@ -37,7 +52,6 @@ var known := true
 var dismantle_cost: Dictionary = {}
 var salvage: Dictionary = {}
 var distance_rules: Array = []
-var support_surface := false
 var animation := {"frames":1,"columns":1,"fps":6.0}
 var texture_binding: Dictionary = {}
 var default_placement: Variant = null
@@ -78,18 +92,20 @@ static func from_data(data: Dictionary) -> Resource:
 	result.action=data.get("interaction","none");result.texture_path=data.texture
 	result.grid_size=Vector2i(int(data.width),int(data.height))
 	result.placement_type=data.get("placement_type","floor")
-	for cell in data.get("floor_cells",[]):result.floor_cells.append(Vector2i(cell[0],cell[1]))
-	for cell in data.get("wall_cells",[]):
-		var at:=Vector2i(cell[0],cell[1])
-		if at not in result.floor_cells:result.wall_cells.append(at)
-	if result.placement_type=="hanging":result.floor_cells.clear();result.wall_cells.clear()
+	if result.placement_type!="hanging":
+		if data.has("occupancy_grid"):result.occupancy_grid=data.occupancy_grid.duplicate(true)
+		else:
+			for y in range(result.grid_size.y):
+				var row: Array=[];row.resize(result.grid_size.x);row.fill(0);result.occupancy_grid.append(row)
+			for entry in [["wall_cells",2],["floor_cells",1]]:
+				for cell in data.get(entry[0],[]):result.occupancy_grid[int(cell[1])][int(cell[0])]=entry[1]
 	for cell in data.get("reference_cells",[]):result.reference_cells.append(Vector2i(cell[0],cell[1]))
 	var container: Variant=data.get("storage")
 	if container is Dictionary:result.storage=Vector2i(int(container.width),int(container.height))
 	result.item_id=data.get("item_id","");result.effects=data.get("effects",[]).duplicate()
 	result.required_technology=data.get("required_technology",{}).duplicate();result.known=data.get("known",true)
 	result.build_cost=data.get("build_cost",{}).duplicate();result.dismantle_cost=data.get("dismantle_cost",{}).duplicate();result.salvage=data.get("salvage",{}).duplicate()
-	result.distance_rules=data.get("distance_rules",[]).duplicate(true);result.support_surface=data.get("support_surface",false)
+	result.distance_rules=data.get("distance_rules",[]).duplicate(true)
 	result.animation=data.get("animation",{"frames":1,"columns":1,"fps":6}).duplicate()
 	result.texture_binding=data.get("texture_binding",{}).duplicate()
 	result.enabled=data.get("enabled",true) and not data.get("deleted",false)
@@ -106,8 +122,9 @@ func physical_plane_mask(frame_size: Vector2i) -> Texture2D:
 	var center:=Vector2(binding.get("x",0),binding.get("y",0))+extent/2
 	var angle:=deg_to_rad(float(binding.get("rotation",0)))
 	var occupied: Dictionary={}
-	for cell in wall_cells:occupied[cell]=false
-	for cell in floor_cells:occupied[cell]=true
+	for y in range(occupancy_grid.size()):
+		for x in range(occupancy_grid[y].size()):
+			if occupancy_grid[y][x]!=0:occupied[Vector2i(x,y)]=occupancy_grid[y][x]==1
 	for y in range(image.get_height()):
 		for x in range(image.get_width()):
 			var point:=center+((Vector2(x-2+.5,y-2+.5)/Vector2(frame_size)-Vector2(.5,.5))*extent).rotated(angle)

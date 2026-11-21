@@ -130,3 +130,5 @@ python test/tools/check_desktop_editor.py
 装修停靠面板也可使用实际渲染验证：设置有效的 `DISPLAY` 与 `METRO_TEST_RESULTS`，运行 Godot 的 `--display-driver x11 --rendering-method gl_compatibility --path Game --script ../test/cases/test_renovation_dock.gd`。通过后会生成 `renovation-dock.png`，用于检查两层蒙版着色器和左侧布局。
 
 装修停靠回归还覆盖悬挂物参考范围超过旧容量、参考格不影响实机贴图、中心对齐和单挂点单物体；家具界面回归覆盖白色参考格、悬挂属性切换、两种编辑模式互斥与服务端校验。
+
+三态占位回归覆盖单格循环、批量绘制与清空、矩阵校验、旧数据迁移、混合家具承托、支撑移除保护、不规则占位最近格距离和效果距离，以及整备/探索与门、Rail的绘制关系。API拒绝非法状态和同时传入新旧两套占位数据。

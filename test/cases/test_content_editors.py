@@ -229,6 +229,18 @@ console.log('EDITOR_MODELS_OK');
             invalid={**preparation,**changes}
             with self.assertRaises(ValueError):editor.validate_furniture(invalid)
 
+    def test_furniture_single_three_state_grid(self):
+        furniture=copy.deepcopy(editor.catalog('furniture','furniture')[0])
+        furniture.update(width=2,height=2,occupancy_grid=[[1,2],[0,1]],default_placement=None)
+        editor.validate_furniture(furniture)
+        self.assertNotIn('floor_cells',furniture);self.assertNotIn('wall_cells',furniture)
+        for grid in [[[1,3],[0,1]],[[1,True],[0,1]],[[1,2]],[[1],[0,1]],[[0,0],[0,0]]]:
+            with self.assertRaises(ValueError):editor.validate_furniture({**furniture,'occupancy_grid':grid})
+        legacy=copy.deepcopy(furniture);legacy.pop('occupancy_grid');legacy.update(floor_cells=[[0,0],[1,1]],wall_cells=[[1,0]])
+        editor.validate_furniture(legacy)
+        self.assertEqual(legacy['occupancy_grid'],[[1,2],[0,1]])
+        self.assertNotIn('floor_cells',legacy);self.assertNotIn('wall_cells',legacy)
+
     def test_customer_item_weights_validation(self):
         customer=self.customer();customer['sell_categories']=['supplies'];customer['sell_item_weights']={'supplies':{'water':5,'ration':0}}
         editor.validate_customer(customer)

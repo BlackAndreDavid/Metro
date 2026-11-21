@@ -13,12 +13,14 @@ with tempfile.TemporaryDirectory(prefix='metro-catalog-browser-') as scratch:
    browser=playwright.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox']);page=browser.new_page(viewport={'width':1600,'height':1400});errors=[];page.on('pageerror',lambda e:errors.append(str(e)));page.goto(url);page.wait_for_selector('#customerCards button')
    page.set_default_timeout(12000)
    page.click('#furnitureTab');page.wait_for_selector('#furnitureMask')
-   page.locator('#catalogCards [data-catalog-id=preparation]').click();assert page.locator('#furnitureRules input[data-field=distance]').input_value()=='3'
+   page.locator('#catalogCards [data-catalog-id=preparation]').click();expected_distance=next(v for v in json.loads((game/'content/furniture.json').read_text())['furniture'] if v['id']=='preparation')['distance_rules'][0]['distance'];assert float(page.locator('#furnitureRules input[data-field=distance]').input_value())==expected_distance
    page.locator('#furnitureRules input[data-field=distance]').fill('4');page.click('#saveAll');page.wait_for_function('!EditorSession.hasChanges()&&!EditorSession.busy')
    defs=json.loads((game/'content/furniture.json').read_text())['furniture'];assert next(v for v in defs if v['id']=='preparation')['distance_rules'][0]['distance']==4
    page.click('#newCatalog');page.locator('#catalogForm input[data-field=id]').fill('browser_furniture');page.locator('#catalogForm input[data-field=name]').fill('动画储物家具')
-   page.get_by_role('button',name='墙面占位',exact=True).click();grid=page.locator('#furnitureMask');grid.scroll_into_view_if_needed();grid.click(position={'x':5,'y':5})
-   assert page.evaluate('C.data.wall_cells.length===1&&C.data.floor_cells.length===3')
+   grid=page.locator('#furnitureMask');grid.scroll_into_view_if_needed();assert grid.count()==1 and '空置 → 实物 → 墙面 → 空置' in page.locator('#furnitureCellHelp').inner_text()
+   for state in [2,0,1,2]:
+    grid.click(position={'x':5,'y':5});assert page.evaluate('C.data.occupancy_grid[0][0]')==state
+   assert page.evaluate("!('floor_cells' in C.data)&&!('wall_cells' in C.data)&&C.data.occupancy_grid.flat().filter(v=>v===1).length===3")
    page.locator('#catalogForm select[data-field=item_id]').select_option('water');page.locator('#catalogForm select[data-field=interaction]').select_option('storage')
    page.get_by_text('具有储物功能',exact=True).locator('input').check()
    from PIL import Image
@@ -38,27 +40,34 @@ with tempfile.TemporaryDirectory(prefix='metro-catalog-browser-') as scratch:
    center=page.evaluate('furnitureCenter(furnitureBinding())');drag_texture(center,[center[0]+16,center[1]+8]);moved=page.evaluate('structuredClone(C.data.texture_binding)');assert abs(moved['x']-.5)<.01 and abs(moved['y']-.25)<.01
    b=page.evaluate('structuredClone(C.data.texture_binding)');center=page.evaluate('furnitureCenter(furnitureBinding())');corner=[center[0]+b['width']*16,center[1]+b['height']*16];drag_texture(corner,[corner[0]+6,corner[1]+6]);scaled=page.evaluate('structuredClone(C.data.texture_binding)');assert scaled['width']>b['width'] and abs(scaled['width']/scaled['height']-b['width']/b['height'])<.01
    center=page.evaluate('furnitureCenter(furnitureBinding())');handle=[center[0],center[1]-scaled['height']*16-18];drag_texture(handle,[center[0]+scaled['height']*16+18,center[1]]);bound=page.evaluate('structuredClone(C.data.texture_binding)');assert abs(bound['rotation']-90)<2
-   page.get_by_role('button',name='墙面占位',exact=True).click();grid=page.locator('#furnitureMask');grid.scroll_into_view_if_needed();r=grid.bounding_box();grid.click(position={'x':56*r['width']/560,'y':8*r['height']/192});assert page.evaluate('C.data.width===4') and page.evaluate('structuredClone(C.data.texture_binding)')==bound
-   assert page.evaluate("!C.data.wall_cells.some(w=>C.data.floor_cells.some(f=>f[0]===w[0]&&f[1]===w[1]))")
+   grid=page.locator('#furnitureMask');grid.scroll_into_view_if_needed();r=grid.bounding_box();point={'x':56*r['width']/560,'y':8*r['height']/192};grid.click(position=point);grid.click(position=point);assert page.evaluate('C.data.width===4') and page.evaluate('structuredClone(C.data.texture_binding)')==bound
+   assert page.evaluate("C.data.occupancy_grid.every(row=>row.every(v=>[0,1,2].includes(v)))")
    page.click('#saveAll');page.wait_for_function('!EditorSession.hasChanges()&&!EditorSession.busy')
    defs=json.loads((game/'content/furniture.json').read_text())['furniture'];furniture=next(v for v in defs if v['id']=='browser_furniture');assert furniture['storage']=={'width':4,'height':4} and furniture['item_id']=='water' and furniture['texture_binding']==bound
    items=json.loads((game/'content/items.json').read_text())['items'];water=next(v for v in items if v['id']=='water');assert water['furniture_kind']=='browser_furniture' and water['texture']!=furniture['texture']
    page.locator('#catalogPreview').screenshot(path=str(OUTPUT/'animated-furniture.png'))
    broken={**furniture,'distance_rules':[{'target_type':'furniture','target':'missing','relation':'require','distance':3}]};response=page.request.post(url+'/api/furniture',data=broken,headers={'X-Editor-Token':page.evaluate('S.project.token')});assert response.status==400
-   conflict={**furniture,'wall_cells':furniture['wall_cells']+[furniture['floor_cells'][0]]};response=page.request.post(url+'/api/furniture',data=conflict,headers={'X-Editor-Token':page.evaluate('S.project.token')});assert response.status==400
-   page.reload();page.wait_for_selector('#customerCards button');page.click('#furnitureTab');page.locator('#catalogCards [data-catalog-id=browser_furniture]').click();assert page.evaluate('C.data.animation.frames===3&&C.data.wall_cells.length===2')
+   conflict={**furniture,'wall_cells':[[0,0]]};response=page.request.post(url+'/api/furniture',data=conflict,headers={'X-Editor-Token':page.evaluate('S.project.token')});assert response.status==400
+   page.reload();page.wait_for_selector('#customerCards button');page.click('#furnitureTab');page.locator('#catalogCards [data-catalog-id=browser_furniture]').click();assert page.evaluate('C.data.animation.frames===3&&C.data.occupancy_grid.flat().filter(v=>v===2).length===2')
    assert page.evaluate('C.data.texture_binding.rotation')==bound['rotation']
    dock=page.locator('#saveAll').bounding_box();assert abs(dock['width']-285)<1 and abs(dock['x']+dock['width']-1584)<1
    page.set_viewport_size({'width':900,'height':650});dock=page.locator('#saveAll').bounding_box();assert abs(dock['width']-285)<1 and abs(dock['x']+dock['width']-884)<1 and dock['y']>550
-   page.check('#furnitureHanging');assert page.get_by_role('button',name='参考格',exact=True).count()==1 and page.get_by_role('button',name='实物占位',exact=True).count()==0 and page.get_by_role('button',name='墙面占位',exact=True).count()==0
+   grid=page.locator('#furnitureMask');grid.scroll_into_view_if_needed();r=grid.bounding_box()
+   def grid_drag(first,last,button='left'):
+    def at(point):return r['x']+(point[0]*16+8)*r['width']/560,r['y']+(point[1]*16+8)*r['height']/192
+    page.mouse.move(*at(first));page.mouse.down(button=button);page.mouse.move(*at(last),steps=8);page.mouse.up(button=button)
+   grid_drag((4,2),(5,3));assert page.evaluate('C.data.occupancy_grid[2][4]===1&&C.data.occupancy_grid[3][5]===1')
+   grid_drag((4,2),(5,3),'right');assert page.evaluate('C.data.occupancy_grid[2][4]===0&&C.data.occupancy_grid[3][5]===0')
+   page.locator('#furnitureMask').screenshot(path=str(OUTPUT/'single-three-state-grid.png'))
+   page.check('#furnitureHanging');assert '参考格' in page.locator('#furnitureCellHelp').inner_text() and page.locator('#furnitureMask').count()==1
    grid=page.locator('#furnitureMask');grid.scroll_into_view_if_needed();r=grid.bounding_box();grid.click(position={'x':104*r['width']/560,'y':40*r['height']/192})
-   assert page.evaluate('C.data.width===7&&C.data.floor_cells.length===0&&C.data.wall_cells.length===0&&C.data.reference_cells.some(c=>c[0]===6&&c[1]===2)')
+   assert page.evaluate('C.data.width===7&&C.data.occupancy_grid.length===0&&C.data.reference_cells.some(c=>c[0]===6&&c[1]===2)')
    assert page.evaluate("(()=>{const p=document.getElementById('furnitureMask').getContext('2d').getImageData(104,40,1,1).data;return p[0]===p[1]&&p[1]===p[2]&&p[0]>200})()")
    page.click('#saveAll');page.wait_for_function('!EditorSession.hasChanges()&&!EditorSession.busy')
-   hanging=next(v for v in json.loads((game/'content/furniture.json').read_text())['furniture'] if v['id']=='browser_furniture');assert hanging['placement_type']=='hanging' and hanging['width']==7 and hanging['reference_cells'] and not hanging['floor_cells'] and not hanging['wall_cells']
+   hanging=next(v for v in json.loads((game/'content/furniture.json').read_text())['furniture'] if v['id']=='browser_furniture');assert hanging['placement_type']=='hanging' and hanging['width']==7 and hanging['reference_cells'] and hanging['occupancy_grid']==[] and 'floor_cells' not in hanging and 'wall_cells' not in hanging
    invalid={**hanging,'floor_cells':[[0,0]]};response=page.request.post(url+'/api/furniture',data=invalid,headers={'X-Editor-Token':page.evaluate('S.project.token')});assert response.status==400
-   page.uncheck('#furnitureHanging');assert page.get_by_role('button',name='参考格',exact=True).count()==0 and page.get_by_role('button',name='实物占位',exact=True).count()==1 and page.evaluate('C.data.reference_cells.length===0')
+   page.uncheck('#furnitureHanging');assert '空置 → 实物 → 墙面 → 空置' in page.locator('#furnitureCellHelp').inner_text() and page.evaluate('C.data.reference_cells.length===0&&C.data.occupancy_grid.length>0')
    assert not errors,errors
-   print('FURNITURE_EDITOR_OK: dual masks, generic distance rules, storage, item linkage, GIF grid animation, manual texture drag/scale/rotate, stable binding, right save dock, validation and persistence')
+   print('FURNITURE_EDITOR_OK: single three-state grid, click cycle, legacy migration, generic distance rules, storage, item linkage, GIF grid animation, manual texture drag/scale/rotate, stable binding, right save dock, validation and persistence')
    browser.close()
  finally:server.terminate();server.wait(timeout=5)

@@ -137,6 +137,8 @@ func _input(event: InputEvent) -> void:
 
 func cabin_art() -> void:
 	home_backdrop = BACKDROP.instantiate()
+	# Modal pages keep the whole cabin, including raised rails/furniture, below UI.
+	home_backdrop.z_index=0 if screen=="cabin" else -10
 	view.add_child(home_backdrop)
 	home_backdrop.interaction_enabled = screen == "cabin"
 	home_backdrop.configure_world(self)
@@ -145,6 +147,7 @@ func begin_page(kind: String, scene: PackedScene = null) -> void:
 	home_backdrop = null
 	if is_instance_valid(view):
 		view.hide()
+		remove_child(view)
 		view.queue_free()
 	if kind != "surface":
 		surface_block = null

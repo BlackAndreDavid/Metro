@@ -215,29 +215,46 @@ static func support_problem(kind: String, p: Dictionary, layout: Dictionary) -> 
 		var supported:=false
 		for other in layout:
 			var at: Variant=layout[other]
-			if other==kind or at==null or not DEFINITIONS.has(other) or not DEFINITIONS[other].support_surface:continue
+			if other==kind or at==null or not DEFINITIONS.has(other):continue
 			if int(at.car)==int(p.car) and not at.has("mount") and below in cells(other,at,"floor_cells"):supported=true;break
 		if not supported:return data.display_name+"下方没有地面或平整支撑面。"
 	return ""
+
+static func occupied_regions(kind: String,placement: Dictionary) -> Array[Rect2]:
+	var result: Array[Rect2]=[]
+	if placement.has("mount"):
+		var anchor:=(mount_position(int(placement.car),int(placement.mount))-floor_rect(int(placement.car)).position)/CELL_SIDE
+		result.append(Rect2(anchor,Vector2.ZERO)) # Hanging references are never occupancy.
+	else:
+		for cell in cells(kind,placement,"floor_cells")+cells(kind,placement,"wall_cells"):result.append(Rect2(Vector2(cell),Vector2.ONE))
+	return result
+
+static func nearest_occupancy_distance(a_kind: String,a: Dictionary,b_kind: String,b: Dictionary) -> float:
+	if int(a.car)!=int(b.car):return INF
+	var closest:=INF
+	var first_regions:=occupied_regions(a_kind,a);var second_regions:=occupied_regions(b_kind,b)
+	for first in first_regions:
+		for second in second_regions:
+			var gap:=Vector2(maxf(0,maxf(first.position.x-second.end.x,second.position.x-first.end.x)),maxf(0,maxf(first.position.y-second.end.y,second.position.y-first.end.y)))
+			closest=minf(closest,gap.length())
+			if closest==0:return 0
+	return closest
 
 static func distance_problem(layout: Dictionary) -> String:
 	for kind in layout:
 		if layout[kind]==null or not DEFINITIONS.has(kind):continue
 		var data: Resource=DEFINITIONS[kind]
 		for rule in data.distance_rules:
-			var matches:=false
+			var closest:=INF
 			for other in layout:
 				if other==kind or layout[other]==null or not DEFINITIONS.has(other):continue
 				if rule.target_type=="furniture" and base_kind(other)!=rule.target:continue
 				if rule.target_type=="effect" and rule.target not in DEFINITIONS[other].effects:continue
-				if int(layout[kind].car)!=int(layout[other].car):continue
-				var a:=placement_rect(kind,layout[kind]);var b:=placement_rect(other,layout[other])
-				if layout[kind].has("mount"):a=visual_rect(kind,a)
-				if layout[other].has("mount"):b=visual_rect(other,b)
-				var gap:=Vector2(maxf(0,maxf(a.position.x-b.end.x,b.position.x-a.end.x)),maxf(0,maxf(a.position.y-b.end.y,b.position.y-a.end.y)))/CELL_SIDE
-				if (gap.length()<=float(rule.distance)+0.0001 if rule.relation=="require" else gap.length()<float(rule.distance)-0.0001):matches=true
-			if rule.relation=="require" and not matches:return data.display_name+"需要在 %s 格内靠近 %s。" % [rule.distance,rule.target]
-			if rule.relation=="exclude" and matches:return data.display_name+"必须远离 %s 至少 %s 格。" % [rule.target,rule.distance]
+				closest=minf(closest,nearest_occupancy_distance(kind,layout[kind],other,layout[other]))
+			var target: String=DEFINITIONS[rule.target].display_name if rule.target_type=="furniture" and DEFINITIONS.has(rule.target) else rule.target
+			var distance_text:="同车厢无目标" if is_inf(closest) else "最近占位格间距 %.2f 格" % closest
+			if rule.relation=="require" and closest>float(rule.distance)+.0001:return "%s需要靠近%s，上限%s格（%s）。" % [data.display_name,target,rule.distance,distance_text]
+			if rule.relation=="exclude" and closest<float(rule.distance)-.0001:return "%s需要远离%s，下限%s格（%s）。" % [data.display_name,target,rule.distance,distance_text]
 	return ""
 
 
