@@ -11,6 +11,7 @@ func check(ok: bool, description: String) -> void:
 		push_error(description)
 
 func _initialize() -> void:
+	load(get_script().resource_path.get_base_dir()+"/support/furniture_fixtures.gd").canonical_profile()
 	call_deferred("run")
 
 func mouse_button(at: Vector2, pressed: bool) -> InputEventMouseButton:

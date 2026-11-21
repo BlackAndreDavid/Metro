@@ -18,7 +18,7 @@ func configure(data: Resource, owner_home: Control, surface: Control) -> void:
 	set_item(data.texture, data.display_name + " · 长按1秒移动" if building else data.function_text, surface)
 	set_highlighted(false)
 	activated.connect(use)
-	if data.id == "screen":
+	if data.id.get_slice("#",0) == "screen":
 		if not building:
 			caption.text = "%s · %s · %s\n%s" % [home.state.station,home.state.date_text(),home.state.weather(),home.state.news()]
 			caption.position = Vector2(size.x + 12,0)

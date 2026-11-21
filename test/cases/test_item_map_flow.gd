@@ -7,7 +7,9 @@ func check(ok: bool, message: String) -> void:
 	if not ok:
 		failures += 1
 		push_error(message)
-func _initialize() -> void: call_deferred("run")
+func _initialize() -> void:
+	load(get_script().resource_path.get_base_dir()+"/support/furniture_fixtures.gd").canonical_profile()
+	call_deferred("run")
 func run() -> void:
 	var state := State.new()
 	check(state.ITEM_DEFINITIONS.computer is MetroItem, "computer uses storable item class")
@@ -32,10 +34,10 @@ func run() -> void:
 	check(state.place_furniture("computer", state.Furniture.default_placement("computer")).is_empty(), "stored computer can become furniture")
 	check(state.material_count("computer") == 0 and not state.furniture_layout.computer.has("rotated"), "placement consumes item and discards storage rotation")
 	var forged := state.save_data()
-	forged.locker.append({"kind":"computer","x":0,"y":0,"rotated":false})
+	forged.locker.append({"kind":"computer","x":0,"y":0,"rotated":false,"mirrored":"invalid"})
 	state.write_save(path,forged)
 	var before := copy.save_data()
-	check(not copy.load_cabin(path,[state.station]) and copy.save_data() == before, "duplicate item and furniture ownership rejected atomically")
+	check(not copy.load_cabin(path,[state.station]) and copy.save_data() == before, "invalid cargo metadata is rejected atomically")
 	state.locker.clear()
 	state.inventory.clear()
 	for container in state.storage_containers()+["bag"]:

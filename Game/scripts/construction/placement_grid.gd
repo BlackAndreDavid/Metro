@@ -21,3 +21,7 @@ func _draw() -> void:
 			for y in range(dimensions.y + 1):
 				var at := plane.position + Vector2(0, y * Catalog.CELL_SIZE.y)
 				draw_line(at, at + Vector2(plane.size.x, 0), color, 1)
+
+		if not hanging:
+			var bottom:=Vector2(Catalog.floor_rect(car).position.x,Catalog.GROUND_EDGE_Y)
+			draw_line(bottom,bottom+Vector2(Catalog.floor_rect(car).size.x,0),Color("e1c28a"),3)

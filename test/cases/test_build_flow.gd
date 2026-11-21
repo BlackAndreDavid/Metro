@@ -9,7 +9,9 @@ func check(ok: bool, message: String) -> void:
 	if not ok:
 		failures += 1
 		push_error(message)
-func _initialize() -> void: call_deferred("run")
+func _initialize() -> void:
+	load(get_script().resource_path.get_base_dir()+"/support/furniture_fixtures.gd").canonical_profile()
+	call_deferred("run")
 func recipe(state) -> void:
 	for kind in State.EXPANSION_COST:
 		for i in range(State.EXPANSION_COST[kind]):

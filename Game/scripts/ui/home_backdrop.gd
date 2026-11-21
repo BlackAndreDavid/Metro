@@ -119,6 +119,7 @@ func update_preview(kind: String, placement: Dictionary, valid: bool) -> void:
 		preview.queue_redraw()
 
 func configure_world(home: Control) -> void:
+	home.state.ensure_carriage_fixtures()
 	train_count = home.state.carriage_count
 	home_controller = home
 	focused_carriage = clampi(home.focused_carriage, 0, train_count - 1)
@@ -166,7 +167,7 @@ func configure_world(home: Control) -> void:
 	carriage.add_child(hanging_layer)
 	if home.construction.active:
 		make_grid(hanging_layer, true)
-	for kind in Catalog.IDS:
+	for kind in home.state.furniture_layout:
 		var placement: Variant = home.state.furniture_layout[kind]
 		if placement == null:
 			continue

@@ -129,7 +129,7 @@ def validate_furniture(data):
     require(isinstance(data,dict) and ID.fullmatch(data.get('id','')) and isinstance(data.get('name'),str) and 0<len(data['name'])<=80,'家具ID或名称无效')
     require(integer(data.get('width'),1,35) and integer(data.get('height'),1,12),'家具占位范围须在35×12内')
     validate_texture(data.get('texture',''))
-    require(all(isinstance(data[key],bool) for key in ['enabled','default_owned','support_surface','fill_grid','initial_placed'] if key in data),'家具开关字段须为布尔值')
+    require(all(isinstance(data[key],bool) for key in ['enabled','default_owned','support_surface','fill_grid','initial_placed','known'] if key in data),'家具开关字段须为布尔值')
     require(isinstance(data.get('function_text',''),str) and len(data.get('function_text',''))<=200,'家具功能说明无效')
     require(data.get('placement_type','floor') in ['floor','hanging'],'家具摆放类型无效')
     for plane in ['floor_cells','wall_cells']:
@@ -154,6 +154,9 @@ def validate_furniture(data):
     for rule in data.get('distance_rules',[]):
         require(isinstance(rule,dict) and rule.get('target_type') in ['furniture','effect'] and isinstance(rule.get('target'),str) and 0<len(rule['target'])<=80 and rule.get('relation') in ['require','exclude'] and number(rule.get('distance'),0,100),'需求/排斥距离规则无效')
         if rule['target_type']=='furniture':require(rule['target'] in definitions and rule['target']!=data['id'],'需求/排斥家具不存在或引用自身')
+    require(isinstance(data.get('required_technology',{}),dict) and all(ID.fullmatch(key) and integer(level,0,100) for key,level in data.get('required_technology',{}).items()),'家具技术要求无效')
+    for recipe in ['build_cost','dismantle_cost','salvage']:
+        require(isinstance(data.get(recipe,{}),dict) and all(kind in item_ids() and integer(amount,0,1000) for kind,amount in data.get(recipe,{}).items()),'家具建造、分解或返还材料配置无效')
     item_id=data.get('item_id','')
     require(isinstance(item_id,str),'家具物品属性无效')
     if item_id:

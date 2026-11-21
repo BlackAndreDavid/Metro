@@ -21,7 +21,7 @@ python test/tools/run_tests.py --godot "C:\Godot\Godot_v4.7.2-stable_win64.exe"
 
 ## 用例与工具
 
-统一入口目前包含23组：导入、15组 Godot 流程、临时素材、美术工具、内容编辑器、Godot 独立编辑器启动接入和原生测试器接入。内容编辑器组还会在隔离 Game 副本中进行资源导入、Godot 关卡预览和剧情运行检查。
+统一入口目前包含24组：导入、16组 Godot 流程、临时素材、美术工具、内容编辑器、Godot 独立编辑器启动接入和原生测试器接入。内容编辑器组还会在隔离 Game 副本中进行资源导入、Godot 关卡预览和剧情运行检查。
 
 | 用例 | 覆盖内容 |
 | --- | --- |
@@ -116,3 +116,11 @@ python test/tools/check_desktop_editor.py
 前者需要 Playwright 与 Chromium，在隔离副本中覆盖按物品/建筑/关卡/顾客/线路图保存、连续修改不写盘、保存/放弃/取消、保存失败留在原项和子建筑归入关卡。后者还验证真实 Qt 窗口关闭时取消退出、保存后退出。结果位于 `test/results/save-sessions/` 和 `test/results/desktop-editor/`，不修改正常工程内容。
 
 家具专项：`cases/test_furniture_system.gd` 覆盖双平面占位、支撑、距离、移动、收纳、可调储物、动画、迁移及退出检查；`python test/tools/check_furniture_editor_browser.py` 检查真实家具编辑、GIF转换、物品关联与保存。截图位于 `test/results/furniture-editor/`。
+
+## 装修与建造回归
+
+`cases/test_renovation_workflow.gd` 使用真实家具目录，覆盖初始冲突恢复、每车门窗、临时收纳清空、地面边界吸附、分解确认与原子回滚、技术保存、建造条件亮暗及排序，以及真实鼠标操作临时仓库和单家具储物格。已纳入统一入口。
+
+部分既有家具规则用例使用 `cases/support/furniture_fixtures.gd` 的进程内窗户墙面基准，隔离美术占位变化；不修改工程定义。新增装修用例保留实际窗户地面格，负责当前内容布局和迁移兼容检查。
+
+`python test/tools/check_preview_layers_browser.py` 检查物品/家具占位和建筑碰撞箱实际像素叠放、隐藏开关与数据不变；截图在 `results/preview-layers/`。`python test/tools/check_furniture_editor_browser.py` 同时验证家具贴图绑定、动画、双平面占位和保存。

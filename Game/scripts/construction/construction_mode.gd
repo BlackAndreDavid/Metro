@@ -28,6 +28,12 @@ var grab_cell := Vector2i.ZERO
 var candidate: Dictionary = {}
 var registered: Dictionary = {}
 var storage_panel: Control
+var context_panel: PanelContainer
+var context_actions: VBoxContainer
+var dismantle_dialog: ConfirmationDialog
+var warehouse_mode := "temporary"
+var building_new := false
+var build_panel: Control
 @onready var actions: HBoxContainer = $Toolbar/Margin/Actions
 @onready var inventory: ItemList = $Warehouse/Center/Panel/Margin/Items/Inventory
 @onready var place_button: Button = $Warehouse/Center/Panel/Margin/Items/Buttons/Place
@@ -36,15 +42,21 @@ func _ready() -> void:
 	_setup_theme()
 	$Expansion/Center/Panel/Margin/Items/Buttons/Confirm.pressed.connect(confirm_expansion)
 	$Expansion/Center/Panel/Margin/Items/Buttons/Back.pressed.connect(func(): _refresh(""))
-	actions.get_node("Dismantle").pressed.connect(dismantle)
 	actions.get_node("Warehouse").pressed.connect(open_warehouse)
+	actions.get_node("Warehouse").text="临时收纳仓库"
+	var build_button:=Button.new();build_button.name="Build";build_button.text="建造 / 摆放";actions.add_child(build_button);build_button.pressed.connect(open_build_menu)
 	actions.get_node("Expand").pressed.connect(request_expansion)
 	actions.get_node("Exit").pressed.connect(exit)
 	var check_button:=Button.new();check_button.name="Check";check_button.text="检查装修";actions.add_child(check_button)
 	check_button.pressed.connect(func():
 		var problem: String=state.furniture_completion_problem()
 		$Message.text="检查通过，可以退出装修。" if problem.is_empty() else problem)
-	var storage_button:=Button.new();storage_button.name="Storage";storage_button.text="储物格";actions.add_child(storage_button);storage_button.pressed.connect(edit_storage)
+	context_panel=PanelContainer.new();context_panel.name="FurnitureActions";context_panel.z_index=60;context_panel.hide();add_child(context_panel)
+	context_actions=VBoxContainer.new();context_panel.add_child(context_actions)
+	for spec in [["Storage","查看储物格",edit_storage],["Temporary","临时收纳",temporarily_store_selected],["PackItem","收纳为物品",pack_selected],["Dismantle","分解",dismantle]]:
+		var button:=Button.new();button.name=spec[0];button.text=spec[1];button.custom_minimum_size=Vector2(158,34);context_actions.add_child(button);button.pressed.connect(spec[2])
+	var temp_pack:=Button.new();temp_pack.name="PackItem";temp_pack.text="收进储物家具";$Warehouse/Center/Panel/Margin/Items/Buttons.add_child(temp_pack);temp_pack.pressed.connect(pack_selected_temporary)
+	var temp_decompose:=Button.new();temp_decompose.name="Decompose";temp_decompose.text="分解选中";$Warehouse/Center/Panel/Margin/Items/Buttons.add_child(temp_decompose);temp_decompose.pressed.connect(decompose_selected_temporary)
 	place_button.pressed.connect(take_from_warehouse)
 	$Warehouse/Center/Panel/Margin/Items/Buttons/Close.pressed.connect(func(): $Warehouse.hide())
 	inventory.item_selected.connect(func(_index): place_button.disabled = false)
@@ -77,6 +89,7 @@ func enter() -> void:
 	if not is_instance_valid(source) or not source.state.can_edit_home():
 		return
 	state = source.state
+	state.renovation_active=true
 	focused_carriage = source.focused_carriage
 	if not is_inside_tree():
 		source.get_tree().root.add_child(self)
@@ -90,7 +103,7 @@ func enter() -> void:
 	selected_id = ""
 	moving = false
 	screen = "construction"
-	_refresh("点击家具选中，或从家具仓库取出家具。")
+	_refresh("选中家具使用右上角操作；临时收纳必须在完成装修前清空。")
 
 func exit() -> void:
 	if moving and state.furniture_layout.get(selected_id)==null:
@@ -108,8 +121,11 @@ func exit() -> void:
 
 func deactivate() -> void:
 	if is_instance_valid(storage_panel):storage_panel.queue_free()
+	if is_instance_valid(build_panel):build_panel.queue_free()
 	clear_gesture()
 	active = false
+	state.renovation_active=false
+	context_panel.hide()
 	selected_id = ""
 	moving = false
 	$Warehouse.hide()
@@ -125,36 +141,75 @@ func select_furniture(kind: String) -> void:
 	if not active or not Catalog.DEFINITIONS.has(kind):
 		return
 	selected_id = kind
+	building_new=false
 	moving = false
-	_refresh("已选中%s，长按1秒可拖动，也可拆除。" % Catalog.DEFINITIONS[kind].display_name)
+	_refresh("已选中%s，长按1秒拖动；右上角可查看储物、收纳或分解。" % Catalog.DEFINITIONS[kind].display_name)
 
 func can_place_at(placement: Dictionary) -> bool:
-	return active and moving and not selected_id.is_empty() and state.furniture_placement_problem(selected_id, placement).is_empty()
+	return active and moving and not selected_id.is_empty() and (not building_new or state.build_requirements_problem(selected_id).is_empty()) and state.furniture_placement_problem(selected_id, placement).is_empty()
 
 func place_at(placement: Dictionary) -> void:
 	if not active or not moving or selected_id.is_empty():
 		return
-	var problem: String = state.place_furniture(selected_id, placement)
+	var problem: String = state.build_furniture(selected_id,placement) if building_new else state.place_furniture(selected_id, placement)
 	if problem.is_empty():
 		focused_carriage = int(placement.car)
 		moving = false
+		building_new=false
 		clear_gesture()
 	_refresh("家具位置已更新，请在床铺保存。" if problem.is_empty() else problem)
 
 func dismantle() -> void:
-	if not active or selected_id.is_empty():
-		return
-	var kind := selected_id
-	var problem: String = state.store_furniture(kind)
-	if problem.is_empty():
-		selected_id = ""
-		moving = false
-	_refresh(("电脑已收纳到柜子或背包。" if kind == "computer" else "家具已拆除并收纳到家具仓库。") if problem.is_empty() else problem)
+	if not active or selected_id.is_empty():return
+	request_decomposition(selected_id)
+
+func request_decomposition(id: String) -> void:
+	var problem: String=state.Renovation.decomposition_problem(state,id)
+	if not problem.is_empty():$Message.text=problem;return
+	if is_instance_valid(dismantle_dialog):dismantle_dialog.hide();dismantle_dialog.queue_free()
+	dismantle_dialog=ConfirmationDialog.new();dismantle_dialog.name="DecompositionConfirmation";dismantle_dialog.title="确认分解家具";dismantle_dialog.ok_button_text="确认分解";dismantle_dialog.cancel_button_text="取消"
+	var definition: Resource=Catalog.DEFINITIONS[id]
+	dismantle_dialog.dialog_text="分解%s？家具将被消耗。\n消耗：%s\n获得：%s" % [definition.display_name,recipe_text(definition.dismantle_cost),recipe_text(definition.salvage)]
+	add_child(dismantle_dialog)
+	dismantle_dialog.confirmed.connect(func():
+		var result: String=state.decompose_furniture(id)
+		if result.is_empty():selected_id="";moving=false;building_new=false
+		$Warehouse.hide();_refresh("家具已分解。" if result.is_empty() else result))
+	dismantle_dialog.popup_centered(Vector2i(470,210))
+
+func recipe_text(recipe: Dictionary) -> String:
+	var names: PackedStringArray=[]
+	for kind in recipe:names.append("%s × %d" % [state.item_name(kind),int(recipe[kind])])
+	return "无" if names.is_empty() else "、".join(names)
+
+func temporarily_store_selected() -> void:
+	var problem: String=state.temporarily_store_furniture(selected_id)
+	if problem.is_empty():selected_id="";moving=false
+	_refresh("家具已临时收纳；完成装修前请放回、收纳为物品或分解。" if problem.is_empty() else problem)
+
+func pack_selected() -> void:
+	var problem: String=state.Renovation.pack_item(state,selected_id)
+	if problem.is_empty():selected_id="";moving=false
+	_refresh("家具已作为物品收进储物空间。" if problem.is_empty() else problem)
+
+func selected_temporary() -> String:
+	var selected:=inventory.get_selected_items()
+	return "" if selected.is_empty() else str(inventory.get_item_metadata(selected[0]))
+func pack_selected_temporary() -> void:
+	var id:=selected_temporary()
+	if id.is_empty():return
+	var problem: String=state.Renovation.pack_item(state,id)
+	if problem.is_empty():open_warehouse()
+	$Message.text="家具已收纳为物品。" if problem.is_empty() else problem
+func decompose_selected_temporary() -> void:
+	var id:=selected_temporary()
+	if not id.is_empty():request_decomposition(id)
 
 func cancel_selection() -> void:
 	clear_gesture()
 	selected_id = ""
 	moving = false
+	building_new=false
 	_refresh("")
 
 func request_expansion() -> void:
@@ -166,24 +221,38 @@ func request_expansion() -> void:
 	show_expansion()
 
 func open_warehouse() -> void:
-	if not active:
-		return
-	cancel_selection()
-	inventory.clear()
-	for kind in Catalog.IDS:
-		if not state.stored_furniture_available(kind):
-			continue
-		var data: Resource = Catalog.DEFINITIONS[kind]
-		inventory.add_item(data.display_name, data.texture)
-		var index := inventory.item_count - 1
-		inventory.set_item_metadata(index, kind)
-		inventory.set_item_tooltip_enabled(index, false)
-	place_button.disabled = inventory.item_count == 0
-	if inventory.item_count > 0:
-		inventory.select(0)
-	$Warehouse/Center/Panel/Margin/Items/Empty.visible = inventory.item_count == 0
-	$Warehouse.show()
-	inventory.grab_focus()
+	show_furniture_list("temporary")
+func open_build_menu() -> void:
+	if not active:return
+	cancel_selection();$Warehouse.hide()
+	if is_instance_valid(build_panel):build_panel.queue_free()
+	build_panel=preload("res://scripts/construction/build_panel.gd").new();add_child(build_panel);build_panel.configure(self)
+	build_panel.build_requested.connect(select_build_kind)
+	context_panel.hide()
+func select_build_kind(kind: String) -> void:
+	var problem: String=state.build_requirements_problem(kind)
+	if not problem.is_empty():$Message.text=problem;return
+	if is_instance_valid(build_panel):build_panel.queue_free()
+	selected_id=state.Renovation.next_id(state,kind);moving=true;building_new=true;grab_cell=Vector2i.ZERO
+	_refresh("点击兼容位置放置%s；成功后扣除所需物品和材料。" % Catalog.DEFINITIONS[selected_id].display_name)
+func show_furniture_list(mode: String) -> void:
+	if not active:return
+	cancel_selection();warehouse_mode=mode;inventory.clear()
+	var items: Array=state.temporary_furniture if mode=="temporary" else Catalog.IDS
+	for id in items:
+		var definition: Resource=Catalog.DEFINITIONS[id]
+		if mode=="build" and not definition.enabled:continue
+		var text: String=definition.display_name
+		if mode=="build":text+=" · "+(state.item_name(definition.item_id)+" × 1" if not definition.item_id.is_empty() else recipe_text(definition.build_cost))
+		inventory.add_item(text,definition.texture);inventory.set_item_metadata(inventory.item_count-1,id)
+	place_button.disabled=inventory.item_count==0
+	if inventory.item_count>0:inventory.select(0)
+	$Warehouse/Center/Panel/Margin/Items/Title.text="临时收纳仓库" if mode=="temporary" else "建造 / 从物品摆放"
+	$Warehouse/Center/Panel/Margin/Items/Help.text="完成装修前必须清空；这些家具不会在分解后重新出现。" if mode=="temporary" else "放置成功后才消耗材料或对应物品。"
+	$Warehouse/Center/Panel/Margin/Items/Empty.visible=inventory.item_count==0
+	$Warehouse/Center/Panel/Margin/Items/Empty.text="临时收纳仓库为空。" if mode=="temporary" else "没有可建造的家具。"
+	for node in ["PackItem","Decompose"]:$Warehouse/Center/Panel/Margin/Items/Buttons.get_node(node).visible=mode=="temporary"
+	$Warehouse.show();context_panel.hide();inventory.grab_focus()
 
 func take_from_warehouse() -> void:
 	if not active:
@@ -192,9 +261,9 @@ func take_from_warehouse() -> void:
 	if selected.is_empty():
 		return
 	var kind: String = inventory.get_item_metadata(selected[0])
-	if not state.stored_furniture_available(kind):
-		return
-	selected_id = kind
+	building_new=warehouse_mode=="build"
+	if not building_new and kind not in state.temporary_furniture:return
+	selected_id = state.Renovation.next_id(state,kind) if building_new else kind
 	moving = true
 	$Warehouse.hide()
 	grab_cell = Vector2i.ZERO
@@ -206,8 +275,19 @@ func refresh_ui() -> void:
 		return
 	var has_selection := not selected_id.is_empty()
 	actions.get_node("Selection").text = "装修 · " + (("移动中：" if moving else "已选中：") + Catalog.DEFINITIONS[selected_id].display_name if has_selection else "长按家具1秒后拖动，或点击选中拆除")
-	actions.get_node("Storage").disabled = not has_selection or state.furniture_layout.get(selected_id)==null or Catalog.DEFINITIONS[selected_id].storage==Vector2i.ZERO
-	actions.get_node("Dismantle").disabled = not has_selection or state.furniture_layout[selected_id] == null
+	var at: Variant=state.furniture_layout.get(selected_id)
+	context_panel.visible=has_selection and at!=null and not moving and not $Warehouse.visible and not is_instance_valid(storage_panel)
+	if context_panel.visible:
+		context_actions.get_node("Storage").visible=Catalog.DEFINITIONS[selected_id].storage!=Vector2i.ZERO
+		context_actions.get_node("PackItem").visible=not Catalog.DEFINITIONS[selected_id].item_id.is_empty()
+	update_context_position()
+
+func update_context_position() -> void:
+	if not is_instance_valid(context_panel) or not context_panel.visible or not registered.has(selected_id):return
+	var item: Control=registered[selected_id].get_ref()
+	if not is_instance_valid(item):context_panel.hide();return
+	var rect:=item.get_global_rect()
+	context_panel.position=Vector2(rect.end.x+8,rect.position.y).clamp(Vector2(8,76),size-context_panel.size-Vector2(8,8))
 
 func _refresh(message: String) -> void:
 	screen = "construction"
@@ -260,7 +340,7 @@ func confirm_expansion() -> void:
 	_refresh("扩建完成，请返回后在床铺保存。")
 
 func _unhandled_key_input(event: InputEvent) -> void:
-	if not active or is_instance_valid(storage_panel) or not event.is_pressed() or event.is_echo():
+	if not active or is_instance_valid(storage_panel) or is_instance_valid(build_panel) or not event.is_pressed() or event.is_echo():
 		return
 	if event is InputEventKey and event.keycode == KEY_ESCAPE:
 		if $Expansion.visible:
@@ -287,6 +367,7 @@ func clear_gesture() -> void:
 func press_furniture(kind: String, at: Vector2) -> void:
 	if not active or screen != "construction" or moving:
 		return
+	building_new=false
 	hold_kind = kind
 	hold_elapsed = 0
 	hold_cancelled = false
@@ -308,6 +389,7 @@ func show_hold_progress() -> void:
 	$HoldProgress.queue_redraw()
 
 func _process(delta: float) -> void:
+	if active:update_context_position()
 	if not active or screen != "construction" or hold_kind.is_empty() or hold_cancelled:
 		return
 	hold_elapsed = minf(HOLD_SECONDS, hold_elapsed + delta)
@@ -321,7 +403,7 @@ func _process(delta: float) -> void:
 		_refresh("拖到目标格后松开；红色位置不可放置，Esc 可取消。")
 
 func target_at(at: Vector2) -> Dictionary:
-	if selected_id.is_empty() or $Toolbar.get_global_rect().has_point(at):
+	if selected_id.is_empty() or $Toolbar.get_global_rect().has_point(at) or (context_panel.visible and context_panel.get_global_rect().has_point(at)):
 		return {}
 	var local: Vector2 = backdrop.carriage.get_global_transform().affine_inverse() * at
 	if Catalog.DEFINITIONS[selected_id].placement_type == "hanging":
@@ -336,6 +418,10 @@ func target_at(at: Vector2) -> Dictionary:
 	if car < 0 or car >= state.carriage_count or anchor.y < 144 or anchor.y > 576:
 		return {}
 	var cell := Vector2i(((anchor - Catalog.floor_rect(car).position) / Catalog.CELL_SIZE).floor())
+	if Catalog.DEFINITIONS[selected_id].wall_cells.is_empty() and not Catalog.DEFINITIONS[selected_id].floor_cells.is_empty():
+		var bottom:=0
+		for occupied in Catalog.DEFINITIONS[selected_id].floor_cells:bottom=maxi(bottom,occupied.y+1)
+		if absf(anchor.y+bottom*Catalog.CELL_SIDE-Catalog.GROUND_EDGE_Y)<=Catalog.CELL_SIDE*0.45:cell.y=Catalog.GRID_SIZE.y-bottom
 	return {"car": car, "x": cell.x, "y": cell.y}
 
 func update_drag_preview() -> void:
@@ -352,7 +438,7 @@ func finish_drag() -> void:
 		_refresh("落点无效，已保留原位置。")
 
 func _input(event: InputEvent) -> void:
-	if not active or screen != "construction" or $Warehouse.visible or $Expansion.visible or is_instance_valid(storage_panel):
+	if not active or screen != "construction" or $Warehouse.visible or $Expansion.visible or is_instance_valid(storage_panel) or is_instance_valid(build_panel) or (is_instance_valid(dismantle_dialog) and dismantle_dialog.visible):
 		return
 	if event is InputEventMouse:
 		pointer = event.position
@@ -374,7 +460,7 @@ func _input(event: InputEvent) -> void:
 		elif not event.pressed and dragging_furniture:
 			finish_drag()
 			get_viewport().set_input_as_handled()
-		elif event.pressed and moving and not $Toolbar.get_global_rect().has_point(pointer):
+		elif event.pressed and moving and not $Toolbar.get_global_rect().has_point(pointer) and not (context_panel.visible and context_panel.get_global_rect().has_point(pointer)):
 			finish_drag()
 			get_viewport().set_input_as_handled()
 
@@ -383,4 +469,6 @@ func edit_storage() -> void:
 	if selected_id.is_empty() or Catalog.DEFINITIONS[selected_id].storage==Vector2i.ZERO:return
 	clear_gesture()
 	storage_panel=preload("res://scripts/construction/storage_editor.gd").new();add_child(storage_panel)
-	storage_panel.configure(self,selected_id,true)
+	storage_panel.configure(self,selected_id,true,false)
+	context_panel.hide()
+	storage_panel.tree_exited.connect(refresh_ui)

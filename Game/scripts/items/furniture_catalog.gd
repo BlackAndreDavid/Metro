@@ -13,13 +13,15 @@ const HANGING_ORIGINS := [Vector2(28, 22), Vector2(87, 22), Vector2(130, 20), Ve
 const LEGACY_IDS := ["bed","computer","locker","door","screen"]
 static var IDS: Array = []
 static var DEFINITIONS: Dictionary = {}
+static var SOURCES: Dictionary = {}
+const GROUND_EDGE_Y := GRID_ORIGIN.y + GRID_SIZE.y * CELL_SIDE
 static func _static_init() -> void:
 	reload()
 static func reload() -> void:
-	IDS.clear();DEFINITIONS.clear()
+	IDS.clear();DEFINITIONS.clear();SOURCES.clear()
 	var document: Dictionary=preload("res://scripts/content/content_registry.gd").read_json("res://content/furniture.json")
 	for data in document.get("furniture",[]):
-		IDS.append(data.id);DEFINITIONS[data.id]=preload("res://scripts/items/furniture_definition.gd").from_data(data)
+		SOURCES[data.id]=data.duplicate(true);IDS.append(data.id);DEFINITIONS[data.id]=preload("res://scripts/items/furniture_definition.gd").from_data(data)
 
 static func floor_rect(car: int) -> Rect2:
 	return Rect2(GRID_ORIGIN + Vector2(car * CARRIAGE_PITCH, 0), Vector2(GRID_SIZE) * CELL_SIZE)
@@ -39,14 +41,55 @@ static func default_placement(kind: String, car: int = 0) -> Dictionary:
 	return result
 
 static func initial_layout() -> Dictionary:
-	var result := {}
+	var requested := {}
 	for kind in IDS:
 		var placement:=default_placement(kind)
-		result[kind]=placement if not placement.is_empty() and DEFINITIONS[kind].initial_placed and DEFINITIONS[kind].enabled else null
+		requested[kind]=placement if not placement.is_empty() and (DEFINITIONS[kind].initial_placed and DEFINITIONS[kind].enabled or kind in ["door","window"]) else null
+	return reconcile_layout(requested,1)
+
+static func base_kind(id: String) -> String:
+	return id.get_slice("#",0)
+
+static func ensure_instance(id: String) -> bool:
+	if DEFINITIONS.has(id):return true
+	var base:=base_kind(id)
+	if id.count("#")!=1 or base not in IDS or not id.get_slice("#",1).is_valid_int() or int(id.get_slice("#",1))<1:return false
+	var definition: Resource=preload("res://scripts/items/furniture_definition.gd").from_data(SOURCES[base])
+	definition.id=id;DEFINITIONS[id]=definition
+	return true
+
+static func reconcile_layout(requested: Dictionary, count: int) -> Dictionary:
+	var result: Dictionary={}
+	var order: Array=requested.keys()
+	var priorities: Dictionary={"door":0,"window":1,"locker":2,"preparation":3,"bed":4}
+	order.sort_custom(func(a,b):return priorities.get(base_kind(a),5)<priorities.get(base_kind(b),5))
+	for id in order:result[id]=null
+	for id in order:
+		if requested[id]==null or not ensure_instance(id):continue
+		var preferred: Dictionary=canonical(requested[id])
+		if free_placement(id,preferred,result,count):result[id]=preferred;continue
+		var options: Array[Dictionary]=[]
+		if DEFINITIONS[id].placement_type=="hanging":
+			for car in range(count):
+				for mount in range(HANGING_ORIGINS.size()):options.append({"car":car,"mount":mount,"x":0,"y":0})
+		else:
+			for car in range(count):
+				for y in range(-occupancy_bounds(id).position.y,GRID_SIZE.y-occupancy_bounds(id).end.y+1):
+					for x in range(-occupancy_bounds(id).position.x,GRID_SIZE.x-occupancy_bounds(id).end.x+1):options.append({"car":car,"x":x,"y":y})
+		options.sort_custom(func(a,b):return placement_distance(a,preferred)<placement_distance(b,preferred))
+		for option in options:
+			if free_placement(id,option,result,count):result[id]=option;break
 	return result
 
-static func valid_placement(kind: String, p: Variant, count: int, version: int = 18) -> bool:
-	if not DEFINITIONS.has(kind) or not p is Dictionary:
+static func free_placement(id: String, at: Dictionary, layout: Dictionary, count: int) -> bool:
+	if not valid_placement(id,at,count):return false
+	for other in layout:
+		if other!=id and layout[other]!=null and overlaps(id,at,other,layout[other]):return false
+	var trial:=layout.duplicate(true);trial[id]=at
+	return support_problem(id,at,trial).is_empty() and distance_problem(trial).is_empty()
+
+static func valid_placement(kind: String, p: Variant, count: int, version: int = 19) -> bool:
+	if not ensure_instance(kind) or not p is Dictionary:
 		return false
 	var hanging: bool = DEFINITIONS[kind].placement_type == "hanging"
 	if p.size() != (4 if hanging else 3):
@@ -59,9 +102,15 @@ static func valid_placement(kind: String, p: Variant, count: int, version: int =
 	var bounds := (Vector2i(2, 2) if version <= 8 else (Vector2i(3, 3) if version == 9 else MOUNT_SIZE)) if hanging else (Vector2i(16, 12) if version == 6 else (Vector2i(34, 12) if version == 7 else GRID_SIZE))
 	if hanging and (not integer(p.get("mount")) or p.mount < 0 or p.mount >= HANGING_ORIGINS.size()):
 		return false
+	if version>=19 and not hanging:
+		var occupied:=cells(kind,p,"floor_cells")+cells(kind,p,"wall_cells")
+		if occupied.is_empty():return false
+		for cell in occupied:
+			if not Rect2i(Vector2i.ZERO,bounds).has_point(cell):return false
+		return true
 	return Rect2i(Vector2i.ZERO, bounds).encloses(Rect2i(Vector2i(int(p.x), int(p.y)), footprint(kind, version)))
 
-static func overlaps(a_kind: String, a: Dictionary, b_kind: String, b: Dictionary, version: int = 18) -> bool:
+static func overlaps(a_kind: String, a: Dictionary, b_kind: String, b: Dictionary, version: int = 19) -> bool:
 	if int(a.car) != int(b.car) or a.has("mount") != b.has("mount"):
 		return false
 	if a.has("mount") and int(a.mount) != int(b.mount):
@@ -91,10 +140,12 @@ static func canonical(p: Dictionary) -> Dictionary:
 static func copy_layout(layout: Dictionary) -> Dictionary:
 	var result := {}
 	for kind in IDS:
-		result[kind] = canonical(layout[kind]) if layout.get(kind) != null else (null if layout.has(kind) or DEFINITIONS[kind].default_placement==null else canonical(DEFINITIONS[kind].default_placement))
+		result[kind]=canonical(layout[kind]) if layout.get(kind)!=null else null
+	for id in layout:
+		if ensure_instance(id):result[id]=canonical(layout[id]) if layout[id]!=null else null
 	return result
 
-static func footprint(kind: String, version: int = 18) -> Vector2i:
+static func footprint(kind: String, version: int = 19) -> Vector2i:
 	if version <= 10 and kind == "computer": return Vector2i(2, 2)
 	if version == 9 and kind == "screen": return Vector2i(3, 3)
 	if version <= 8 and kind == "screen": return Vector2i(2, 2)
@@ -151,7 +202,7 @@ static func support_problem(kind: String, p: Dictionary, layout: Dictionary) -> 
 	var occupied:=cells(kind,p,"floor_cells")
 	for cell in occupied:
 		var below:=cell+Vector2i.DOWN
-		if below in occupied or below.y==GRID_SIZE.y:continue
+		if below in occupied or is_on_ground(cell):continue
 		var supported:=false
 		for other in layout:
 			var at: Variant=layout[other]
@@ -168,7 +219,7 @@ static func distance_problem(layout: Dictionary) -> String:
 			var matches:=false
 			for other in layout:
 				if other==kind or layout[other]==null or not DEFINITIONS.has(other):continue
-				if rule.target_type=="furniture" and other!=rule.target:continue
+				if rule.target_type=="furniture" and base_kind(other)!=rule.target:continue
 				if rule.target_type=="effect" and rule.target not in DEFINITIONS[other].effects:continue
 				if int(layout[kind].car)!=int(layout[other].car):continue
 				var a:=placement_rect(kind,layout[kind]);var b:=placement_rect(other,layout[other])
@@ -191,7 +242,7 @@ static func add_missing_layout(layout: Dictionary, count: int) -> Dictionary:
 		for car in range(count):
 			for y in range(GRID_SIZE.y-data.grid_size.y+1):
 				for x in range(GRID_SIZE.x-data.grid_size.x+1):candidates.append({"car":car,"x":x,"y":y})
-		candidates.sort_custom(func(a,b):return Vector3(a.car,a.x,a.y).distance_squared_to(Vector3(preferred.car,preferred.x,preferred.y))<Vector3(b.car,b.x,b.y).distance_squared_to(Vector3(preferred.car,preferred.x,preferred.y)))
+		candidates.sort_custom(func(a,b):return placement_distance(a,preferred)<placement_distance(b,preferred))
 		for candidate in candidates:
 			var blocked:=false
 			for other in result:
@@ -200,3 +251,19 @@ static func add_missing_layout(layout: Dictionary, count: int) -> Dictionary:
 			var trial:=result.duplicate(true);trial[kind]=candidate
 			if support_problem(kind,candidate,trial).is_empty() and distance_problem(trial).is_empty():result[kind]=candidate;break
 	return result
+
+
+static func is_on_ground(cell: Vector2i) -> bool:
+	return absf(GRID_ORIGIN.y+(cell.y+1)*CELL_SIDE-GROUND_EDGE_Y)<0.001
+
+
+static func occupancy_bounds(id: String) -> Rect2i:
+	var occupied: Array[Vector2i]=cells(id,{"x":0,"y":0},"floor_cells")+cells(id,{"x":0,"y":0},"wall_cells")
+	if occupied.is_empty():return Rect2i(Vector2i.ZERO,DEFINITIONS[id].grid_size)
+	var left:=occupied[0];var right:=occupied[0]+Vector2i.ONE
+	for cell in occupied:left=left.min(cell);right=right.max(cell+Vector2i.ONE)
+	return Rect2i(left,right-left)
+
+
+static func placement_distance(at: Dictionary, preferred: Dictionary) -> float:
+	return pow(float(at.car)-float(preferred.car),2)*10000+Vector2(at.x,at.y).distance_squared_to(Vector2(preferred.x,preferred.y))+pow(float(at.get("mount",0))-float(preferred.get("mount",0)),2)

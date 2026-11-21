@@ -32,6 +32,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 [node name="Message" type="Label" parent="."]
+z_index = 60
 offset_left = 32.0
 offset_top = 648.0
 offset_right = 1248.0
@@ -40,6 +41,7 @@ mouse_filter = 2
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 17
 [node name="Toolbar" type="PanelContainer" parent="."]
+z_index = 60
 offset_left = 32.0
 offset_top = 16.0
 offset_right = 1248.0
@@ -62,15 +64,7 @@ theme_override_styles/normal = SubResource("Button")
 theme_override_styles/hover = SubResource("Button")
 theme_override_styles/pressed = SubResource("Button")
 theme_override_styles/disabled = SubResource("Button")
-text = "家具仓库"
-[node name="Dismantle" type="Button" parent="Toolbar/Margin/Actions"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 14
-theme_override_styles/normal = SubResource("Button")
-theme_override_styles/hover = SubResource("Button")
-theme_override_styles/pressed = SubResource("Button")
-theme_override_styles/disabled = SubResource("Button")
-text = "拆除"
+text = "临时收纳仓库"
 [node name="Expand" type="Button" parent="Toolbar/Margin/Actions"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 14
@@ -88,6 +82,7 @@ theme_override_styles/pressed = SubResource("Button")
 theme_override_styles/disabled = SubResource("Button")
 text = "退出装修"
 [node name="Warehouse" type="Control" parent="."]
+z_index = 100
 visible = false
 anchors_preset = 15
 anchor_right = 1.0
@@ -117,7 +112,7 @@ theme_override_constants/separation = 12
 [node name="Title" type="Label" parent="Warehouse/Center/Panel/Margin/Items"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 26
-text = "家具仓库"
+text = "临时收纳仓库"
 [node name="Help" type="Label" parent="Warehouse/Center/Panel/Margin/Items"]
 layout_mode = 2
 text = "选择收纳中的家具，点击放置或双击条目。"
@@ -128,7 +123,7 @@ size_flags_vertical = 3
 fixed_icon_size = Vector2i(48, 48)
 [node name="Empty" type="Label" parent="Warehouse/Center/Panel/Margin/Items"]
 layout_mode = 2
-text = "所有家具均已安装。可选中已安装家具后拆除收纳。"
+text = "临时收纳仓库为空。"
 [node name="Buttons" type="HBoxContainer" parent="Warehouse/Center/Panel/Margin/Items"]
 layout_mode = 2
 theme_override_constants/separation = 12
@@ -142,6 +137,7 @@ size_flags_horizontal = 3
 text = "返回建造"
 
 [node name="Expansion" type="Control" parent="."]
+z_index = 100
 visible = false
 anchors_preset = 15
 anchor_right = 1.0
