@@ -1,7 +1,7 @@
 'use strict';
 // A session owns a whole editable document, including its nested inspectors.
 const EditSession={key:null,baseline:null,metadata:null,depth:0,pending:null,busy:false,closeDecision:'idle'};
-function lockSessionUI(){const elements=[...document.querySelectorAll('main,header,dialog:not(#unsavedDialog)')].map(element=>[element,element.inert]);for(const [element] of elements)element.inert=true;return ()=>{for(const [element,inert]of elements)element.inert=inert}}
+function lockSessionUI(){const elements=[...document.querySelectorAll('main,header,#saveDock,dialog:not(#unsavedDialog)')].map(element=>[element,element.inert]);for(const [element] of elements)element.inert=true;return ()=>{for(const [element,inert]of elements)element.inert=inert}}
 function sessionKey(viewId){
  if(viewId==='levelView'||viewId==='catalogView'&&(C.instance!==null||C.outdoor!==undefined))return 'level/'+S.station;
  if(viewId==='catalogView')return 'catalog/'+C.kind+'/'+(C.originalId||C.data?.id||'new');
@@ -33,9 +33,17 @@ EditSession.hasChanges=function(){
  if(!this.key||this.baseline===null)return false;
  try{return this.metadata?.fresh||JSON.stringify(sessionData())!==JSON.stringify(this.baseline)}catch(_error){return true}
 };
+function updateSaveButtons(changed){
+ for(const id of ['saveAll','saveCatalog','saveCustomer','saveLevel','saveSettings','networkSave']){
+  const button=$(id);button.classList.toggle('save-dirty',changed);button.classList.toggle('save-clean',!changed);
+  const caption=EditSession.busy?'正在保存…':changed?'保存草稿 · 未保存':'✓ 已保存';
+  if(button.textContent!==caption)button.textContent=caption;
+  const title=(changed?'保存当前编辑项：':'当前编辑项已保存：')+EditSession.title();if(button.title!==title)button.title=title;
+ }
+}
 EditSession.refresh=function(){
  if(!this.key||this.depth)return;
- try{const changed=this.hasChanges();$('dirty').textContent=(changed?'● 未保存 · ':'✓ 已保存 · ')+this.title();if(this.key==='networkView')N.dirty=changed}catch(error){$('dirty').textContent='● 未保存';}
+ try{const changed=this.hasChanges();updateSaveButtons(changed);$('dirty').textContent=(changed?'● 未保存 · ':'✓ 已保存 · ')+this.title();if(this.key==='networkView')N.dirty=changed}catch(error){updateSaveButtons(true);$('dirty').textContent='● 未保存';}
 };
 EditSession.title=function(){
  if(this.key?.startsWith('level/'))return S.station+' · 关卡';
@@ -66,7 +74,7 @@ EditSession.discard=function(){
  this.metadata.fresh=false;this.baseline=sessionData();this.refresh();
 };
 EditSession.save=async function(){
- if(this.busy)throw Error('正在保存，请稍候。');this.busy=true;status('正在保存当前编辑项…');const unlock=lockSessionUI();
+ if(this.busy)throw Error('正在保存，请稍候。');this.busy=true;updateSaveButtons(this.hasChanges());status('正在保存当前编辑项…');const unlock=lockSessionUI();
  try{
   const data=sessionData(),key=this.key;
   if(key.startsWith('catalog/')){
@@ -85,7 +93,7 @@ EditSession.save=async function(){
   if(key==='networkView'){const station=S.station;$('stations').replaceChildren();for(const name of S.project.stations)option($('stations'),name,name);$('stations').value=station;updateStationBanner();$('networkState').textContent='✓ 地图已保存'}
   if(key.startsWith('level/')&&sessionView()==='catalogView'){sessionViewBase('levelView');C.instance=null;delete C.outdoor;listEntities();drawMap()}
   this.enter(sessionKey(sessionView()));this.metadata.fresh=false;this.refresh();status((key.startsWith('level/')?'关卡':key.startsWith('customer/')?'顾客':key.startsWith('catalog/')?catalogTitles[C.kind]:'设置')+'已保存：'+this.title());return true;
- }finally{unlock();this.busy=false}
+ }finally{unlock();this.busy=false;this.refresh()}
 };
 const saveDialog=document.createElement('dialog');saveDialog.id='unsavedDialog';saveDialog.innerHTML='<h2>保存当前编辑项？</h2><p id="unsavedMessage"></p><p id="unsavedError" role="alert"></p><div class="bar"><button id="unsavedSave" class="primary">保存并离开</button><button id="unsavedDiscard">放弃修改</button><button id="unsavedCancel">取消</button></div>';document.body.append(saveDialog);
 EditSession.ask=function(){
