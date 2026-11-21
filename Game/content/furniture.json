@@ -429,8 +429,8 @@
       },
       "default_owned": true,
       "texture_binding": {
-        "x": -2.541524707031249,
-        "y": 0.8672137085783473,
+        "x": 0.020819673585890985,
+        "y": 0.02411995857834781,
         "width": 4,
         "height": 3,
         "rotation": 0
@@ -516,8 +516,8 @@
       "interaction": "storage",
       "function_text": "打开预备仓库",
       "storage": {
-        "width": 8,
-        "height": 6
+        "width": 6,
+        "height": 4
       },
       "item_id": "",
       "effects": [],
