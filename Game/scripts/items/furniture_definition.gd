@@ -16,7 +16,7 @@ var texture: Texture2D:
 func perform(home: Control) -> void:
 	if action == "none":
 		return
-	if id.contains("#") and action in ["locker","preparation","storage"]:
+	if action=="preparation" or (id.contains("#") and action in ["locker","storage"]):
 		home.show_furniture_storage(id)
 	elif action == "storage":
 		home.show_furniture_storage(id)

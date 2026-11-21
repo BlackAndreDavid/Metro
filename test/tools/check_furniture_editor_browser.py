@@ -17,10 +17,11 @@ with tempfile.TemporaryDirectory(prefix='metro-catalog-browser-') as scratch:
    page.locator('#furnitureRules input[data-field=distance]').fill('4');page.click('#saveAll');page.wait_for_function('!EditorSession.hasChanges()&&!EditorSession.busy')
    defs=json.loads((game/'content/furniture.json').read_text())['furniture'];assert next(v for v in defs if v['id']=='preparation')['distance_rules'][0]['distance']==4
    page.click('#newCatalog');page.locator('#catalogForm input[data-field=id]').fill('browser_furniture');page.locator('#catalogForm input[data-field=name]').fill('动画储物家具')
-   grid=page.locator('#furnitureMask');grid.scroll_into_view_if_needed();assert grid.count()==1 and '空置 → 实物 → 墙面 → 空置' in page.locator('#furnitureCellHelp').inner_text()
-   for state in [2,0,1,2]:
-    grid.click(position={'x':5,'y':5});assert page.evaluate('C.data.occupancy_grid[0][0]')==state
-   assert page.evaluate("!('floor_cells' in C.data)&&!('wall_cells' in C.data)&&C.data.occupancy_grid.flat().filter(v=>v===1).length===3")
+   grid=page.locator('#furnitureMask');grid.scroll_into_view_if_needed();assert grid.count()==1 and '右键删除' in page.locator('#furnitureCellHelp').inner_text()
+   page.get_by_role('button',name='墙面格',exact=True).click();grid.scroll_into_view_if_needed()
+   for _ in range(2):grid.click(position={'x':5,'y':5});assert page.evaluate('C.data.occupancy_grid[0][0]')==2
+   grid.click(position={'x':5,'y':5},button='right');assert page.evaluate('C.data.occupancy_grid[0][0]')==0
+   grid.click(position={'x':5,'y':5});assert page.evaluate("!('floor_cells' in C.data)&&!('wall_cells' in C.data)&&C.data.occupancy_grid.flat().filter(v=>v===1).length===3")
    page.locator('#catalogForm select[data-field=item_id]').select_option('water');page.locator('#catalogForm select[data-field=interaction]').select_option('storage')
    page.get_by_text('具有储物功能',exact=True).locator('input').check()
    from PIL import Image
@@ -56,18 +57,19 @@ with tempfile.TemporaryDirectory(prefix='metro-catalog-browser-') as scratch:
    def grid_drag(first,last,button='left'):
     def at(point):return r['x']+(point[0]*16+8)*r['width']/560,r['y']+(point[1]*16+8)*r['height']/192
     page.mouse.move(*at(first));page.mouse.down(button=button);page.mouse.move(*at(last),steps=8);page.mouse.up(button=button)
+   page.get_by_role('button',name='实物格',exact=True).click();grid.scroll_into_view_if_needed();r=grid.bounding_box()
    grid_drag((4,2),(5,3));assert page.evaluate('C.data.occupancy_grid[2][4]===1&&C.data.occupancy_grid[3][5]===1')
    grid_drag((4,2),(5,3),'right');assert page.evaluate('C.data.occupancy_grid[2][4]===0&&C.data.occupancy_grid[3][5]===0')
    page.locator('#furnitureMask').screenshot(path=str(OUTPUT/'single-three-state-grid.png'))
-   page.check('#furnitureHanging');assert '参考格' in page.locator('#furnitureCellHelp').inner_text() and page.locator('#furnitureMask').count()==1
+   page.check('#furnitureHanging');assert page.get_by_role('button',name='参考格',exact=True).count()==1 and page.get_by_role('button',name='实物格',exact=True).count()==0 and page.locator('#furnitureMask').count()==1;page.get_by_role('button',name='参考格',exact=True).click()
    grid=page.locator('#furnitureMask');grid.scroll_into_view_if_needed();r=grid.bounding_box();grid.click(position={'x':104*r['width']/560,'y':40*r['height']/192})
    assert page.evaluate('C.data.width===7&&C.data.occupancy_grid.length===0&&C.data.reference_cells.some(c=>c[0]===6&&c[1]===2)')
    assert page.evaluate("(()=>{const p=document.getElementById('furnitureMask').getContext('2d').getImageData(104,40,1,1).data;return p[0]===p[1]&&p[1]===p[2]&&p[0]>200})()")
    page.click('#saveAll');page.wait_for_function('!EditorSession.hasChanges()&&!EditorSession.busy')
    hanging=next(v for v in json.loads((game/'content/furniture.json').read_text())['furniture'] if v['id']=='browser_furniture');assert hanging['placement_type']=='hanging' and hanging['width']==7 and hanging['reference_cells'] and hanging['occupancy_grid']==[] and 'floor_cells' not in hanging and 'wall_cells' not in hanging
    invalid={**hanging,'floor_cells':[[0,0]]};response=page.request.post(url+'/api/furniture',data=invalid,headers={'X-Editor-Token':page.evaluate('S.project.token')});assert response.status==400
-   page.uncheck('#furnitureHanging');assert '空置 → 实物 → 墙面 → 空置' in page.locator('#furnitureCellHelp').inner_text() and page.evaluate('C.data.reference_cells.length===0&&C.data.occupancy_grid.length>0')
+   page.uncheck('#furnitureHanging');assert page.get_by_role('button',name='实物格',exact=True).count()==1 and page.get_by_role('button',name='参考格',exact=True).count()==0 and page.evaluate('C.data.reference_cells.length===0&&C.data.occupancy_grid.length>0&&F.cellType===1')
    assert not errors,errors
-   print('FURNITURE_EDITOR_OK: single three-state grid, click cycle, legacy migration, generic distance rules, storage, item linkage, GIF grid animation, manual texture drag/scale/rotate, stable binding, right save dock, validation and persistence')
+   print('FURNITURE_EDITOR_OK: single three-state grid, type brush, left-add/right-delete, legacy migration, generic distance rules, storage, item linkage, GIF grid animation, manual texture drag/scale/rotate, stable binding, right save dock, validation and persistence')
    browser.close()
  finally:server.terminate();server.wait(timeout=5)

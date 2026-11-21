@@ -275,7 +275,8 @@ func use_hotspot(kind: String) -> void:
 			trade_supplies = false
 			show_trade()
 		"rest": show_rest()
-		"gear", "preparation":
+		"preparation": show_furniture_storage("preparation")
+		"gear":
 			loadout = {"heavy": false, "inventory_tools":true}
 			state.sync_carried_tools()
 			show_gear()
@@ -621,7 +622,8 @@ func move_cargo(target: String, cell: Vector2i) -> void:
 	var message := "%s 已放入%s。" % [state.item_name(entry.kind), container_name]
 	if screen == "locker":
 		show_locker(message)
-	elif screen == "gear":show_gear(message)
+	elif screen == "gear":
+		clear_selection();view.refresh_inventory(message)
 	else:
 		show_surface(message)
 
@@ -952,16 +954,19 @@ func close_settings() -> void:
 	settings_panel.queue_free()
 	settings_panel = null
 
-func equip_selected_active(id: int = -1) -> void:
+func equip_selected_active(id: int = -1, source: String = "") -> void:
 	if check_trip_timeout(): return
 	if id < 0:
-		if selection.get("source") != "bag": report("先在背包中选中道具。"); return
+		if selection.get("source") not in ["bag","preparation"]: report("先在储物格中选中道具。"); return
 		id = int(selection.id)
-	var problem := state.equip_active(id)
+	if source.is_empty():source=selection.get("source","bag")
+	var problem := state.equip_active(id,source)
 	if problem.is_empty():
 		clear_selection()
-		update_surface_pack(true)
-		report("道具已装备到主动位，不再占用背包格。")
+		if screen=="gear":view.refresh_inventory("道具已装备，不再占用储物格。")
+		else:
+			update_surface_pack(true)
+			report("道具已装备到主动位，不再占用背包格。")
 	else: report(problem)
 
 func unequip_active_item() -> void:
@@ -983,7 +988,7 @@ func sort_cargo(container:String)->void:
 	var problem:=state.sort_container(container)
 	clear_selection()
 	if screen=="locker":show_locker(problem if not problem.is_empty() else "整理完成，物品数量与状态已保留。")
-	elif screen=="gear":show_gear(problem if not problem.is_empty() else "整理完成。")
+	elif screen=="gear":view.refresh_inventory(problem if not problem.is_empty() else "整理完成。")
 	elif screen=="surface":update_surface_pack(true);report(problem if not problem.is_empty() else "背包整理完成。")
 
 func quick_place_selected()->void:
@@ -996,7 +1001,7 @@ func quick_place_selected()->void:
 	var problem:=state.auto_place(selection,target)
 	if problem.is_empty():clear_selection()
 	if screen=="locker":show_locker(problem if not problem.is_empty() else "物品已自动放置。")
-	elif screen=="gear":show_gear(problem if not problem.is_empty() else "物品已自动放置。")
+	elif screen=="gear":view.refresh_inventory(problem if not problem.is_empty() else "物品已自动放置。")
 	elif screen=="surface":update_surface_pack(true);report(problem if not problem.is_empty() else "物品已自动放置。")
 
 func quick_pickup_nearby()->void:

@@ -4,6 +4,8 @@ var host: Control
 var container: String
 var cell_size := 52
 var hover_cell := Vector2i(-1, -1)
+# Canvas draw commands keep texture RIDs, not the catalogue resources that own them.
+var drawn_textures: Array[Texture2D] = []
 
 func setup(owner_ui: Control, target: String, pixels: int) -> void:
 	host = owner_ui
@@ -71,6 +73,7 @@ func _drop_data(_at: Vector2, _payload: Variant) -> void:
 	host.move_cargo(container, drag_cell())
 
 func _draw() -> void:
+	drawn_textures.clear()
 	if host == null:
 		return
 	var bounds: Vector2i = host.state.grid_size(container)
@@ -96,6 +99,7 @@ func _draw() -> void:
 		draw_string(host.font, rect.position + Vector2(5, rect.size.y-5), title, HORIZONTAL_ALIGNMENT_CENTER, rect.size.x-10, 12, Color("f0ebdf"))
 		if host.state.ITEM_DEFINITIONS.has(entry.kind) and host.state.ITEM_DEFINITIONS[entry.kind].texture != null:
 			var texture: Texture2D = host.state.ITEM_DEFINITIONS[entry.kind].texture
+			drawn_textures.append(texture)
 			var definition: Resource = host.state.ITEM_DEFINITIONS[entry.kind]
 			var binding: Dictionary = definition.texture_binding
 			var mirrored: bool = host.selection.get("mirrored",false) if active else entry.get("mirrored",false)
