@@ -104,14 +104,12 @@ $('map').ondrop=e=>{e.preventDefault();try{placeAsset(JSON.parse(e.dataTransfer.
 // The station picker uses the same line geometry and station coordinates as the game.
 const svgNS='http://www.w3.org/2000/svg';
 let diagram=null,diagramView={x:-50,y:-55,w:1370,h:1210},stationPan=null,stationLoad=0;
-const mapDrafts=new Map();
 function svgElement(tag,attrs={}){const element=document.createElementNS(svgNS,tag);for(const[k,v]of Object.entries(attrs))element.setAttribute(k,v);return element}
 function applyDiagramView(){diagram?.setAttribute('viewBox',`${diagramView.x} ${diagramView.y} ${diagramView.w} ${diagramView.h}`)}
 function updateStationBanner(){if(!S.project)return;const lines=S.project.station_map.lines.filter(l=>l[2].includes(S.station)).map(l=>`${l[0]}号线`).join(' / ');$('editingStation').textContent=S.station;$('stationBadge').textContent=`${S.station} · ${lines}`}
 async function selectStation(name){
-  if(S.level){readLevel();mapDrafts.set(S.station,clone(S.level))}
   const sequence=++stationLoad,result=await api('/api/level?station='+encodeURIComponent(name));if(sequence!==stationLoad)return;
-  S.station=name;$('stations').value=name;showLevel(mapDrafts.get(name)||result.definition||cloneTemplate(result.template));$('levelPaths').textContent=JSON.stringify(S.project.registry.stations[name]||{},null,2);$('stationDialog').close();updateStationBanner();status(`正在编辑：${name}；切换前的地图草稿已在本页保留。`);
+  S.station=name;$('stations').value=name;showLevel(result.definition||cloneTemplate(result.template));$('levelPaths').textContent=JSON.stringify(S.project.registry.stations[name]||{},null,2);$('stationDialog').close();updateStationBanner();status(`正在编辑：${name}；按当前站点关卡统一保存。`);
 }
 function renderStationMap(){
   if(!S.project)return;diagram=svgElement('svg',{'aria-label':'地铁站点选择地图'});const geometry=S.project.station_map;
@@ -135,7 +133,7 @@ $('chooseStation').onclick=()=>{renderStationMap();$('stationDialog').showModal(
 $('stationSearch').oninput=()=>{const query=$('stationSearch').value.trim(),entry=Object.entries(S.project.station_map.stations).find(([name])=>name.includes(query));if(!query||!entry)return;const[x,y]=entry[1].position;diagramView={x:x-250,y:y-220,w:500,h:440};applyDiagramView()};
 // Thumbnail cards replace the former customer directory list.
 const workspaceListCustomers=listCustomers,workspaceShowCustomer=showCustomer;
-function customerCards(){const box=$('customerCards');box.replaceChildren();for(const c of S.project.customers){const card=button(c.name,()=>{readCustomer();if(S.customer&&!S.customer._create){const index=S.project.customers.findIndex(n=>n.id===S.customer.id);if(index>=0)S.project.customers[index]=clone(S.customer)}showCustomer(c)},'customer-card'+(S.customer?.id===c.id?' selected':''));card.dataset.customer=c.id;const image=document.createElement('img');image.src='/asset?path='+encodeURIComponent(c.texture);image.alt=c.name;card.prepend(image);box.append(card)}}
+function customerCards(){const box=$('customerCards');box.replaceChildren();for(const c of S.project.customers){const card=button(c.name,()=>{showCustomer(c)},'customer-card'+(S.customer?.id===c.id?' selected':''));card.dataset.customer=c.id;const image=document.createElement('img');image.src='/asset?path='+encodeURIComponent(c.texture);image.alt=c.name;card.prepend(image);box.append(card)}}
 listCustomers=function(){workspaceListCustomers();customerCards();renderPalette()};
 showCustomer=function(c){workspaceShowCustomer(c);customerCards()};
 // Encounter preview: every story owns an independent conversation graph.

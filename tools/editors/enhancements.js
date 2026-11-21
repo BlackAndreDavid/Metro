@@ -27,7 +27,7 @@ $('settingsTab').onclick=run(async()=>{view('settingsView');godotPathEdited=fals
 let syncingPaths=false;
 setInterval(async()=>{if($('settingsView').hidden||syncingPaths)return;syncingPaths=true;try{await syncIntegrationPaths(true)}catch(_error){}finally{syncingPaths=false}},2000);
 $('saveAll').onclick=()=>{if(!$('settingsView').hidden)$('saveSettings').click();else if(!$('levelView').hidden)$('saveLevel').click();else $('saveCustomer').click()};
-document.addEventListener('input',e=>{if(e.target.closest('main'))$('dirty').textContent='● 未保存'});window.addEventListener('beforeunload',e=>{if($('dirty').textContent.includes('未保存')){e.preventDefault();e.returnValue=''}});
+// Unsaved document tracking is provided by save_sessions.js.
 $('saveSettings').onclick=run(async()=>{const result=await api('/api/settings',{godot_executable:$('godotPath').value.trim()});S.project.settings=result.settings;godotPathEdited=false;$('dirty').textContent='✓ 已保存';status('Godot 接口设置已保存')});
 for(const[id,action]of[['probeGodot','probe'],['openGodot','editor'],['runGodot','game']])$(id).onclick=run(async()=>{await api('/api/settings',{godot_executable:$('godotPath').value.trim()});const result=await api('/api/godot',{action});$('godotResult').textContent=JSON.stringify(result,null,2);status(action==='probe'?'Godot 连接成功':'Godot 已启动')});
 const oldShowLevel=showLevel,oldReadLevel=readLevel,oldEntityForm=entityForm,oldApplyEntity=applyEntity;

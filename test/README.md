@@ -21,7 +21,7 @@ python test/tools/run_tests.py --godot "C:\Godot\Godot_v4.7.2-stable_win64.exe"
 
 ## 用例与工具
 
-统一入口目前包含21组：导入、15组 Godot 流程、临时素材、美术工具、内容编辑器、Godot 独立编辑器启动接入和原生测试器接入。内容编辑器组还会在隔离 Game 副本中进行资源导入、Godot 关卡预览和剧情运行检查。
+统一入口目前包含22组：导入、15组 Godot 流程、临时素材、美术工具、内容编辑器、Godot 独立编辑器启动接入和原生测试器接入。内容编辑器组还会在隔离 Game 副本中进行资源导入、Godot 关卡预览和剧情运行检查。
 
 | 用例 | 覆盖内容 |
 | --- | --- |
@@ -105,3 +105,12 @@ python test/tools/check_desktop_editor.py
 存档维护检查 `test_save_management.gd` 验证确认/取消、修复备份、无损重排、缺失定义/空间不足/核心数据异常时停止，以及删除隔离。
 
 `tools/check_tester.py` 启动真实原生 Qt 窗口和隔离 Godot 游戏，验证双向登记、插件启动、数值/向量修改、物品生成、正式存档不变、鉴权和单实例退出。`check_packaged_tools.py` 由目标平台打包工作流运行，验证实际生成的程序。
+
+## 编辑项保存检查
+
+```sh
+python test/tools/check_save_sessions_browser.py
+python test/tools/check_desktop_editor.py
+```
+
+前者需要 Playwright 与 Chromium，在隔离副本中覆盖按物品/建筑/关卡/顾客/线路图保存、连续修改不写盘、保存/放弃/取消、保存失败留在原项和子建筑归入关卡。后者还验证真实 Qt 窗口关闭时取消退出、保存后退出。结果位于 `test/results/save-sessions/` 和 `test/results/desktop-editor/`，不修改正常工程内容。

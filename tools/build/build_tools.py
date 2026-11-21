@@ -3,7 +3,7 @@
 import argparse,os,subprocess,sys,tempfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
-STATIC=['index.html','style.css','models.js','editor.js','enhancements.js','workspace.js','catalogs.js','geometry_editor.js','network_editor.js']
+STATIC=['index.html','style.css','models.js','editor.js','enhancements.js','workspace.js','catalogs.js','geometry_editor.js','network_editor.js','save_sessions.js']
 def command(tool,work):
  name,folder=('MetroEditor','editors') if tool=='editor' else ('MetroTester','tester')
  args=[sys.executable,'-m','PyInstaller','--noconfirm','--clean','--onedir','--windowed','--name',name,'--distpath',str(ROOT/'tools/bin'),'--workpath',str(work/'work'),'--specpath',str(work/'spec'),'--paths',str(ROOT/'tools'/folder)]

@@ -49,7 +49,27 @@ python tools/editors/desktop.py --project /path/to/Game
 
 ### 窗口与保存
 
-桌面程序具有自己的菜单、最大化/最小化、窗口尺寸记忆和退出行为；导入素材使用系统文件选择器。编辑后点界面中的保存按钮，也可使用“文件 → 保存当前编辑”或 Ctrl+S；“文件 → 退出编辑器”或窗口关闭键会检查未保存内容，存在修改时可取消关闭继续编辑，或明确放弃修改。
+桌面程序具有自己的菜单、最大化/最小化、窗口尺寸记忆和退出行为；导入素材使用系统文件选择器。
+
+保存以**当前编辑项**为单位，无需每改一个属性就保存：
+
+| 编辑项 | 一次保存包含 |
+| --- | --- |
+| 线路地图 | 线路层、贴图层、全部结点与地图素材变换 |
+| 站点关卡 | 当前站点的街道、地图格、建筑实例、怪物、NPC 与物资生成点 |
+| 物品 / 建筑模板 / 怪物 | 当前选中的一条定义及其贴图、占位、碰撞、掉落等全部属性 |
+| 顾客 | 当前顾客资料、商品配置及所有见面对话与事件线 |
+| 总设置 | 当前 Godot 接口配置 |
+
+可在同一项内连续调整，最后点击“保存当前编辑项”、菜单“文件 → 保存当前编辑”或按 **Ctrl+S**（macOS 也支持 Cmd+S）。关卡内“编辑此建筑”及室外物资点属于该关卡的子编辑界面；点“返回关卡”自动合入当前草稿，不要求先保存细节，最终保存一次关卡即可。目录里的建筑模板则是独立编辑项。
+
+切换条目、切换编辑类别、更换站点、重新读取地图、关闭或刷新桌面窗口时，若当前项有未保存内容，会弹出三项选择：
+
+- **保存并离开**：保存整个当前项，成功后才切换或关闭。
+- **放弃修改**：恢复当前项进入时或最后保存时的内容，再离开。
+- **取消**：保留当前界面和全部修改，继续编辑。
+
+校验或写入失败时保留草稿和提示框，不执行切换。重复点击当前条目不会重载草稿；切换网格、贴图预览或同一顾客内的对话节点不要求单独保存。删除/归档目录条目也先成为当前项修改，保存后生效。Godot 预览会先保存当前关卡。
 
 同一个 Game 只启动一个桌面窗口。再次从 Godot 或命令行启动会激活已有窗口。退出窗口会清理自己的内容服务及连接文件，不关闭 Godot。停止 Godot 不强制结束这个独立程序。
 
@@ -359,7 +379,7 @@ Godot 预览使用独立的 `user://content_preview/session_<timestamp>.json`，
 | POST `/api/settings` | `{godot_executable}`，保存本机路径 |
 | POST `/api/godot` | action 为 probe/editor/game/preview，preview 另带 station |
 
-`server.py` 负责接口、校验和写入；`index.html`、`style.css` 定义页面，`editor.js`、`enhancements.js` 保留通用表单/关系设置，`workspace.js` 管理地图、素材拖放、线路图及对话视窗，`catalogs.js` 提供怪物/物品/建筑编辑，`geometry_editor.js` 负责不规则格、手动贴图绑定、楼层和掉落路径编辑，`models.js` 封装建筑实例与单次见面对话。游戏由 `scripts/content/content_registry.gd` 读取关卡，`scripts/commerce/customer_catalog.gd` 读取角色，`customer_dialogue.gd` 管理关系和事件，`scripts/content/npc_interaction.gd` 提供探索对话窗口。
+`server.py` 负责接口、校验和写入；`index.html`、`style.css` 定义页面，`editor.js`、`enhancements.js` 保留通用表单/关系设置，`workspace.js` 管理地图、素材拖放、线路图及对话视窗，`catalogs.js` 提供怪物/物品/建筑编辑，`geometry_editor.js` 负责不规则格、手动贴图绑定、楼层和掉落路径编辑，`models.js` 封装建筑实例与单次见面对话，`save_sessions.js` 集中管理编辑项草稿、保存边界、离开提示和桌面关闭握手。游戏由 `scripts/content/content_registry.gd` 读取关卡，`scripts/commerce/customer_catalog.gd` 读取角色，`customer_dialogue.gd` 管理关系和事件，`scripts/content/npc_interaction.gd` 提供探索对话窗口。
 
 自动检查和浏览器交互验证统一见 [测试 README](../../test/README.md)。
 

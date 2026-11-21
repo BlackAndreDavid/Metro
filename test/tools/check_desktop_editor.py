@@ -92,9 +92,14 @@ with tempfile.TemporaryDirectory(prefix='metro-desktop-ui-') as scratch:
     assert json.loads(connection.read_text())['pid']==process.pid
     token=evaluate('S.project.token')
     request=urllib.request.Request(url+'/api/desktop/close',data=b'{}',headers={'Content-Type':'application/json','X-Editor-Token':token})
+    fill('#customerName','退出前保存测试')
     with urllib.request.urlopen(request,timeout=5) as r:assert json.load(r)['ok']
+    wait('document.querySelector("#unsavedDialog").open');click('#unsavedCancel');wait('EditorSession.closeDecision==="cancelled"');assert process.poll() is None;time.sleep(.25)
+    with urllib.request.urlopen(request,timeout=5) as r:assert json.load(r)['ok']
+    wait('document.querySelector("#unsavedDialog").open');click('#unsavedSave')
     process.wait(timeout=15);assert process.returncode==0,(OUTPUT/'desktop.log').read_text()
    assert not connection.exists()
+   assert next(c for c in json.loads((game/'content/customers.json').read_text())['customers'] if c['id']=='desktop_guest')['name']=='退出前保存测试'
    print('DESKTOP_EDITOR_OK: independent Qt window, full embedded editor, map/item/customer save, bidirectional paths, single instance, clean close')
   finally:
    inner=game/".godot/metro_editor_desktop.log"

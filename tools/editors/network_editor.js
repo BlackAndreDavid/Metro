@@ -96,7 +96,7 @@ $('networkReload').onclick=run(async()=>{if(N.dirty&&!confirm('放弃当前未�
 for(const[key,id]of Object.entries({width:'networkWidth',height:'networkHeight'}))$(id).onchange=()=>{networkCheckpoint();N.data.canvas[key]=+$(id).value;networkChanged();networkFit();renderNetwork()};
 $('networkZoomIn').onclick=()=>networkZoom(.8);$('networkZoomOut').onclick=()=>networkZoom(1.25);$('networkFit').onclick=()=>{networkFit();renderNetworkCanvas()};
 
-window.addEventListener("beforeunload",e=>{if(N.dirty){e.preventDefault();e.returnValue=""}});
+
 
 // Page-level shortcuts survive SVG replacement and toolbar focus; text keeps native undo.
 document.addEventListener('keydown',e=>{if($('networkView').hidden||e.target.closest('input,textarea,select,[contenteditable=true]'))return;if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){e.preventDefault();networkUndo()}});

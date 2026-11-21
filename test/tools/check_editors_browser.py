@@ -67,7 +67,7 @@ with tempfile.TemporaryDirectory(prefix='metro-editor-browser-') as scratch:
    assert level['npcs'][0]['npc']=='browser_guest' and level['npcs'][0]['row']==3
    assert (game/entry['scene'][6:]).is_file();page.locator('#map').scroll_into_view_if_needed();page.screenshot(path=str(output/'ragged-map-editor.png'),full_page=True)
    page.click('#chooseStation');page.click('#stationReset');page.screenshot(path=str(output/'station-map.png'));page.click('#closeStations')
-   page.click('#settingsTab');page.fill('#godotPath',godot);page.click('#saveSettings');page.click('#probeGodot');page.wait_for_function("document.getElementById('status').textContent.includes('Godot 连接成功')");assert '4.7.2' in page.locator('#godotResult').inner_text()
+   page.click('#settingsTab');page.wait_for_function("!document.getElementById('settingsView').inert");page.fill('#godotPath',godot);page.click('#saveSettings');page.click('#probeGodot');page.wait_for_function("document.getElementById('status').textContent.includes('Godot 连接成功')");assert '4.7.2' in page.locator('#godotResult').inner_text()
    assert not errors,errors
    print('BROWSER_EDITOR_FLOW_OK: avatar cards, meeting turns/replies, event selection, station diagram, ragged add/remove, undo, native building/NPC drags, save/reload, Godot connection')
    browser.close()

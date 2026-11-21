@@ -477,7 +477,7 @@ class Handler(BaseHTTPRequestHandler):
             if route.path=='/asset':
                 path=resource(parse_qs(route.query).get('path',[''])[0]); require(path.suffix.lower()=='.png','只能预览PNG'); data=path.read_bytes(); mime='image/png'
             else:
-                file={'/':'index.html','/editor.js':'editor.js','/style.css':'style.css','/enhancements.js':'enhancements.js','/models.js':'models.js','/workspace.js':'workspace.js','/catalogs.js':'catalogs.js','/network_editor.js':'network_editor.js','/geometry_editor.js':'geometry_editor.js'}.get(route.path)
+                file={'/':'index.html','/editor.js':'editor.js','/style.css':'style.css','/enhancements.js':'enhancements.js','/models.js':'models.js','/workspace.js':'workspace.js','/catalogs.js':'catalogs.js','/network_editor.js':'network_editor.js','/geometry_editor.js':'geometry_editor.js','/save_sessions.js':'save_sessions.js'}.get(route.path)
                 if not file: return self.respond({'error':'未找到'},404)
                 path=WEB/file; data=path.read_bytes(); mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'}[path.suffix]
             self.send_response(200); self.send_header('Content-Type',mime); self.send_header('Content-Length',str(len(data))); self.end_headers(); self.wfile.write(data)

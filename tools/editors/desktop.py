@@ -32,7 +32,7 @@ def activate_existing(connection, project):
 
 
 def run_window(project,connection):
-    from PySide6.QtCore import QObject,QSettings,QUrl,Signal,QEvent,Qt,QLockFile
+    from PySide6.QtCore import QObject,QSettings,QUrl,Signal,QEvent,Qt,QLockFile,QTimer
     from PySide6.QtGui import QAction,QIcon,QKeySequence
     from PySide6.QtWidgets import QApplication,QMainWindow,QMessageBox
     from PySide6.QtWebEngineCore import QWebEnginePage,QWebEngineProfile
@@ -73,12 +73,22 @@ def run_window(project,connection):
             menu.addSeparator()
             close=QAction('退出编辑器',self);close.setShortcut(QKeySequence.StandardKey.Quit);close.triggered.connect(self.close);menu.addAction(close)
             view_menu=self.menuBar().addMenu('视图')
-            reload=QAction('重新加载界面',self);reload.setShortcut(QKeySequence.StandardKey.Refresh);reload.triggered.connect(self.view.reload);view_menu.addAction(reload)
+            reload=QAction('重新加载界面',self);reload.setShortcut(QKeySequence.StandardKey.Refresh);reload.triggered.connect(self.request_reload);view_menu.addAction(reload)
             self.statusBar().showMessage('正在编辑：'+str(project))
             self.resize(1440,960)
             geometry=self.settings.value('geometry')
             if geometry:self.restoreGeometry(geometry)
             self.view.setUrl(QUrl(url))
+        def request_reload(self):
+            self.page.runJavaScript("window.EditorSession ? (window.EditorSession.closeDecision='idle',window.EditorSession.requestClose(),true) : false",self.begin_reload)
+        def begin_reload(self,waiting):
+            if waiting:QTimer.singleShot(100,self.poll_reload)
+            else:self.view.reload()
+        def poll_reload(self):
+            self.page.runJavaScript("window.EditorSession.closeDecision",self.reload_result)
+        def reload_result(self,decision):
+            if decision=='approved':self.view.reload()
+            elif decision!='cancelled':QTimer.singleShot(100,self.poll_reload)
         def render_failed(self,*_args):
             self.renderer_lost=True;self.statusBar().showMessage('界面进程已停止，已保存的内容不受影响；可从视图菜单重新加载。')
         def foreground(self):
@@ -91,8 +101,20 @@ def run_window(project,connection):
             event.ignore()
             if self.checking_close:return
             self.checking_close=True
-            expression="Boolean(document.getElementById('dirty')?.textContent.includes('未保存') || (typeof N!=='undefined' && N.dirty))"
-            self.page.runJavaScript(expression,self.confirm_close)
+            self.page.runJavaScript("Boolean(window.EditorSession)",self.begin_close)
+        def begin_close(self,available):
+            if not available:
+                self.page.runJavaScript("document.getElementById('dirty')?.textContent.includes('未保存')",self.confirm_close)
+                return
+            self.page.runJavaScript("window.EditorSession.requestClose()")
+            QTimer.singleShot(100,self.poll_close)
+        def poll_close(self):
+            self.page.runJavaScript("window.EditorSession.closeDecision",self.close_result)
+        def close_result(self,decision):
+            if decision=='approved':
+                self.checking_close=False;self.approved=True;self.close()
+            elif decision=='cancelled':self.checking_close=False
+            else:QTimer.singleShot(100,self.poll_close)
         def confirm_close(self,dirty):
             self.checking_close=False
             if dirty:
