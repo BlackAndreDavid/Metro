@@ -326,7 +326,7 @@
     {
       "id": "ration",
       "name": "口粮",
-      "width": 1,
+      "width": 2,
       "height": 1,
       "price": 8,
       "category": "supplies",
@@ -337,7 +337,26 @@
       "active_use": {
         "action": "eat",
         "amount": 1
-      }
+      },
+      "texture_binding": {
+        "x": 0.3668478260869561,
+        "y": -0.015397610871688228,
+        "width": 1.2599652331808335,
+        "height": 1.056745034280699,
+        "rotation": 0
+      },
+      "cells": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ]
+      ],
+      "runtime_id": "ration",
+      "aliases": []
     },
     {
       "id": "tire",
@@ -353,7 +372,16 @@
       "active_use": {
         "action": "none",
         "amount": 1
-      }
+      },
+      "texture_binding": {
+        "x": 0,
+        "y": 0.04657442179586058,
+        "width": 1.9953440765508772,
+        "height": 1.883604808264028,
+        "rotation": 0
+      },
+      "runtime_id": "tire",
+      "aliases": []
     },
     {
       "id": "bolts",
