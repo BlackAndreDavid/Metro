@@ -11,6 +11,7 @@ func configure(data: Resource, owner_home: Control, surface: Control) -> void:
 	definition = data
 	pivot_offset=size/2
 	rotation_degrees=float(data.texture_binding.get("rotation",0))
+	caption.rotation_degrees=-rotation_degrees
 	home = owner_home
 	var building: bool = build_controller != null and build_controller.active
 	is_selected = building and build_controller.selected_id == data.id

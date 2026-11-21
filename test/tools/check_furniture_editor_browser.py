@@ -26,13 +26,29 @@ with tempfile.TemporaryDirectory(prefix='metro-catalog-browser-') as scratch:
    images=[Image.new('RGBA',(16,16),color) for color in ['red','green','blue']];buffer=io.BytesIO();images[0].save(buffer,format='GIF',save_all=True,append_images=images[1:],duration=[100,200,300],loop=0)
    gif=Path(scratch)/'furniture.gif';gif.write_bytes(buffer.getvalue());page.set_input_files('#contentUpload',str(gif));page.click('#uploadContent');page.wait_for_function('C.data.animation.frames===3')
    assert page.evaluate('C.data.animation.columns')==2 and page.evaluate('C.data.animation.durations')==[100,200,300]
+   # Manipulate the animated frame with the same camera transform used for rendering.
+   before=page.evaluate('structuredClone(furnitureBinding())');assert before['width']==.5 and before['height']==.5
+   page.evaluate('G.viewZoom=4;G.viewPan=[120,80];drawCatalogPreview()')
+   def drag_texture(start,end):
+    canvas=page.locator('#catalogPreview');canvas.scroll_into_view_if_needed();box=canvas.bounding_box()
+    def screen(point):
+     at=page.evaluate('p=>p.map((v,i)=>v*G.viewZoom+G.viewPan[i])',point)
+     return box['x']+at[0]*box['width']/600,box['y']+at[1]*box['height']/340
+    page.mouse.move(*screen(start));page.mouse.down();page.mouse.move(*screen(end),steps=12);page.mouse.up()
+   center=page.evaluate('furnitureCenter(furnitureBinding())');drag_texture(center,[center[0]+16,center[1]+8]);moved=page.evaluate('structuredClone(C.data.texture_binding)');assert abs(moved['x']-.5)<.01 and abs(moved['y']-.25)<.01
+   b=page.evaluate('structuredClone(C.data.texture_binding)');center=page.evaluate('furnitureCenter(furnitureBinding())');corner=[center[0]+b['width']*16,center[1]+b['height']*16];drag_texture(corner,[corner[0]+6,corner[1]+6]);scaled=page.evaluate('structuredClone(C.data.texture_binding)');assert scaled['width']>b['width'] and abs(scaled['width']/scaled['height']-b['width']/b['height'])<.01
+   center=page.evaluate('furnitureCenter(furnitureBinding())');handle=[center[0],center[1]-scaled['height']*16-18];drag_texture(handle,[center[0]+scaled['height']*16+18,center[1]]);bound=page.evaluate('structuredClone(C.data.texture_binding)');assert abs(bound['rotation']-90)<2
+   page.get_by_role('button',name='墙面占位',exact=True).click();grid=page.locator('#furnitureMask');grid.scroll_into_view_if_needed();r=grid.bounding_box();grid.click(position={'x':56*r['width']/560,'y':8*r['height']/192});assert page.evaluate('C.data.width===4') and page.evaluate('structuredClone(C.data.texture_binding)')==bound
    page.click('#saveAll');page.wait_for_function('!EditorSession.hasChanges()&&!EditorSession.busy')
-   defs=json.loads((game/'content/furniture.json').read_text())['furniture'];furniture=next(v for v in defs if v['id']=='browser_furniture');assert furniture['storage']=={'width':4,'height':4} and furniture['item_id']=='water'
+   defs=json.loads((game/'content/furniture.json').read_text())['furniture'];furniture=next(v for v in defs if v['id']=='browser_furniture');assert furniture['storage']=={'width':4,'height':4} and furniture['item_id']=='water' and furniture['texture_binding']==bound
    items=json.loads((game/'content/items.json').read_text())['items'];water=next(v for v in items if v['id']=='water');assert water['furniture_kind']=='browser_furniture' and water['texture']!=furniture['texture']
    page.locator('#catalogPreview').screenshot(path=str(OUTPUT/'animated-furniture.png'))
    broken={**furniture,'distance_rules':[{'target_type':'furniture','target':'missing','relation':'require','distance':3}]};response=page.request.post(url+'/api/furniture',data=broken,headers={'X-Editor-Token':page.evaluate('S.project.token')});assert response.status==400
-   page.reload();page.wait_for_selector('#customerCards button');page.click('#furnitureTab');page.locator('#catalogCards [data-catalog-id=browser_furniture]').click();assert page.evaluate('C.data.animation.frames===3&&C.data.wall_cells.length===1')
+   page.reload();page.wait_for_selector('#customerCards button');page.click('#furnitureTab');page.locator('#catalogCards [data-catalog-id=browser_furniture]').click();assert page.evaluate('C.data.animation.frames===3&&C.data.wall_cells.length===2')
+   assert page.evaluate('C.data.texture_binding.rotation')==bound['rotation']
+   dock=page.locator('#saveAll').bounding_box();assert abs(dock['width']-285)<1 and abs(dock['x']+dock['width']-1584)<1
+   page.set_viewport_size({'width':900,'height':650});dock=page.locator('#saveAll').bounding_box();assert abs(dock['width']-285)<1 and abs(dock['x']+dock['width']-884)<1 and dock['y']>550
    assert not errors,errors
-   print('FURNITURE_EDITOR_OK: dual masks, generic distance rules, storage, item linkage, GIF grid animation, validation and persistence')
+   print('FURNITURE_EDITOR_OK: dual masks, generic distance rules, storage, item linkage, GIF grid animation, manual texture drag/scale/rotate, stable binding, right save dock, validation and persistence')
    browser.close()
  finally:server.terminate();server.wait(timeout=5)

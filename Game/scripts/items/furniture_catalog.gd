@@ -141,10 +141,8 @@ static func visual_rect(kind: String, bounds: Rect2) -> Rect2:
 	if not data.texture_binding.is_empty():
 		var binding: Dictionary=data.texture_binding
 		return Rect2(bounds.position+Vector2(binding.x,binding.y)*CELL_SIZE,Vector2(binding.width,binding.height)*CELL_SIZE)
-	if data.fill_grid: return bounds
-	var raw := Vector2(data.texture.get_size())
-	var fitted := raw * minf(bounds.size.x / raw.x,bounds.size.y / raw.y)
-	return Rect2(bounds.get_center() - fitted / 2,fitted)
+	# Unbound artwork uses a fixed native scale, independent of the occupied cells.
+	return Rect2(bounds.position,Vector2(data.texture.get_size())*CELL_SIZE/32.0)
 
 
 static func support_problem(kind: String, p: Dictionary, layout: Dictionary) -> String:

@@ -83,7 +83,6 @@
       "placement_type": "floor",
       "interaction": "rest",
       "function_text": "睡觉",
-      "fill_grid": true,
       "support_surface": true,
       "storage": null,
       "item_id": "",
@@ -94,7 +93,14 @@
         "x": 27,
         "y": 10
       },
-      "default_owned": true
+      "default_owned": true,
+      "texture_binding": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 8,
+        "height": 2,
+        "rotation": 0
+      }
     },
     {
       "id": "computer",
@@ -138,7 +144,6 @@
       "placement_type": "floor",
       "interaction": "news",
       "function_text": "使用电脑",
-      "fill_grid": false,
       "support_surface": false,
       "storage": null,
       "item_id": "computer",
@@ -150,7 +155,14 @@
         "y": 10
       },
       "default_owned": true,
-      "initial_placed": false
+      "initial_placed": false,
+      "texture_binding": {
+        "x": 0.22222222222222232,
+        "y": 0.0,
+        "width": 2.5555555555555554,
+        "height": 2.0,
+        "rotation": 0
+      }
     },
     {
       "id": "locker",
@@ -314,7 +326,6 @@
       "placement_type": "floor",
       "interaction": "locker",
       "function_text": "整理物品",
-      "fill_grid": true,
       "support_surface": true,
       "storage": {
         "width": 8,
@@ -328,7 +339,14 @@
         "x": 0,
         "y": 0
       },
-      "default_owned": true
+      "default_owned": true,
+      "texture_binding": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 3,
+        "height": 12,
+        "rotation": 0
+      }
     },
     {
       "id": "door",
@@ -732,7 +750,6 @@
       "placement_type": "floor",
       "interaction": "gear",
       "function_text": "出站探索",
-      "fill_grid": true,
       "support_surface": false,
       "storage": null,
       "item_id": "",
@@ -743,7 +760,14 @@
         "x": 9,
         "y": 0
       },
-      "default_owned": true
+      "default_owned": true,
+      "texture_binding": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 8,
+        "height": 12,
+        "rotation": 0
+      }
     },
     {
       "id": "screen",
@@ -762,7 +786,6 @@
       "placement_type": "hanging",
       "interaction": "none",
       "function_text": "当天信息",
-      "fill_grid": true,
       "support_surface": false,
       "storage": null,
       "item_id": "",
@@ -774,7 +797,14 @@
         "y": 0,
         "mount": 0
       },
-      "default_owned": true
+      "default_owned": true,
+      "texture_binding": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 4,
+        "height": 3,
+        "rotation": 0
+      }
     },
     {
       "id": "preparation",
@@ -874,7 +904,6 @@
       "placement_type": "floor",
       "interaction": "preparation",
       "function_text": "整备物品",
-      "fill_grid": false,
       "support_surface": true,
       "storage": {
         "width": 8,
@@ -895,7 +924,14 @@
         "x": 17,
         "y": 8
       },
-      "default_owned": true
+      "default_owned": true,
+      "texture_binding": {
+        "x": 0.0,
+        "y": 0.1875437368789361,
+        "width": 5.0,
+        "height": 3.624912526242128,
+        "rotation": 0
+      }
     },
     {
       "deleted": false,
@@ -1697,7 +1733,6 @@
       "placement_type": "floor",
       "interaction": "trade",
       "function_text": "交易",
-      "fill_grid": true,
       "support_surface": false,
       "storage": null,
       "item_id": "",

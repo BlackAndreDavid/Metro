@@ -15,4 +15,7 @@ func _draw() -> void:
 			var rect:=Rect2(bounds.position+Vector2(cell)*Catalog.CELL_SIZE,Catalog.CELL_SIZE)
 			draw_rect(rect,Color(Color("76a5dc") if plane=="wall_cells" else color,0.25),true)
 	draw_rect(bounds, color, false, 2)
-	draw_texture_rect(texture, Catalog.visual_rect(kind,bounds), false, Color(1, 1, 1, 0.65))
+	var image_bounds:=Catalog.visual_rect(kind,bounds)
+	draw_set_transform(image_bounds.get_center(),deg_to_rad(float(definition.texture_binding.get("rotation",0))))
+	draw_texture_rect(texture,Rect2(-image_bounds.size/2,image_bounds.size),false,Color(1,1,1,0.65))
+	draw_set_transform(Vector2.ZERO)

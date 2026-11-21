@@ -8,7 +8,6 @@ extends Resource
 var texture: Texture2D:
 	get:
 		return frame_at(0.0)
-@export var fill_grid := true
 @export var grid_size := Vector2i(2, 2)
 @export_enum("floor", "hanging") var placement_type := "floor"
 # Offset of the cropped image in the original 243x108 carriage canvas.
@@ -69,7 +68,7 @@ static func from_data(data: Dictionary) -> Resource:
 	var result=load("res://scripts/items/furniture_definition.gd").new()
 	result.id=data.id;result.display_name=data.name;result.function_text=data.get("function_text",data.name)
 	result.action=data.get("interaction","none");result.texture_path=data.texture
-	result.grid_size=Vector2i(int(data.width),int(data.height));result.fill_grid=data.get("fill_grid",true)
+	result.grid_size=Vector2i(int(data.width),int(data.height))
 	result.placement_type=data.get("placement_type","floor")
 	for cell in data.get("floor_cells",[]):result.floor_cells.append(Vector2i(cell[0],cell[1]))
 	for cell in data.get("wall_cells",[]):result.wall_cells.append(Vector2i(cell[0],cell[1]))

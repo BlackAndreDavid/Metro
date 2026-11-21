@@ -56,12 +56,32 @@ func run()->void:
 	var animated=Definition.from_data({"id":"animation_test","name":"动画","texture":"res://assets/textures/temp/items/water_bottle.png","width":1,"height":1,"floor_cells":[[0,0]],"animation":{"frames":2,"columns":2,"fps":2,"durations":[100,300]}})
 	check(animated.frame_index(.05)==0 and animated.frame_index(.2)==1 and animated.frame_index(.45)==0,"animation supports variable frame durations and looping")
 	check(animated.frame_at(.05).get_width()*2==load(animated.texture_path).get_width(),"animation displays a frame instead of the full sheet")
+	Catalog.DEFINITIONS[animated.id]=animated
+	var native_rect:=Catalog.visual_rect(animated.id,Rect2(Vector2.ZERO,Catalog.CELL_SIZE))
+	var expanded_rect:=Catalog.visual_rect(animated.id,Rect2(Vector2.ZERO,Catalog.CELL_SIZE*Vector2(8,6)))
+	check(native_rect==expanded_rect,"unbound furniture art retains native scale when its grid changes")
+	animated.texture_binding={"x":1.0,"y":0.5,"width":3.0,"height":2.0,"rotation":90.0}
+	var bound_rect:=Catalog.visual_rect(animated.id,Rect2(Vector2.ZERO,Catalog.CELL_SIZE))
+	check(bound_rect.position.is_equal_approx(Catalog.CELL_SIZE*Vector2(1,.5)) and bound_rect.size.is_equal_approx(Catalog.CELL_SIZE*Vector2(3,2)),"runtime furniture uses the editor-authored texture binding")
+	Catalog.DEFINITIONS.erase(animated.id)
 	var home=load("res://scenes/game/home.tscn").instantiate();root.add_child(home);await process_frame;home.show_cabin()
+	var rotated=load("res://scenes/items/furniture.tscn").instantiate();root.add_child(rotated);rotated.size=Vector2(96,64);rotated.configure(animated,home,home.home_backdrop)
+	check(is_equal_approx(rotated.rotation_degrees,90) and is_equal_approx(rotated.caption.rotation_degrees,-90),"authored rotation is rendered while the function label stays upright")
+	rotated.queue_free()
 	var art=home.home_backdrop.carriage
 	check(art.has_node("FurnitureSlots/Preparation") and art.has_node("WallFixtures/Window"),"movable preparation and window use MetroFurniture instances")
 	check(art.get_node("Rails").z_index>art.get_node("FurnitureSlots").z_index and art.get_node("HangingFixtures").z_index>art.get_node("Rails").z_index,"rail and hanging fixtures render above furniture")
 	home.construction.enter();await process_frame
-	var mode=home.construction;mode.select_furniture("preparation");mode.edit_storage();await process_frame
+	var mode=home.construction
+	var original_binding: Dictionary=Catalog.DEFINITIONS.preparation.texture_binding.duplicate()
+	Catalog.DEFINITIONS.preparation.texture_binding=original_binding.duplicate();Catalog.DEFINITIONS.preparation.texture_binding.x=20;Catalog.DEFINITIONS.preparation.texture_binding.y=-4;Catalog.DEFINITIONS.preparation.texture_binding.rotation=90
+	mode.state.carriage_count=2;mode._refresh("")
+	var sprite_center:=Catalog.visual_rect("preparation",Catalog.placement_rect("preparation",mode.state.furniture_layout.preparation)).get_center()
+	var cursor: Vector2=mode.backdrop.carriage.get_global_transform()*sprite_center
+	mode.press_furniture("preparation",cursor);mode._process(1.0)
+	check(mode.target_at(cursor)==mode.state.furniture_layout.preparation,"dragging displaced artwork preserves its occupied anchor across carriage boundaries")
+	Catalog.DEFINITIONS.preparation.texture_binding=original_binding;mode.state.carriage_count=1;mode.cancel_selection()
+	mode.select_furniture("preparation");mode.edit_storage();await process_frame
 	check(is_instance_valid(mode.storage_panel) and mode.storage_panel.grids.size()==2,"renovation storage inspector reuses draggable cargo grids")
 	mode.storage_panel.queue_free();await process_frame
 	mode.state.store_furniture("bed");mode.exit()

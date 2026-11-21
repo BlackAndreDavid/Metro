@@ -298,7 +298,7 @@ func press_furniture(kind: String, at: Vector2) -> void:
 	var placement: Dictionary = state.furniture_layout[kind]
 	var local: Vector2 = backdrop.carriage.get_global_transform().affine_inverse() * at
 	var rect := Catalog.placement_rect(kind, placement)
-	grab_cell = Vector2i((local - rect.position) / Catalog.CELL_SIZE).clamp(Vector2i.ZERO, Catalog.DEFINITIONS[kind].grid_size - Vector2i.ONE)
+	grab_cell = Vector2i(((local - rect.position) / Catalog.CELL_SIZE).floor())
 	show_hold_progress()
 
 func show_hold_progress() -> void:
@@ -330,10 +330,12 @@ func target_at(at: Vector2) -> Dictionary:
 				if Catalog.mount_rect(car, mount).has_point(local):
 					return {"car": car, "mount": mount, "x": 0, "y": 0}
 		return {}
-	var car := floori((local.x - 154) / Catalog.CARRIAGE_PITCH)
-	if car < 0 or car >= state.carriage_count or local.y < 144 or local.y > 576:
+	# Artwork can extend beyond its occupied grid or into an adjacent carriage.
+	var anchor := local - Vector2(grab_cell) * Catalog.CELL_SIZE
+	var car := floori((anchor.x - 154) / Catalog.CARRIAGE_PITCH)
+	if car < 0 or car >= state.carriage_count or anchor.y < 144 or anchor.y > 576:
 		return {}
-	var cell := Vector2i(((local - Catalog.floor_rect(car).position) / Catalog.CELL_SIZE).floor()) - grab_cell
+	var cell := Vector2i(((anchor - Catalog.floor_rect(car).position) / Catalog.CELL_SIZE).floor())
 	return {"car": car, "x": cell.x, "y": cell.y}
 
 func update_drag_preview() -> void:
