@@ -513,8 +513,8 @@
       "width": 3,
       "height": 2,
       "placement_type": "floor",
-      "interaction": "preparation",
-      "function_text": "整备物品",
+      "interaction": "storage",
+      "function_text": "打开预备仓库",
       "storage": {
         "width": 8,
         "height": 6

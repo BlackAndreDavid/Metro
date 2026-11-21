@@ -317,7 +317,9 @@ func can_place(selection: Dictionary, target: String, cell: Vector2i) -> bool:
 				if trial[i].id == id: trial.remove_at(i)
 		if target == "bag":
 			var incoming := entry.duplicate(true);incoming.x=cell.x;incoming.y=cell.y;incoming.rotated=selection.rotated;trial.append(incoming)
-		var bounds := LARGE if cargo_has_tool(trial,"wide") else SMALL
+		var carried_trial: Array[Dictionary]=trial.duplicate()
+		if source!="active" and not active_item.is_empty():carried_trial.append(active_item)
+		var bounds := LARGE if cargo_has_tool(carried_trial,"wide") else SMALL
 		for item in trial:
 			if not Rect2i(Vector2i.ZERO,bounds).encloses(item_rect(item)):return false
 	return fits_item(entries(target),grid_size(target),entry.kind,cell,selection.rotated,selection.get("mirrored",entry.get("mirrored",false)),id if source==target else -1)
@@ -1135,27 +1137,35 @@ func stored_furniture_available(kind: String) -> bool:
 	return false if item_id.is_empty() else material_count(item_id)>0 or (not active_item.is_empty() and active_item.kind==ItemCatalog.runtime_id(item_id))
 
 ## Equip/swap is atomic; the active container owns its entry outside the backpack grid.
-func equip_active(id: int) -> String:
-	var incoming := find_entry("bag",id)
-	if incoming.is_empty(): return "先在背包中选中道具。"
-	var trial: Array[Dictionary] = inventory.duplicate(true)
+func equip_active(id: int, source: String = "bag") -> String:
+	if source not in ["bag","preparation"] or (trip_active and source!="bag"):return "当前无法从该储物空间装备。"
+	var incoming:=find_entry(source,id)
+	if incoming.is_empty():return "先在储物格中选中道具。"
+	var cargo:=entries(source)
+	var trial: Array[Dictionary]=cargo.duplicate(true)
 	for index in range(trial.size()-1,-1,-1):
-		if trial[index].id == id: trial.remove_at(index)
-	var placement := {}
+		if trial[index].id==id:trial.remove_at(index)
+	var future_bag: Array[Dictionary]=trial.duplicate(true) if source=="bag" else inventory.duplicate(true)
+	future_bag.append(incoming)
+	if source=="bag" and not active_item.is_empty():future_bag.append(active_item)
+	var bounds:=grid_size(source) if source!="bag" else LARGE if cargo_has_tool(future_bag,"wide") else SMALL
+	for entry in trial:
+		if not Rect2i(Vector2i.ZERO,bounds).encloses(item_rect(entry)):return "当前装备无法收回，请先整理储物空间。"
+	if source!="bag":
+		var bag_bounds:=LARGE if cargo_has_tool(future_bag,"wide") else SMALL
+		for entry in inventory:
+			if not Rect2i(Vector2i.ZERO,bag_bounds).encloses(item_rect(entry)):return "背包缩小前请先整理超出边界的物品。"
+	var placement: Dictionary={}
 	if not active_item.is_empty():
 		for rotated in [false,true]:
-			var shape := footprint(active_item.kind,rotated)
-			for y in range(bag_size().y):
-				for x in range(bag_size().x):
-					if placement.is_empty() and fits_item(trial,bag_size(),active_item.kind,Vector2i(x,y),rotated,active_item.get("mirrored",false)):
-						placement = {"x":x,"y":y,"rotated":rotated}
-		if placement.is_empty(): return "背包无法收回当前主动道具，换装未执行。"
-	inventory.erase(incoming)
-	if not active_item.is_empty():
-		active_item.merge(placement,true)
-		inventory.append(active_item)
-	active_item = incoming
-	active_item.x = 0; active_item.y = 0; active_item.rotated = false
+			for y in range(bounds.y):
+				for x in range(bounds.x):
+					if placement.is_empty() and fits_item(trial,bounds,active_item.kind,Vector2i(x,y),rotated,active_item.get("mirrored",false)):placement={"x":x,"y":y,"rotated":rotated}
+		if placement.is_empty():return "原储物空间无法收回当前装备，换装未执行。"
+	cargo.erase(incoming)
+	if not active_item.is_empty():active_item.merge(placement,true);cargo.append(active_item)
+	active_item=incoming;active_item.x=0;active_item.y=0;active_item.rotated=false
+	sync_carried_tools()
 	return ""
 
 func unequip_active() -> String:
@@ -1226,11 +1236,13 @@ func give_preparation_tools() -> void:
 func cargo_has_tool(cargo: Array[Dictionary], capability: String) -> bool:
 	for entry in cargo:
 		if TOOL_CAPABILITIES.get(entry.kind,"") == capability:return true
-	return not active_item.is_empty() and TOOL_CAPABILITIES.get(active_item.kind,"") == capability
+	return false
 
 func carried_tools() -> Dictionary:
 	var result := {}
-	for capability in ["light","crowbar","wrench","wide"]:result[capability]=cargo_has_tool(inventory,capability)
+	var carried: Array[Dictionary]=inventory.duplicate()
+	if not active_item.is_empty():carried.append(active_item)
+	for capability in ["light","crowbar","wrench","wide"]:result[capability]=cargo_has_tool(carried,capability)
 	return result
 
 func sync_carried_tools() -> void:
