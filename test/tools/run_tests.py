@@ -107,7 +107,7 @@ def main():
         run('godot_editor_bridge', [], ['GODOT_EDITOR_BRIDGE_OK'], command_override=[sys.executable, str(root/'tools/check_godot_editor_bridge.py')])
     if results[0]['passed']:
         run('native_tester', [], ['TESTER_OK'], command_override=[sys.executable, str(root/'tools/check_tester.py')])
-    passed = len(results) == 24 and all(item['passed'] for item in results)
+    passed = len(results) == 25 and all(item['passed'] for item in results)
     summary = dict(run_id=run_id, passed=passed, results=results)
     (output / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print(f'Results: {output}')
