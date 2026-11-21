@@ -1,9 +1,0 @@
-[gd_resource type="Resource" load_steps=2 format=3]
-[ext_resource type="Script" path="res://scripts/items/furniture_definition.gd" id="1"]
-[resource]
-script = ExtResource("1")
-id = "preparation"
-display_name = "预备仓库"
-function_text = "整备物品 · 8×6"
-action = "preparation"
-texture_path = "res://assets/textures/PreparationWarehouse.png"

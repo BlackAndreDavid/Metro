@@ -83,6 +83,8 @@ func run() -> void:
 	check(not resumed.load_cabin(path,Rail.STATIONS.keys()) and resumed.save_data() == before, "invalid customer budget load is atomic")
 	var legacy := state.save_data()
 	legacy.version = 11
+	for key in legacy.furniture_layout.keys():
+		if key not in ["bed","computer","locker","door","screen"]:legacy.furniture_layout.erase(key)
 	legacy.erase("customer_visits")
 	state.write_save(path,legacy)
 	check(resumed.load_cabin(path,Rail.STATIONS.keys()) and resumed.customer_visits.is_empty(), "version 11 save gains fresh customer records")
@@ -123,6 +125,8 @@ func run() -> void:
 	Orders.ensure(old_record)
 	var old_save := old_record.save_data()
 	old_save.version = 12
+	for key in old_save.furniture_layout.keys():
+		if key not in ["bed","computer","locker","door","screen"]:old_save.furniture_layout.erase(key)
 	for visits in old_save.customer_visits.values(): visits.erase("dismissed")
 	old_record.write_save(path,old_save)
 	check(resumed.load_cabin(path,Rail.STATIONS.keys()) and Orders.record(resumed).dismissed == 0, "version12 visit records migrate without dismiss count")

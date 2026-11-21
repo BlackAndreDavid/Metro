@@ -21,7 +21,7 @@ python test/tools/run_tests.py --godot "C:\Godot\Godot_v4.7.2-stable_win64.exe"
 
 ## 用例与工具
 
-统一入口目前包含22组：导入、15组 Godot 流程、临时素材、美术工具、内容编辑器、Godot 独立编辑器启动接入和原生测试器接入。内容编辑器组还会在隔离 Game 副本中进行资源导入、Godot 关卡预览和剧情运行检查。
+统一入口目前包含23组：导入、15组 Godot 流程、临时素材、美术工具、内容编辑器、Godot 独立编辑器启动接入和原生测试器接入。内容编辑器组还会在隔离 Game 副本中进行资源导入、Godot 关卡预览和剧情运行检查。
 
 | 用例 | 覆盖内容 |
 | --- | --- |
@@ -114,3 +114,5 @@ python test/tools/check_desktop_editor.py
 ```
 
 前者需要 Playwright 与 Chromium，在隔离副本中覆盖按物品/建筑/关卡/顾客/线路图保存、连续修改不写盘、保存/放弃/取消、保存失败留在原项和子建筑归入关卡。后者还验证真实 Qt 窗口关闭时取消退出、保存后退出。结果位于 `test/results/save-sessions/` 和 `test/results/desktop-editor/`，不修改正常工程内容。
+
+家具专项：`cases/test_furniture_system.gd` 覆盖双平面占位、支撑、距离、移动、收纳、可调储物、动画、迁移及退出检查；`python test/tools/check_furniture_editor_browser.py` 检查真实家具编辑、GIF转换、物品关联与保存。截图位于 `test/results/furniture-editor/`。

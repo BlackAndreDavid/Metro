@@ -27,6 +27,7 @@ var press_position := Vector2.ZERO
 var grab_cell := Vector2i.ZERO
 var candidate: Dictionary = {}
 var registered: Dictionary = {}
+var storage_panel: Control
 @onready var actions: HBoxContainer = $Toolbar/Margin/Actions
 @onready var inventory: ItemList = $Warehouse/Center/Panel/Margin/Items/Inventory
 @onready var place_button: Button = $Warehouse/Center/Panel/Margin/Items/Buttons/Place
@@ -39,6 +40,11 @@ func _ready() -> void:
 	actions.get_node("Warehouse").pressed.connect(open_warehouse)
 	actions.get_node("Expand").pressed.connect(request_expansion)
 	actions.get_node("Exit").pressed.connect(exit)
+	var check_button:=Button.new();check_button.name="Check";check_button.text="检查装修";actions.add_child(check_button)
+	check_button.pressed.connect(func():
+		var problem: String=state.furniture_completion_problem()
+		$Message.text="检查通过，可以退出装修。" if problem.is_empty() else problem)
+	var storage_button:=Button.new();storage_button.name="Storage";storage_button.text="储物格";actions.add_child(storage_button);storage_button.pressed.connect(edit_storage)
 	place_button.pressed.connect(take_from_warehouse)
 	$Warehouse/Center/Panel/Margin/Items/Buttons/Close.pressed.connect(func(): $Warehouse.hide())
 	inventory.item_selected.connect(func(_index): place_button.disabled = false)
@@ -87,6 +93,10 @@ func enter() -> void:
 	_refresh("点击家具选中，或从家具仓库取出家具。")
 
 func exit() -> void:
+	if moving and state.furniture_layout.get(selected_id)==null:
+		$Message.text="还有取出的家具未放置，请先放置或取消选择。";return
+	var problem: String=state.furniture_completion_problem()
+	if not problem.is_empty():$Message.text=problem;return
 	deactivate()
 	var source: Control = _return_scene.get_ref() if _return_scene != null else null
 	if is_instance_valid(source):
@@ -97,6 +107,7 @@ func exit() -> void:
 		source.show_cabin()
 
 func deactivate() -> void:
+	if is_instance_valid(storage_panel):storage_panel.queue_free()
 	clear_gesture()
 	active = false
 	selected_id = ""
@@ -195,6 +206,7 @@ func refresh_ui() -> void:
 		return
 	var has_selection := not selected_id.is_empty()
 	actions.get_node("Selection").text = "装修 · " + (("移动中：" if moving else "已选中：") + Catalog.DEFINITIONS[selected_id].display_name if has_selection else "长按家具1秒后拖动，或点击选中拆除")
+	actions.get_node("Storage").disabled = not has_selection or state.furniture_layout.get(selected_id)==null or Catalog.DEFINITIONS[selected_id].storage==Vector2i.ZERO
 	actions.get_node("Dismantle").disabled = not has_selection or state.furniture_layout[selected_id] == null
 
 func _refresh(message: String) -> void:
@@ -248,7 +260,7 @@ func confirm_expansion() -> void:
 	_refresh("扩建完成，请返回后在床铺保存。")
 
 func _unhandled_key_input(event: InputEvent) -> void:
-	if not active or not event.is_pressed() or event.is_echo():
+	if not active or is_instance_valid(storage_panel) or not event.is_pressed() or event.is_echo():
 		return
 	if event is InputEventKey and event.keycode == KEY_ESCAPE:
 		if $Expansion.visible:
@@ -338,7 +350,7 @@ func finish_drag() -> void:
 		_refresh("落点无效，已保留原位置。")
 
 func _input(event: InputEvent) -> void:
-	if not active or screen != "construction" or $Warehouse.visible or $Expansion.visible:
+	if not active or screen != "construction" or $Warehouse.visible or $Expansion.visible or is_instance_valid(storage_panel):
 		return
 	if event is InputEventMouse:
 		pointer = event.position
@@ -363,3 +375,10 @@ func _input(event: InputEvent) -> void:
 		elif event.pressed and moving and not $Toolbar.get_global_rect().has_point(pointer):
 			finish_drag()
 			get_viewport().set_input_as_handled()
+
+
+func edit_storage() -> void:
+	if selected_id.is_empty() or Catalog.DEFINITIONS[selected_id].storage==Vector2i.ZERO:return
+	clear_gesture()
+	storage_panel=preload("res://scripts/construction/storage_editor.gd").new();add_child(storage_panel)
+	storage_panel.configure(self,selected_id,true)

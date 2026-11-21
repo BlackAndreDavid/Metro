@@ -91,6 +91,7 @@ def main():
     if results[0]['passed']:
         run('exploration_hud', ['--script', str(root / 'cases/test_exploration_hud.gd'), '--', '--save-file='+str(output/'hud-home.json')], ['EXPLORATION_HUD_OK'])
     if results[0]['passed']:
+        run('furniture_system', ['--script', str(root / 'cases/test_furniture_system.gd'), '--', '--save-file='+str(output/'furniture-home.json')], ['FURNITURE_SYSTEM_OK'])
         run('preparation', ['--script', str(root / 'cases/test_preparation.gd'), '--', '--save-file='+str(output/'preparation-home.json')], ['PREPARATION_OK'])
         run('save_management', ['--script', str(root / 'cases/test_save_management.gd')], ['SAVE_MANAGEMENT_OK'])
         run('geometry_contract', ['--script', str(root / 'cases/test_geometry_contract.gd')], ['GEOMETRY_CONTRACT_OK'])
@@ -104,7 +105,7 @@ def main():
         run('godot_editor_bridge', [], ['GODOT_EDITOR_BRIDGE_OK'], command_override=[sys.executable, str(root/'tools/check_godot_editor_bridge.py')])
     if results[0]['passed']:
         run('native_tester', [], ['TESTER_OK'], command_override=[sys.executable, str(root/'tools/check_tester.py')])
-    passed = len(results) == 22 and all(item['passed'] for item in results)
+    passed = len(results) == 23 and all(item['passed'] for item in results)
     summary = dict(run_id=run_id, passed=passed, results=results)
     (output / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print(f'Results: {output}')

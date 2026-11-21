@@ -40,7 +40,7 @@ func run()->void:
 	var saved:=state.save_data().duplicate(true)
 	var loaded:=State.new()
 	check(loaded.load_data(saved,Rail.STATIONS.keys()) and loaded.preparation.size()==4,"warehouse persists in v17 saves")
-	saved.version=16;saved.erase("preparation")
+	saved.version=16;saved.furniture_layout.erase("preparation");saved.furniture_layout.erase("window");saved.erase("preparation")
 	check(loaded.load_data(saved,Rail.STATIONS.keys()) and loaded.preparation.size()==4,"v16 migrates existing cargo plus new starter warehouse")
 	check(loaded.depart({"heavy":false,"inventory_tools":true},0).is_empty() and not loaded.gear.light,"may deliberately depart without a flashlight")
 	check(not loaded.toggle_flashlight().is_empty(),"missing physical flashlight cannot light")

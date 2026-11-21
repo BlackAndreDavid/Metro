@@ -7,7 +7,7 @@ extends Control
 const HIGHLIGHTABLE = preload("res://scenes/items/highlightable_item.tscn")
 const FURNITURE = preload("res://scenes/items/furniture.tscn")
 const Catalog = preload("res://scripts/items/furniture_catalog.gd")
-const DEFINITIONS = Catalog.DEFINITIONS
+var DEFINITIONS: Dictionary = Catalog.DEFINITIONS
 var train_count := 1
 var train_zoom := 1.0
 var focused_carriage := 0
@@ -103,6 +103,7 @@ func make_grid(parent: Control, hanging: bool) -> void:
 func make_preview(parent: Control, name: String) -> void:
 	var preview = preload("res://scripts/construction/placement_preview.gd").new()
 	preview.name = name
+	preview.z_index=4 # Placement feedback stays above the world layers.
 	preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(preview)
 
@@ -139,26 +140,28 @@ func configure_world(home: Control) -> void:
 	fixtures.name = "Fixtures"
 	fixtures.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	carriage.add_child(fixtures)
-	for index in range(0 if home.construction.active else train_count):
-		# The window remains part of the carriage art. Reuse the common item
-		# component over that exact region instead of an invisible tooltip button.
-		var image: Image = $Carriage/Texture.texture.get_image().get_region(Rect2i(137, 17, 101, 49))
-		var window = HIGHLIGHTABLE.instantiate()
-		window.name = "TradeWindow%d" % index
-		window.position = Vector2(694 + index * 972, 204)
-		window.size = Vector2(420, 212)
-		fixtures.add_child(window)
-		window.set_item(ImageTexture.create_from_image(image), "交易", self)
-		window.activated.connect(_open_trade)
 	if home.construction.active:
 		make_grid(carriage, false)
+	var wall_layer:=Control.new()
+	wall_layer.name="WallFixtures";wall_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	carriage.add_child(wall_layer)
 	var floor_layer := Control.new()
 	floor_layer.name = "FurnitureSlots"
+	floor_layer.z_index=1
 	floor_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	carriage.add_child(floor_layer)
 	make_preview(carriage, "FloorPreview")
+	var rail_layer:=Control.new()
+	rail_layer.name="Rails";rail_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;rail_layer.z_index=2
+	carriage.add_child(rail_layer)
+	for index in range(train_count):
+		var rail:=TextureRect.new();rail.texture=preload("res://assets/textures/Rail.png")
+		rail.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST;rail.mouse_filter=Control.MOUSE_FILTER_IGNORE
+		rail.position=Vector2(158+index*972,152);rail.size=Vector2(964,416);rail.expand_mode=TextureRect.EXPAND_IGNORE_SIZE
+		rail_layer.add_child(rail)
 	var hanging_layer := Control.new()
 	hanging_layer.name = "HangingFixtures"
+	hanging_layer.z_index=3
 	hanging_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	carriage.add_child(hanging_layer)
 	if home.construction.active:
@@ -175,23 +178,12 @@ func configure_world(home: Control) -> void:
 		var pixel_scale := bounds.size / raw
 		item.size = (raw + Vector2(4, 4)) * pixel_scale
 		item.position = bounds.position - Vector2(2, 2) * pixel_scale
-		(hanging_layer if data.placement_type == "hanging" else floor_layer).add_child(item)
+		(hanging_layer if data.placement_type == "hanging" else wall_layer if data.floor_cells.is_empty() and not data.wall_cells.is_empty() else floor_layer).add_child(item)
 		home.construction.register_furniture(item, data)
 		item.configure(data, home, self)
 		if home.construction.moving and home.construction.selected_id == kind:
 			item.modulate.a = 0.25
 			item.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# The departure chest is attached to the door rather than occupying movable furniture cells.
-	var door: Variant = home.state.furniture_layout.door
-	if door != null:
-		var bounds := furniture_rect("door",door)
-		var chest = FURNITURE.instantiate()
-		chest.name = "PreparationWarehouse"
-		chest.position = Vector2(bounds.end.x + 8,bounds.end.y - 96)
-		chest.size = Vector2(128,96)
-		floor_layer.add_child(chest)
-		chest.configure(preload("res://resources/furniture/preparation.tres"),home,self)
-		if home.construction.active:chest.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	make_preview(hanging_layer, "HangingPreview")
 	_apply_offset()
 

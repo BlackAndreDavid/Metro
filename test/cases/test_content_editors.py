@@ -221,6 +221,14 @@ console.log('EDITOR_MODELS_OK');
         bad=copy.deepcopy(geometry);bad['loot_points'][0]['region']['control']=[241,20]
         with self.assertRaises(ValueError):editor.validate_points(bad)
 
+    def test_furniture_definitions_and_distance_validation(self):
+        definitions=editor.catalog('furniture','furniture')
+        for definition in definitions:editor.validate_furniture(copy.deepcopy(definition))
+        preparation=copy.deepcopy(next(v for v in definitions if v['id']=='preparation'))
+        for changes in [{'support_surface':'yes'},{'function_text':3},{'distance_rules':[{'target_type':'furniture','target':'missing','relation':'require','distance':3}]},{'floor_cells':[[99,0]]},{'animation':{'frames':2,'columns':3,'fps':6}},{'storage':{'width':0,'height':6}}]:
+            invalid={**preparation,**changes}
+            with self.assertRaises(ValueError):editor.validate_furniture(invalid)
+
     def test_customer_item_weights_validation(self):
         customer=self.customer();customer['sell_categories']=['supplies'];customer['sell_item_weights']={'supplies':{'water':5,'ration':0}}
         editor.validate_customer(customer)

@@ -31,10 +31,10 @@ func run() -> void:
 	for mount in range(4):
 		check(state.place_furniture("screen", {"car":0,"mount":mount,"x":0,"y":0}).is_empty(), "four independent mounts")
 	check(not state.place_furniture("screen", {"car":0,"mount":0,"x":1,"y":0}).is_empty(), "mount maximum 4x3")
-	check(state.place_furniture("computer", {"car":0,"x":18,"y":0}).is_empty(), "floor independent of hanging screen")
+	check(state.place_furniture("computer", {"car":0,"x":23,"y":10}).is_empty(), "floor independent of hanging screen")
 	var before := state.save_data()
 	before.furniture_layout.computer.x = 14
-	check(state.furniture_layout.computer.x == 18, "save snapshot does not alias nested placement")
+	check(state.furniture_layout.computer.x == 23, "save snapshot does not alias nested placement")
 	root.size = Vector2i(1280,720)
 	var home = load("res://scenes/game/home.tscn").instantiate()
 	root.add_child(home)

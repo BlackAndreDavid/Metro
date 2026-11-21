@@ -6,8 +6,16 @@ const Orders=preload("res://scripts/commerce/customer_orders.gd")
 static func repair(raw: Dictionary, stations: Array) -> Dictionary:
 	var candidate:=raw.duplicate(true)
 	var containers: Array = ["bag","locker","preparation"] if int(raw.get("version",0)) >= 17 else ["bag","locker"]
+	var extra: Variant=raw.get("furniture_storage",{})
+	if not extra is Dictionary:return {"error":"家具储物数据损坏。"}
+	for kind in extra:
+		if not extra[kind] is Array:return {"error":"家具储物列表损坏。"}
+		containers.append("furniture:"+kind)
+	candidate.furniture_storage={}
 	var original:Dictionary={}
 	for name in containers:
+		if name.begins_with("furniture:"):
+			original[name]=extra[name.trim_prefix("furniture:")].duplicate(true);continue
 		if not raw.get(name) is Array:return {"error":"物品列表结构损坏，无法自动修复。"}
 		original[name]=raw[name].duplicate(true);candidate[name]=[]
 	var active:Variant=raw.get("active_item",{})
@@ -27,6 +35,8 @@ static func repair(raw: Dictionary, stations: Array) -> Dictionary:
 	if not validator.load_data(candidate,stations):return {"error":"核心进度、家具或资金字段未通过校验，未修改原存档。请恢复匹配版本或使用备份。"}
 	var bag:Array[Dictionary]=[];var locker:Array[Dictionary]=[];var preparation:Array[Dictionary]=[]
 	var packed:Dictionary={"bag":bag,"locker":locker,"preparation":preparation}
+	for name in containers:
+		if not packed.has(name):packed[name]=[] as Array[Dictionary]
 	var pending:Array=[]
 	for name in containers:
 		for source in original[name]:
@@ -37,7 +47,7 @@ static func repair(raw: Dictionary, stations: Array) -> Dictionary:
 	for item in pending:
 		var preferred:String=item.preferred;item.erase("preferred")
 		var placed:=false
-		for name in (["preparation"] if preferred=="preparation" else [preferred,"locker" if preferred=="bag" else "bag"]):
+		for name in ([preferred] if preferred=="preparation" or preferred.begins_with("furniture:") else [preferred,"locker" if preferred=="bag" else "bag"]):
 			var bounds:Vector2i=validator.grid_size(name)
 			if name==preferred and validator.fits_item(packed[name],bounds,item.kind,Vector2i(item.x,item.y),item.rotated,item.mirrored):
 				packed[name].append(item);placed=true;break
@@ -51,6 +61,8 @@ static func repair(raw: Dictionary, stations: Array) -> Dictionary:
 		if not placed:return {"error":"空间不足，无法完整保留物品“%s”。请先恢复旧占位定义，或缩小该物品占位；原文件未修改。" % item.kind}
 	candidate.bag=packed.bag;candidate.locker=packed.locker
 	if "preparation" in containers:candidate.preparation=packed.preparation
+	for name in containers:
+		if name.begins_with("furniture:"):candidate.furniture_storage[name.trim_prefix("furniture:")]=packed[name]
 	if not active.is_empty():
 		var item:=checked_item(active,validator)
 		if item.has("error"):return item

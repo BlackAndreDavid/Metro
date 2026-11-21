@@ -40,7 +40,7 @@ static func from_data(data: Dictionary) -> Resource:
 	result.texture_binding = data.get("texture_binding",{}).duplicate(true)
 	result.texture_path = data.get("texture","")
 	result.price = float(data.get("price",0))
-	result.furniture_kind = "computer" if result.id == "computer" else data.get("furniture_kind","")
+	result.furniture_kind = data.get("furniture_kind","computer" if result.id=="computer" else "")
 	result.category = data.get("category","none")
 	result.rarity = int(data.get("rarity",0))
 	return result

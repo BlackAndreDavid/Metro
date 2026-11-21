@@ -46,6 +46,7 @@ func run() -> void:
 	var home = load("res://scenes/game/home.tscn").instantiate()
 	root.add_child(home)
 	home.state.carriage_count = 2
+	home.state.store_furniture("preparation") # Move the dependent storage after moving its door.
 	home.show_cabin()
 	await process_frame
 	var mode = home.construction
@@ -84,6 +85,8 @@ func run() -> void:
 	await process_frame
 	check(home.state.furniture_layout.door == target and mode.focused_carriage == 1, "release commits grid placement in destination carriage")
 	check(not mode.moving and not mode.backdrop.camera_locked, "release clears drag and camera lock")
+	home.state.place_furniture("preparation",{"car":1,"x":12,"y":8})
+	mode._refresh("")
 	var before_invalid: Dictionary = home.state.furniture_layout.duplicate(true)
 	item = mode.backdrop.get_node("Carriage/FurnitureSlots/Door")
 	at = painted_point(item)
@@ -104,8 +107,10 @@ func run() -> void:
 	mode.select_furniture("door")
 	await click(mode.actions.get_node("Dismantle"))
 	check(home.state.furniture_layout.door == null, "shared dismantle stores furniture")
+	home.state.store_furniture("bed")
 	await click(mode.actions.get_node("Warehouse"))
 	check(mode.inventory.item_count == 3, "warehouse holds bed computer and dismantled door")
+	home.state.place_furniture("door",target) # Restore the exit required by the preparation storage.
 	var index := -1
 	for i in range(mode.inventory.item_count):
 		if mode.inventory.get_item_metadata(i) == "screen": index = i
@@ -114,7 +119,7 @@ func run() -> void:
 		if mode.inventory.get_item_metadata(i) == "bed": index = i
 	mode.inventory.select(index)
 	await click(mode.place_button)
-	var bed := {"car":0,"x":10,"y":0}
+	var bed := {"car":0,"x":10,"y":10}
 	var point := drop_point(mode,bed)
 	motion(point,mode.pointer)
 	button(point,true)

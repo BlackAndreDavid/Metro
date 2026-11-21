@@ -47,7 +47,7 @@ func run() -> void:
 	home.state.end_trip();home.state.save_current(path)
 	var restored=State.new()
 	check(restored.load_cabin(path,home.Rail.STATIONS.keys()) and restored.active_item.kind=="tools","v16 save restores independent active container")
-	var old:Dictionary=home.state.save_data();old.version=15;old.erase("active_item");var f=FileAccess.open(path,FileAccess.WRITE);f.store_string(JSON.stringify(old));f.close()
+	var old:Dictionary=home.state.save_data();old.version=15;old.furniture_layout.erase("preparation");old.furniture_layout.erase("window");old.erase("active_item");var f=FileAccess.open(path,FileAccess.WRITE);f.store_string(JSON.stringify(old));f.close()
 	check(restored.load_cabin(path,home.Rail.STATIONS.keys()) and restored.active_item.is_empty(),"v15 saves migrate with an empty active slot")
 	var packed=State.new();packed.inventory.clear();packed.add_supply("tools","bag");packed.equip_active(packed.inventory[0].id)
 	for y in range(4):

@@ -9,6 +9,8 @@ var is_selected := false
 func configure(data: Resource, owner_home: Control, surface: Control) -> void:
 	rotation = 0.0 # Storage rotation never becomes a furniture rotation.
 	definition = data
+	pivot_offset=size/2
+	rotation_degrees=float(data.texture_binding.get("rotation",0))
 	home = owner_home
 	var building: bool = build_controller != null and build_controller.active
 	is_selected = building and build_controller.selected_id == data.id
@@ -69,3 +71,15 @@ func _gui_input(event: InputEvent) -> void:
 			accept_event()
 		return
 	super._gui_input(event)
+
+
+var animation_frame := -1
+func _process(_delta: float) -> void:
+	if definition==null or int(definition.animation.get("frames",1))<=1:return
+	var elapsed:=Time.get_ticks_msec()/1000.0
+	var frame: int=definition.frame_index(elapsed)
+	if frame==animation_frame:return
+	animation_frame=frame
+	var text:=caption.text
+	set_item(definition.frame_at(elapsed),text,drag_surface)
+	set_highlighted(hovered)

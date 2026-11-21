@@ -18,7 +18,7 @@ import sys
 import subprocess
 import shutil
 from urllib.parse import parse_qs, urlparse
-from PIL import Image
+from PIL import Image, ImageSequence
 
 ROOT = Path(__file__).resolve().parents[2]
 GAME = ROOT / 'Game'
@@ -121,6 +121,50 @@ def validate_building_geometry(data):
     if 'floor_positions' in data:
         floors=data['floor_positions']
         require(isinstance(floors,list) and len(floors)==data['floors'] and all(number(y,0,2000) for y in floors) and all(b-a>=24 for a,b in zip(floors,floors[1:])),'地板位置须逐层上升且间距至少24')
+
+def item_names(item):
+    return [item['id'],item.get('runtime_id',item['id']),*item.get('aliases',[])]
+
+def validate_furniture(data):
+    require(isinstance(data,dict) and ID.fullmatch(data.get('id','')) and isinstance(data.get('name'),str) and 0<len(data['name'])<=80,'家具ID或名称无效')
+    require(integer(data.get('width'),1,35) and integer(data.get('height'),1,12),'家具占位范围须在35×12内')
+    validate_texture(data.get('texture',''))
+    require(all(isinstance(data[key],bool) for key in ['enabled','default_owned','support_surface','fill_grid','initial_placed'] if key in data),'家具开关字段须为布尔值')
+    require(isinstance(data.get('function_text',''),str) and len(data.get('function_text',''))<=200,'家具功能说明无效')
+    require(data.get('placement_type','floor') in ['floor','hanging'],'家具摆放类型无效')
+    for plane in ['floor_cells','wall_cells']:
+        cells=data.get(plane,[])
+        require(isinstance(cells,list) and all(isinstance(c,list) and len(c)==2 and integer(c[0],0,data['width']-1) and integer(c[1],0,data['height']-1) for c in cells) and len({tuple(c) for c in cells})==len(cells),'家具墙面/地面占位格无效或重复')
+    require(data.get('floor_cells') or data.get('wall_cells') or data.get('placement_type')=='hanging','家具至少需要一种占位格')
+    if data.get('placement_type')=='hanging':require(data['width']<=4 and data['height']<=3,'吊杆挂件不能超过4×3')
+    require(data.get('interaction','none') in ['none','rest','news','gear','locker','trade','map','preparation','storage'],'家具互动功能无效')
+    animation=data.get('animation',{'frames':1,'columns':1,'fps':6})
+    require(isinstance(animation,dict) and integer(animation.get('frames'),1,128) and integer(animation.get('columns'),1,animation['frames']) and number(animation.get('fps'),.1,60),'动画帧数、列数或帧率无效')
+    with Image.open(resource(data['texture'])) as source_image:image_width,image_height=source_image.size
+    require(image_width*image_height<=16*1024*1024,'家具贴图过大');rows=math.ceil(animation['frames']/animation['columns'])
+    require(image_width%animation['columns']==0 and image_height%rows==0,'动画帧表宽高必须能被列数和行数整除')
+    durations=animation.get('durations')
+    if durations is not None:require(isinstance(durations,list) and len(durations)==animation['frames'] and all(number(v,1,60000) for v in durations),'动画帧时长无效')
+    storage=data.get('storage')
+    if data['id'] in ['locker','preparation']:require(storage is not None,'基地柜子与预备仓库须保留储物功能，避免丢失现有物品')
+    if storage is not None:require(isinstance(storage,dict) and integer(storage.get('width'),1,16) and integer(storage.get('height'),1,16),'储物格尺寸须为1～16')
+    require(isinstance(data.get('effects',[]),list) and all(isinstance(v,str) and 0<len(v)<=80 for v in data.get('effects',[])),'家具效果标签无效')
+    definitions={v['id']:v for v in catalog('furniture','furniture')};definitions[data['id']]=data
+    require(isinstance(data.get('distance_rules',[]),list),'距离规则无效')
+    for rule in data.get('distance_rules',[]):
+        require(isinstance(rule,dict) and rule.get('target_type') in ['furniture','effect'] and isinstance(rule.get('target'),str) and 0<len(rule['target'])<=80 and rule.get('relation') in ['require','exclude'] and number(rule.get('distance'),0,100),'需求/排斥距离规则无效')
+        if rule['target_type']=='furniture':require(rule['target'] in definitions and rule['target']!=data['id'],'需求/排斥家具不存在或引用自身')
+    item_id=data.get('item_id','')
+    require(isinstance(item_id,str),'家具物品属性无效')
+    if item_id:
+        items={name:item for item in catalog('items','items') for name in item_names(item)}
+        require(item_id in items,'关联物品不存在，请先创建物品')
+        for other in definitions.values():require(other['id']==data['id'] or not other.get('item_id') or other.get('item_id') not in item_names(items[item_id]),'该物品已关联其他家具')
+    placement=data.get('default_placement')
+    if placement is not None:
+        require(isinstance(placement,dict) and integer(placement.get('car'),0,2) and integer(placement.get('x'),0,35-data['width']) and integer(placement.get('y'),0,12-data['height']),'默认家具位置超出车厢')
+        if data.get('placement_type')=='hanging':require(integer(placement.get('mount'),0,3) and placement['x']+data['width']<=4 and placement['y']+data['height']<=3,'默认挂点位置无效')
+    if 'texture_binding' in data:validate_binding(data)
 
 def validate_item(data):
     require(isinstance(data,dict) and ID.fullmatch(data.get('id','')) and isinstance(data.get('name'),str) and data['name'],'物品ID或名称无效')
@@ -470,14 +514,14 @@ class Handler(BaseHTTPRequestHandler):
             if route.path=='/api/network-map':return self.respond({'definition':network_document(),'revision':network_revision()})
             if route.path=='/api/bridge':return self.respond(bridge_manifest())
             if route.path=='/api/settings':return self.respond({'settings':editor_settings(),'service':dict(SERVICE)})
-            if route.path=='/api/project': return self.respond({'enemies':catalog('enemies','enemies'),'items':catalog('items','items'),'art':art_sprites(),'station_map':station_map(),'building_templates':read(GAME/'content/building_templates.json' if (GAME/'content/building_templates.json').exists() else ROOT/'Game/content/building_templates.json')['templates'],'settings':editor_settings(),'token':self.token,'stations':read(GAME/'content/stations.json'),'customers':read(GAME/'content/customers.json')['customers'],'registry':read(GAME/'content/registry.json'),'categories':{'supplies':'生活补给','power':'电力用品','materials':'工业材料','documents':'文书旧物'}})
+            if route.path=='/api/project': return self.respond({'furniture':catalog('furniture','furniture'),'enemies':catalog('enemies','enemies'),'items':catalog('items','items'),'art':art_sprites(),'station_map':station_map(),'building_templates':read(GAME/'content/building_templates.json' if (GAME/'content/building_templates.json').exists() else ROOT/'Game/content/building_templates.json')['templates'],'settings':editor_settings(),'token':self.token,'stations':read(GAME/'content/stations.json'),'customers':read(GAME/'content/customers.json')['customers'],'registry':read(GAME/'content/registry.json'),'categories':{'supplies':'生活补给','power':'电力用品','materials':'工业材料','documents':'文书旧物'}})
             if route.path=='/api/level':
                 station=parse_qs(route.query).get('station',['邮电新村'])[0]; entry=read(GAME/'content/registry.json')['stations'].get(station)
                 return self.respond({'definition':migrate_level(read(resource(entry['level']))) if entry else None,'template':migrate_level(read(GAME/'content/levels/postal.json'))})
             if route.path=='/asset':
                 path=resource(parse_qs(route.query).get('path',[''])[0]); require(path.suffix.lower()=='.png','只能预览PNG'); data=path.read_bytes(); mime='image/png'
             else:
-                file={'/':'index.html','/editor.js':'editor.js','/style.css':'style.css','/enhancements.js':'enhancements.js','/models.js':'models.js','/workspace.js':'workspace.js','/catalogs.js':'catalogs.js','/network_editor.js':'network_editor.js','/geometry_editor.js':'geometry_editor.js','/save_sessions.js':'save_sessions.js'}.get(route.path)
+                file={'/':'index.html','/editor.js':'editor.js','/style.css':'style.css','/enhancements.js':'enhancements.js','/models.js':'models.js','/workspace.js':'workspace.js','/catalogs.js':'catalogs.js','/network_editor.js':'network_editor.js','/geometry_editor.js':'geometry_editor.js','/save_sessions.js':'save_sessions.js','/furniture_editor.js':'furniture_editor.js'}.get(route.path)
                 if not file: return self.respond({'error':'未找到'},404)
                 path=WEB/file; data=path.read_bytes(); mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'}[path.suffix]
             self.send_response(200); self.send_header('Content-Type',mime); self.send_header('Content-Length',str(len(data))); self.end_headers(); self.wfile.write(data)
@@ -497,6 +541,30 @@ class Handler(BaseHTTPRequestHandler):
                 require(0<image.width*image.height<=16*1024*1024,'图片尺寸过大')
                 path='res://assets/maps/'+data['id']+'.png';target=resource(path);target.parent.mkdir(parents=True,exist_ok=True);image.convert('RGBA').save(target)
                 return self.respond({'ok':True,'texture':path,'size':list(image.size)})
+            if self.path=='/api/furniture':
+                original=data.pop('_original_id',data.get('id'))
+                entries=catalog('furniture','furniture')
+                require(original==data.get('id') or not original,'已有家具ID不可改名')
+                require(original or not any(v['id']==data.get('id') for v in entries),'家具ID已存在')
+                validate_furniture(data)
+                upsert_catalog('furniture','furniture',data)
+                items=catalog('items','items')
+                for item in items:
+                    if data.get('item_id') in item_names(item):item['furniture_kind']=data['id']
+                    elif item.get('furniture_kind')==data['id']:item['furniture_kind']=''
+                atomic(GAME/'content/items.json',{'version':1,'items':items})
+                return self.respond({'ok':True})
+            if self.path=='/api/furniture-image':
+                require(ID.fullmatch(data.get('id','')),'家具素材ID无效')
+                image=Image.open(io.BytesIO(base64.b64decode(data['data'].split(',')[-1],validate=True)))
+                count=getattr(image,'n_frames',1);require(1<=count<=128 and image.width*image.height*count<=16*1024*1024,'动画或图片过大')
+                frames=[];durations=[]
+                for frame in ImageSequence.Iterator(image):frames.append(frame.convert('RGBA').copy());durations.append(max(1,int(frame.info.get('duration',100))))
+                columns=math.ceil(math.sqrt(count));rows=math.ceil(count/columns)
+                sheet=Image.new('RGBA',(image.width*columns,image.height*rows))
+                for index,frame in enumerate(frames):sheet.paste(frame,((index%columns)*image.width,(index//columns)*image.height))
+                path='res://assets/textures/furniture/'+data['id']+'.png';target=resource(path);target.parent.mkdir(parents=True,exist_ok=True);sheet.save(target)
+                return self.respond({'texture':path,'animation':{'frames':count,'columns':columns,'fps':min(60,max(.1,1000/(sum(durations)/count))),'durations':durations}})
             if self.path=='/api/enemy':validate_enemy(data);upsert_catalog('enemies','enemies',data);return self.respond({'ok':True})
             if self.path=='/api/item':return self.respond({'ok':True,'item':save_item(data)})
             if self.path=='/api/catalog/archive':

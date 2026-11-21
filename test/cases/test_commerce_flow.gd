@@ -54,11 +54,11 @@ func run() -> void:
 	root.add_child(home)
 	home.show_cabin()
 	await process_frame
-	var hotspot = home.home_backdrop.get_node("Carriage/Fixtures/TradeWindow0")
+	var hotspot = home.home_backdrop.get_node("Carriage/WallFixtures/Window")
 	check(not hotspot.has_node("Customer"), "Home keeps original window without visitors")
-	var original: Image = home.home_backdrop.carriage.get_node("Texture").texture.get_image().get_region(Rect2i(137,17,101,49))
+	var original: Image = load("res://assets/textures/Window.png").get_image()
 	original.convert(Image.FORMAT_RGBA8)
-	check(hotspot.padded_image.get_region(Rect2i(2,2,101,49)).get_data() == original.get_data(), "Home window source pixels unchanged")
+	check(hotspot.padded_image.get_region(Rect2i(Vector2i(2,2),original.get_size())).get_data() == original.get_data(), "Home furniture uses the independent window source pixels")
 	await click(hotspot)
 	check(home.screen == "trade" and home.view.scene_file_path == "res://scenes/commerce/trade.tscn", "original hotspot opens transaction scene")
 	var scene = home.view
@@ -106,7 +106,7 @@ func run() -> void:
 	var second_id: String = Orders.record(home.state).active.id
 	await click(scene.get_node("Panel/Close"))
 	check(home.screen == "cabin" and not is_instance_valid(window), "leaving transaction removes customer visuals from Home")
-	await click(home.home_backdrop.get_node("Carriage/Fixtures/TradeWindow0"))
+	await click(home.home_backdrop.get_node("Carriage/WallFixtures/Window"))
 	scene = home.view
 	window = scene.get_node("Panel/CustomerWindow")
 	window.set_process(false)
@@ -133,7 +133,7 @@ func run() -> void:
 	check(Orders.record(home.state).dismissed == 1 and Orders.record(home.state).completed == 2 and Orders.record(home.state).arrived == 3, "UI dismissal preserves daily visit accounting")
 	await click(scene.get_node("Panel/Close"))
 	home.state.customer_visits[home.state.station] = {"arrived":Orders.daily_limit(home.state.station),"completed":Orders.daily_limit(home.state.station),"dismissed":0,"active":{}}
-	await click(home.home_backdrop.get_node("Carriage/Fixtures/TradeWindow0"))
+	await click(home.home_backdrop.get_node("Carriage/WallFixtures/Window"))
 	scene = home.view
 	check("今日顾客已全部接待" in scene.get_node("Panel/Order").text and scene.get_node("Panel/Confirm").disabled and scene.window.phase == "empty", "daily cap displays empty window and blocks additional trades")
 	home.queue_free()

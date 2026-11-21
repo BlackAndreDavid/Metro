@@ -38,7 +38,7 @@ func run() -> void:
 	check(not copy.load_cabin(path,[state.station]) and copy.save_data() == before, "duplicate item and furniture ownership rejected atomically")
 	state.locker.clear()
 	state.inventory.clear()
-	for container in ["locker","bag"]:
+	for container in state.storage_containers()+["bag"]:
 		var bounds: Vector2i = state.grid_size(container)
 		for y in range(bounds.y):
 			for x in range(bounds.x): state.entries(container).append(state.make_entry("water",Vector2i(x,y),false))

@@ -536,7 +536,7 @@ func show_locker(message: String = "") -> void:
 	label(panel, cargo_title("bag"), Rect2(40, 91, 350, 34), 21)
 	label(panel, cargo_title("locker"), Rect2(516, 91, 450, 34), 21)
 	add_grid(panel, "bag", Vector2(40, 139), 52)
-	add_grid(panel, "locker", Vector2(516, 139), 52)
+	add_grid(panel, "locker", Vector2(516, 139), mini(52,mini(416/state.grid_size("locker").x,260/state.grid_size("locker").y)))
 	action(panel,"一键放置所选",Rect2(40,48,180,32),quick_place_selected)
 	action(panel,"整理背包",Rect2(230,48,140,32),sort_cargo.bind("bag"))
 	action(panel,"整理柜子",Rect2(516,48,140,32),sort_cargo.bind("locker"))
@@ -1012,3 +1012,8 @@ func quick_pickup_slots(slots:Array)->int:
 	if count>0:
 		clear_selection();update_surface_pack(true);surface_block.update_interaction_visuals()
 	return count
+
+
+func show_furniture_storage(kind: String) -> void:
+	var panel:=preload("res://scripts/construction/storage_editor.gd").new()
+	add_child(panel);panel.configure(self,kind,false)

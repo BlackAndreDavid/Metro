@@ -79,7 +79,7 @@ EditSession.save=async function(){
   const data=sessionData(),key=this.key;
   if(key.startsWith('catalog/')){
    if(C.kind==='items'&&!checkItemId())throw Error('请修正重复或无效的物品ID');
-   await api(C.kind==='items'?'/api/item':C.kind==='enemies'?'/api/enemy':'/api/building-template',C.kind==='items'?{...data,_original_id:C.originalId??''}:data);
+   await api(C.kind==='furniture'?'/api/furniture':C.kind==='items'?'/api/item':C.kind==='enemies'?'/api/enemy':'/api/building-template',['items','furniture'].includes(C.kind)?{...data,_original_id:C.originalId??''}:data);
    C.originalId=data.id;
   }else if(key.startsWith('customer/')){await api('/api/customer',data);delete S.customer._create}
   else if(key.startsWith('level/')){

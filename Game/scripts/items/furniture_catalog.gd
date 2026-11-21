@@ -10,14 +10,16 @@ const GRID_ORIGIN := INTERIOR_RECT.position
 const CARRIAGE_PITCH := 972.0
 const MOUNT_SIZE := Vector2i(4, 3)
 const HANGING_ORIGINS := [Vector2(28, 22), Vector2(87, 22), Vector2(130, 20), Vector2(204, 21)]
-const IDS := ["bed", "computer", "locker", "door", "screen"]
-const DEFINITIONS := {
-	"bed": preload("res://resources/furniture/bed.tres"),
-	"computer": preload("res://resources/furniture/computer.tres"),
-	"locker": preload("res://resources/furniture/locker.tres"),
-	"door": preload("res://resources/furniture/door.tres"),
-	"screen": preload("res://resources/furniture/screen.tres"),
-}
+const LEGACY_IDS := ["bed","computer","locker","door","screen"]
+static var IDS: Array = []
+static var DEFINITIONS: Dictionary = {}
+static func _static_init() -> void:
+	reload()
+static func reload() -> void:
+	IDS.clear();DEFINITIONS.clear()
+	var document: Dictionary=preload("res://scripts/content/content_registry.gd").read_json("res://content/furniture.json")
+	for data in document.get("furniture",[]):
+		IDS.append(data.id);DEFINITIONS[data.id]=preload("res://scripts/items/furniture_definition.gd").from_data(data)
 
 static func floor_rect(car: int) -> Rect2:
 	return Rect2(GRID_ORIGIN + Vector2(car * CARRIAGE_PITCH, 0), Vector2(GRID_SIZE) * CELL_SIZE)
@@ -31,18 +33,19 @@ static func placement_rect(kind: String, placement: Dictionary) -> Rect2:
 	return Rect2(plane.position + Vector2(placement.x, placement.y) * CELL_SIZE, Vector2(DEFINITIONS[kind].grid_size) * CELL_SIZE)
 
 static func default_placement(kind: String, car: int = 0) -> Dictionary:
-	match kind:
-		"door": return {"car": car, "x": 9, "y": 0}
-		"locker": return {"car": car, "x": 0, "y": 0}
-		"computer": return {"car": car, "x": 22, "y": 10}
-		"bed": return {"car": car, "x": 27, "y": 10}
-		"screen": return {"car": car, "mount": 0, "x": 0, "y": 0}
-	return {}
+	var value: Variant = DEFINITIONS[kind].default_placement
+	if value==null:return {}
+	var result: Dictionary=canonical(value);result.car=car
+	return result
 
 static func initial_layout() -> Dictionary:
-	return {"bed": null, "computer": null, "locker": default_placement("locker"), "door": default_placement("door"), "screen": default_placement("screen")}
+	var result := {}
+	for kind in IDS:
+		var placement:=default_placement(kind)
+		result[kind]=placement if not placement.is_empty() and DEFINITIONS[kind].initial_placed and DEFINITIONS[kind].enabled else null
+	return result
 
-static func valid_placement(kind: String, p: Variant, count: int, version: int = 11) -> bool:
+static func valid_placement(kind: String, p: Variant, count: int, version: int = 18) -> bool:
 	if not DEFINITIONS.has(kind) or not p is Dictionary:
 		return false
 	var hanging: bool = DEFINITIONS[kind].placement_type == "hanging"
@@ -58,12 +61,23 @@ static func valid_placement(kind: String, p: Variant, count: int, version: int =
 		return false
 	return Rect2i(Vector2i.ZERO, bounds).encloses(Rect2i(Vector2i(int(p.x), int(p.y)), footprint(kind, version)))
 
-static func overlaps(a_kind: String, a: Dictionary, b_kind: String, b: Dictionary, version: int = 11) -> bool:
+static func overlaps(a_kind: String, a: Dictionary, b_kind: String, b: Dictionary, version: int = 18) -> bool:
 	if int(a.car) != int(b.car) or a.has("mount") != b.has("mount"):
 		return false
 	if a.has("mount") and int(a.mount) != int(b.mount):
 		return false
-	return Rect2i(Vector2i(int(a.x), int(a.y)), footprint(a_kind, version)).intersects(Rect2i(Vector2i(int(b.x), int(b.y)), footprint(b_kind, version)))
+	if version < 18 or a.has("mount"):
+		return Rect2i(Vector2i(int(a.x),int(a.y)),footprint(a_kind,version)).intersects(Rect2i(Vector2i(int(b.x),int(b.y)),footprint(b_kind,version)))
+	for plane in ["floor_cells","wall_cells"]:
+		var occupied:=cells(a_kind,a,plane)
+		for cell in cells(b_kind,b,plane):
+			if cell in occupied:return true
+	return false
+
+static func cells(kind: String, p: Dictionary, plane: String) -> Array[Vector2i]:
+	var result: Array[Vector2i]=[]
+	for cell in DEFINITIONS[kind].get(plane):result.append(cell+Vector2i(int(p.x),int(p.y)))
+	return result
 
 static func integer(value: Variant) -> bool:
 	return (value is int or value is float) and is_finite(value) and value == floor(value)
@@ -77,10 +91,10 @@ static func canonical(p: Dictionary) -> Dictionary:
 static func copy_layout(layout: Dictionary) -> Dictionary:
 	var result := {}
 	for kind in IDS:
-		result[kind] = canonical(layout[kind]) if layout[kind] != null else null
+		result[kind] = canonical(layout[kind]) if layout.get(kind) != null else (null if layout.has(kind) or DEFINITIONS[kind].default_placement==null else canonical(DEFINITIONS[kind].default_placement))
 	return result
 
-static func footprint(kind: String, version: int = 11) -> Vector2i:
+static func footprint(kind: String, version: int = 18) -> Vector2i:
 	if version <= 10 and kind == "computer": return Vector2i(2, 2)
 	if version == 9 and kind == "screen": return Vector2i(3, 3)
 	if version <= 8 and kind == "screen": return Vector2i(2, 2)
@@ -99,7 +113,7 @@ static func migrate_grid_layout(layout: Dictionary, version: int) -> Dictionary:
 	var old_origin := Vector2(174,212) if version <= 7 else GRID_ORIGIN
 	# Place full-height furniture first, then preserve nearby positions of smaller items.
 	for kind in ["screen", "door", "locker", "computer", "bed"]:
-		if layout[kind] == null: continue
+		if layout.get(kind) == null: continue
 		var old: Dictionary = canonical(layout[kind])
 		if kind == "screen":
 			result[kind] = old
@@ -124,7 +138,67 @@ static func migrate_grid_layout(layout: Dictionary, version: int) -> Dictionary:
 
 static func visual_rect(kind: String, bounds: Rect2) -> Rect2:
 	var data: Resource = DEFINITIONS[kind]
+	if not data.texture_binding.is_empty():
+		var binding: Dictionary=data.texture_binding
+		return Rect2(bounds.position+Vector2(binding.x,binding.y)*CELL_SIZE,Vector2(binding.width,binding.height)*CELL_SIZE)
 	if data.fill_grid: return bounds
 	var raw := Vector2(data.texture.get_size())
 	var fitted := raw * minf(bounds.size.x / raw.x,bounds.size.y / raw.y)
 	return Rect2(bounds.get_center() - fitted / 2,fitted)
+
+
+static func support_problem(kind: String, p: Dictionary, layout: Dictionary) -> String:
+	var data: Resource=DEFINITIONS[kind]
+	if p.has("mount") or not data.wall_cells.is_empty():return ""
+	var occupied:=cells(kind,p,"floor_cells")
+	for cell in occupied:
+		var below:=cell+Vector2i.DOWN
+		if below in occupied or below.y==GRID_SIZE.y:continue
+		var supported:=false
+		for other in layout:
+			var at: Variant=layout[other]
+			if other==kind or at==null or not DEFINITIONS.has(other) or not DEFINITIONS[other].support_surface:continue
+			if int(at.car)==int(p.car) and not at.has("mount") and below in cells(other,at,"floor_cells"):supported=true;break
+		if not supported:return data.display_name+"下方没有地面或平整支撑面。"
+	return ""
+
+static func distance_problem(layout: Dictionary) -> String:
+	for kind in layout:
+		if layout[kind]==null or not DEFINITIONS.has(kind):continue
+		var data: Resource=DEFINITIONS[kind]
+		for rule in data.distance_rules:
+			var matches:=false
+			for other in layout:
+				if other==kind or layout[other]==null or not DEFINITIONS.has(other):continue
+				if rule.target_type=="furniture" and other!=rule.target:continue
+				if rule.target_type=="effect" and rule.target not in DEFINITIONS[other].effects:continue
+				if int(layout[kind].car)!=int(layout[other].car):continue
+				var a:=placement_rect(kind,layout[kind]);var b:=placement_rect(other,layout[other])
+				var gap:=Vector2(maxf(0,maxf(a.position.x-b.end.x,b.position.x-a.end.x)),maxf(0,maxf(a.position.y-b.end.y,b.position.y-a.end.y)))/CELL_SIDE
+				if (gap.length()<=float(rule.distance)+0.0001 if rule.relation=="require" else gap.length()<float(rule.distance)-0.0001):matches=true
+			if rule.relation=="require" and not matches:return data.display_name+"需要在 %s 格内靠近 %s。" % [rule.distance,rule.target]
+			if rule.relation=="exclude" and matches:return data.display_name+"必须远离 %s 至少 %s 格。" % [rule.target,rule.distance]
+	return ""
+
+
+static func add_missing_layout(layout: Dictionary, count: int) -> Dictionary:
+	var result:=copy_layout(layout)
+	for kind in IDS:
+		if layout.has(kind):continue
+		result[kind]=null
+		var data: Resource=DEFINITIONS[kind]
+		if data.default_placement==null or not data.default_owned:continue
+		var preferred: Dictionary=data.default_placement
+		var candidates: Array[Dictionary]=[]
+		for car in range(count):
+			for y in range(GRID_SIZE.y-data.grid_size.y+1):
+				for x in range(GRID_SIZE.x-data.grid_size.x+1):candidates.append({"car":car,"x":x,"y":y})
+		candidates.sort_custom(func(a,b):return Vector3(a.car,a.x,a.y).distance_squared_to(Vector3(preferred.car,preferred.x,preferred.y))<Vector3(b.car,b.x,b.y).distance_squared_to(Vector3(preferred.car,preferred.x,preferred.y)))
+		for candidate in candidates:
+			var blocked:=false
+			for other in result:
+				if other!=kind and result[other]!=null and overlaps(kind,candidate,other,result[other]):blocked=true;break
+			if blocked:continue
+			var trial:=result.duplicate(true);trial[kind]=candidate
+			if support_problem(kind,candidate,trial).is_empty() and distance_problem(trial).is_empty():result[kind]=candidate;break
+	return result
