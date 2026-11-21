@@ -926,8 +926,8 @@
         "columns": 1,
         "fps": 6
       },
-      "width": 4,
-      "height": 3,
+      "width": 3,
+      "height": 2,
       "floor_cells": [
         [
           0,
@@ -942,10 +942,6 @@
           0
         ],
         [
-          3,
-          0
-        ],
-        [
           0,
           1
         ],
@@ -956,26 +952,6 @@
         [
           2,
           1
-        ],
-        [
-          3,
-          1
-        ],
-        [
-          0,
-          2
-        ],
-        [
-          1,
-          2
-        ],
-        [
-          2,
-          2
-        ],
-        [
-          3,
-          2
         ]
       ],
       "wall_cells": [],
@@ -994,7 +970,7 @@
           "target_type": "furniture",
           "target": "door",
           "relation": "require",
-          "distance": 3
+          "distance": 6
         }
       ],
       "default_placement": {
@@ -1004,10 +980,10 @@
       },
       "default_owned": true,
       "texture_binding": {
-        "x": -0.020216420189786533,
-        "y": -0.001600963994208504,
-        "width": 4.034995984565841,
-        "height": 2.925301497557881,
+        "x": -0.09033941883266183,
+        "y": 0.017180773721099607,
+        "width": 3.133290468008593,
+        "height": 2.2715807731678814,
         "rotation": 0
       },
       "build_cost": {
@@ -1021,7 +997,8 @@
         "steel_plate": 1
       },
       "known": true,
-      "required_technology": {}
+      "required_technology": {},
+      "reference_cells": []
     },
     {
       "deleted": false,
@@ -1671,8 +1648,8 @@
       },
       "default_owned": true,
       "texture_binding": {
-        "x": 0.08979855132065806,
-        "y": -0.004688778490100631,
+        "x": 0.027806363820657598,
+        "y": 0.11240686097713848,
         "width": 13.933226987813837,
         "height": 10.045097329362834,
         "rotation": 0
@@ -1688,7 +1665,8 @@
         "steel_plate": 1
       },
       "known": true,
-      "required_technology": {}
+      "required_technology": {},
+      "reference_cells": []
     }
   ]
 }
