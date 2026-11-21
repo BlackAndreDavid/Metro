@@ -16,7 +16,9 @@ var texture: Texture2D:
 func perform(home: Control) -> void:
 	if action == "none":
 		return
-	if action == "storage":
+	if id.contains("#") and action in ["locker","preparation","storage"]:
+		home.show_furniture_storage(id)
+	elif action == "storage":
 		home.show_furniture_storage(id)
 	elif action == "map":
 		home.show_map()
@@ -28,6 +30,11 @@ var wall_cells: Array[Vector2i] = []
 var storage := Vector2i.ZERO
 var item_id := ""
 var effects: Array = []
+var build_cost: Dictionary = {}
+var required_technology: Dictionary = {}
+var known := true
+var dismantle_cost: Dictionary = {}
+var salvage: Dictionary = {}
 var distance_rules: Array = []
 var support_surface := false
 var animation := {"frames":1,"columns":1,"fps":6.0}
@@ -49,7 +56,7 @@ func frame_at(seconds: float) -> Texture2D:
 		var frame_size := Vector2i(image.get_width()/columns,image.get_height()/rows)
 		for index in range(count):
 			var part := image.get_region(Rect2i(Vector2i(index%columns,index/columns)*frame_size,frame_size))
-			if id=="preparation":part=part.get_region(part.get_used_rect())
+			if id.get_slice("#",0)=="preparation":part=part.get_region(part.get_used_rect())
 			_frames.append(ImageTexture.create_from_image(part))
 	return _frames[frame_index(seconds)]
 
@@ -75,6 +82,8 @@ static func from_data(data: Dictionary) -> Resource:
 	var container: Variant=data.get("storage")
 	if container is Dictionary:result.storage=Vector2i(int(container.width),int(container.height))
 	result.item_id=data.get("item_id","");result.effects=data.get("effects",[]).duplicate()
+	result.required_technology=data.get("required_technology",{}).duplicate();result.known=data.get("known",true)
+	result.build_cost=data.get("build_cost",{}).duplicate();result.dismantle_cost=data.get("dismantle_cost",{}).duplicate();result.salvage=data.get("salvage",{}).duplicate()
 	result.distance_rules=data.get("distance_rules",[]).duplicate(true);result.support_surface=data.get("support_surface",false)
 	result.animation=data.get("animation",{"frames":1,"columns":1,"fps":6}).duplicate()
 	result.texture_binding=data.get("texture_binding",{}).duplicate()

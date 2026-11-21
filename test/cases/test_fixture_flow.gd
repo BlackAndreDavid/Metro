@@ -8,7 +8,9 @@ func check(ok: bool, message: String) -> void:
 	if not ok:
 		failures += 1
 		push_error(message)
-func _initialize() -> void: call_deferred("run")
+func _initialize() -> void:
+	load(get_script().resource_path.get_base_dir()+"/support/furniture_fixtures.gd").canonical_profile()
+	call_deferred("run")
 func run() -> void:
 	var expected := {"computer": Vector2i(3,2), "locker": Vector2i(3,12), "door": Vector2i(8,12), "bed": Vector2i(8,2), "screen": Vector2i(4,3)}
 	for kind in expected: check(Catalog.DEFINITIONS[kind].grid_size == expected[kind], "explicit footprint: " + kind)

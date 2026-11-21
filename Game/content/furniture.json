@@ -100,7 +100,19 @@
         "width": 8,
         "height": 2,
         "rotation": 0
-      }
+      },
+      "build_cost": {
+        "steel_plate": 1,
+        "bolts": 2
+      },
+      "dismantle_cost": {
+        "tools": 1
+      },
+      "salvage": {
+        "steel_plate": 1
+      },
+      "known": true,
+      "required_technology": {}
     },
     {
       "id": "computer",
@@ -162,7 +174,17 @@
         "width": 2.5555555555555554,
         "height": 2.0,
         "rotation": 0
-      }
+      },
+      "build_cost": {},
+      "dismantle_cost": {
+        "tools": 1
+      },
+      "salvage": {
+        "circuit": 1,
+        "copper": 1
+      },
+      "known": true,
+      "required_technology": {}
     },
     {
       "id": "locker",
@@ -346,7 +368,19 @@
         "width": 3,
         "height": 12,
         "rotation": 0
-      }
+      },
+      "build_cost": {
+        "steel_plate": 1,
+        "bolts": 2
+      },
+      "dismantle_cost": {
+        "tools": 1
+      },
+      "salvage": {
+        "steel_plate": 1
+      },
+      "known": true,
+      "required_technology": {}
     },
     {
       "id": "door",
@@ -767,7 +801,19 @@
         "width": 8,
         "height": 12,
         "rotation": 0
-      }
+      },
+      "build_cost": {
+        "steel_plate": 2,
+        "bolts": 2
+      },
+      "dismantle_cost": {
+        "tools": 1
+      },
+      "salvage": {
+        "steel_plate": 1
+      },
+      "known": true,
+      "required_technology": {}
     },
     {
       "deleted": false,
@@ -805,7 +851,19 @@
         "width": 4,
         "height": 3,
         "rotation": 0
-      }
+      },
+      "build_cost": {
+        "steel_plate": 1,
+        "bolts": 2
+      },
+      "dismantle_cost": {
+        "tools": 1
+      },
+      "salvage": {
+        "steel_plate": 1
+      },
+      "known": true,
+      "required_technology": {}
     },
     {
       "deleted": false,
@@ -901,7 +959,19 @@
         "width": 4.034995984565841,
         "height": 2.925301497557881,
         "rotation": 0
-      }
+      },
+      "build_cost": {
+        "steel_plate": 1,
+        "bolts": 2
+      },
+      "dismantle_cost": {
+        "tools": 1
+      },
+      "salvage": {
+        "steel_plate": 1
+      },
+      "known": true,
+      "required_technology": {}
     },
     {
       "deleted": false,
@@ -1720,7 +1790,19 @@
         "width": 15.23,
         "height": 10.98,
         "rotation": 0
-      }
+      },
+      "build_cost": {
+        "steel_plate": 2,
+        "bolts": 2
+      },
+      "dismantle_cost": {
+        "tools": 1
+      },
+      "salvage": {
+        "steel_plate": 1
+      },
+      "known": true,
+      "required_technology": {}
     }
   ]
 }

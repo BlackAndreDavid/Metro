@@ -7,7 +7,9 @@ func check(ok: bool, message: String) -> void:
 	if not ok:
 		failures += 1
 		push_error(message)
-func _initialize() -> void: call_deferred("run")
+func _initialize() -> void:
+	load(get_script().resource_path.get_base_dir()+"/support/furniture_fixtures.gd").canonical_profile()
+	call_deferred("run")
 func button(at: Vector2, pressed: bool) -> void:
 	var e := InputEventMouseButton.new()
 	e.position = at
@@ -76,7 +78,7 @@ func run() -> void:
 	mode._process(0.02)
 	check(mode.moving and mode.dragging_furniture and not mode.get_node("HoldProgress").visible, "one second unlocks dragging")
 	check(mode.backdrop.camera_locked and not mode.backdrop.dragging, "furniture drag cannot pan camera")
-	var target := {"car":1,"x":4,"y":0}
+	var target := {"car":1,"x":0,"y":0}
 	var destination := drop_point(mode,target)
 	motion(destination,at)
 	check(mode.candidate == target and mode.backdrop.carriage.get_node("FloorPreview").valid, "snapped valid drag preview")
@@ -85,7 +87,7 @@ func run() -> void:
 	await process_frame
 	check(home.state.furniture_layout.door == target and mode.focused_carriage == 1, "release commits grid placement in destination carriage")
 	check(not mode.moving and not mode.backdrop.camera_locked, "release clears drag and camera lock")
-	home.state.place_furniture("preparation",{"car":1,"x":12,"y":8})
+	home.state.place_furniture("preparation",{"car":1,"x":17,"y":8})
 	mode._refresh("")
 	var before_invalid: Dictionary = home.state.furniture_layout.duplicate(true)
 	item = mode.backdrop.get_node("Carriage/FurnitureSlots/Door")
@@ -105,11 +107,11 @@ func run() -> void:
 	button(at + Vector2(16,0),false)
 	check(not mode.moving and home.state.furniture_layout == before_invalid, "movement before charging cancels hold")
 	mode.select_furniture("door")
-	await click(mode.actions.get_node("Dismantle"))
-	check(home.state.furniture_layout.door == null, "shared dismantle stores furniture")
+	await click(mode.context_actions.get_node("Temporary"))
+	check(home.state.furniture_layout.door == null, "contextual temporary storage holds the furniture instance")
 	home.state.store_furniture("bed")
 	await click(mode.actions.get_node("Warehouse"))
-	check(mode.inventory.item_count == 3, "warehouse holds bed computer and dismantled door")
+	check(mode.inventory.item_count == 2, "temporary warehouse lists only the held bed and door")
 	home.state.place_furniture("door",target) # Restore the exit required by the preparation storage.
 	var index := -1
 	for i in range(mode.inventory.item_count):

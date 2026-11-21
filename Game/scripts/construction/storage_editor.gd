@@ -11,9 +11,10 @@ var message: Label
 var width_input: SpinBox
 var height_input: SpinBox
 var grid_layer: Control
+var show_backpack := true
 
-func configure(owner_ui: Control, furniture_kind: String, allow_resize: bool) -> void:
-	state=owner_ui.state;font=owner_ui.font;kind=furniture_kind;target=state.storage_container(kind)
+func configure(owner_ui: Control, furniture_kind: String, allow_resize: bool, show_bag: bool = true) -> void:
+	state=owner_ui.state;font=owner_ui.font;kind=furniture_kind;target=state.storage_container(kind);show_backpack=show_bag;z_index=110
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);mouse_filter=Control.MOUSE_FILTER_STOP
 	var veil:=ColorRect.new();veil.color=Color("100e1cdd");veil.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(veil)
 	var panel:=Panel.new();panel.position=Vector2(130,84);panel.size=Vector2(1020,550);add_child(panel)
@@ -30,17 +31,23 @@ func configure(owner_ui: Control, furniture_kind: String, allow_resize: bool) ->
 			var problem: String=state.resize_furniture_storage(kind,Vector2i(int(width_input.value),int(height_input.value)))
 			message.text="储物格已调整，缩小时不会删除物品。" if problem.is_empty() else problem
 			if problem.is_empty():selection={};rebuild_grids())
+	if not show_backpack:
+		var take:=Button.new();take.name="TakeSelected";take.text="取出选中到背包";take.position=Vector2(24,450);panel.add_child(take);take.pressed.connect(take_selected_to_bag)
+		var take_all:=Button.new();take_all.name="TakeAll";take_all.text="取出全部到背包";take_all.position=Vector2(240,450);panel.add_child(take_all);take_all.pressed.connect(take_all_to_bag)
 	grid_layer=Control.new();grid_layer.position=Vector2(24,126);panel.add_child(grid_layer);rebuild_grids()
-	message=Label.new();message.position=Vector2(24,492);message.size=Vector2(970,45);message.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;message.text="拖拽在家具与背包之间转移 · R/滚轮旋转 · F镜像 · Shift+点击快速转移";panel.add_child(message)
+	message=Label.new();message.position=Vector2(24,492);message.size=Vector2(970,45);message.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;message.text="拖拽调整当前家具内部物品 · R/滚轮旋转 · F镜像 · Shift+点击整理" if not show_backpack else "拖拽在家具与背包之间转移 · R/滚轮旋转 · F镜像 · Shift+点击快速转移";panel.add_child(message)
 
 func rebuild_grids() -> void:
 	for child in grid_layer.get_children():child.queue_free()
 	grids.clear()
-	for container in [target,"bag"]:
+	for container in ([target,"bag"] if show_backpack else [target]):
 		var grid=preload("res://scripts/cargo_grid.gd").new();grid_layer.add_child(grid)
 		grid.position=Vector2(0 if container==target else 590,0)
 		var dimensions: Vector2i=state.grid_size(container)
-		grid.setup(self,container,mini(38,mini(540/dimensions.x,350/dimensions.y)));grids.append(grid)
+		var cell_size:=mini(38,mini((540 if show_backpack else 940)/dimensions.x,(310 if not show_backpack else 350)/dimensions.y))
+		grid.setup(self,container,cell_size)
+		if not show_backpack:grid.position.x=(972-grid.size.x)/2
+		grids.append(grid)
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouse:pointer_position=event.position
@@ -73,6 +80,19 @@ func drag_preview() -> Control:
 	var label:=Label.new();var entry: Dictionary=state.picked(selection.source,selection.id);label.text=state.item_name(entry.kind);return label
 func quick_place_selected() -> void:
 	if selection.is_empty():return
-	var problem: String=state.auto_place(selection,"bag" if selection.source==target else target)
+	var problem: String=state.sort_container(target) if not show_backpack else state.auto_place(selection,"bag" if selection.source==target else target)
 	message.text="物品已转移。" if problem.is_empty() else problem
 	if problem.is_empty():clear_selection()
+
+
+func take_selected_to_bag() -> void:
+	if selection.is_empty():message.text="请先选择物品。";return
+	var problem: String=state.auto_place(selection,"bag")
+	if problem.is_empty():clear_selection()
+	message.text="物品已取出。" if problem.is_empty() else problem
+	redraw()
+func take_all_to_bag() -> void:
+	var count:=0
+	for entry in state.entries(target).duplicate():
+		if state.auto_place({"source":target,"id":entry.id,"rotated":entry.rotated},"bag").is_empty():count+=1
+	clear_selection();message.text="已取出%d件物品；背包装不下的物品仍在原处。" % count;redraw()

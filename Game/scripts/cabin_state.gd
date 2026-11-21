@@ -29,7 +29,7 @@ const RARITY := {
 const RARITY_NAMES := ["普通", "少见", "稀有", "珍稀"]
 const RARITY_COLORS := [Color("bfc3ce"), Color("e4be76"), Color("ffa271"), Color("ff7873")]
 const EPOCH := "2026-07-11T00:00:00"
-const CABIN_SAVE_VERSION := 18
+const CABIN_SAVE_VERSION := 19
 const CustomerDialogue = preload("res://scripts/commerce/customer_dialogue.gd")
 const CustomerOrders = preload("res://scripts/commerce/customer_orders.gd")
 const ItemCatalog = preload("res://scripts/items/item_catalog.gd")
@@ -39,7 +39,9 @@ const MAX_CARRIAGES := 3
 const EXPANSION_COST := {"steel_plate": 2, "bolts": 4, "tools": 1}
 const EXTRA_TRAVEL_COST := 10
 const EXTRA_DAILY_COST := 2.0
-var FURNITURE_IDS: Array = Furniture.IDS
+var FURNITURE_IDS: Array:
+	get:return furniture_layout.keys()
+const Renovation=preload("res://scripts/construction/renovation_rules.gd")
 
 const CAR_CAPACITY := 500.0
 const CAR_START_POWER := 100.0
@@ -63,6 +65,11 @@ var preparation: Array[Dictionary] = []
 var furniture_storage: Dictionary = {}
 var storage_sizes: Dictionary = {}
 var furniture_owned: Array = []
+var temporary_furniture: Array = []
+var fixtures_seeded_cars := 1
+var renovation_active := false
+var technologies: Dictionary = {}
+var learned_furniture: Array = []
 var locker: Array[Dictionary] = []
 var wide_bag := false
 var collected: Dictionary = {}
@@ -102,7 +109,9 @@ func _init() -> void:
 	add_supply("computer", "locker")
 	give_preparation_tools()
 	for kind in FURNITURE_IDS:
-		if Furniture.DEFINITIONS[kind].default_owned:furniture_owned.append(kind)
+		if Furniture.DEFINITIONS[kind].default_owned:
+			furniture_owned.append(kind)
+			if furniture_layout[kind]==null and Furniture.DEFINITIONS[kind].item_id.is_empty():temporary_furniture.append(kind)
 
 func date_unix(extra_days: int = 0) -> int:
 	return Time.get_unix_time_from_datetime_string(EPOCH) + (day - 1 + extra_days) * 86400
@@ -687,7 +696,7 @@ func survival_after_day() -> Dictionary:
 func save_next_day(path: String) -> Error:
 	if trip_active or not game_over_reason.is_empty():
 		return ERR_BUSY
-	if not furniture_completion_problem().is_empty():return ERR_INVALID_DATA
+	if renovation_active and not furniture_completion_problem().is_empty():return ERR_INVALID_DATA
 	var data := save_data()
 	data.day = day + 1
 	data.charger_used = {}
@@ -702,7 +711,7 @@ func save_next_day(path: String) -> Error:
 	return OK
 
 func save_current(path: String) -> Error:
-	if not furniture_completion_problem().is_empty():return ERR_INVALID_DATA
+	if renovation_active and not furniture_completion_problem().is_empty():return ERR_INVALID_DATA
 	if trip_active:
 		return ERR_BUSY
 	return write_save(path, save_data())
@@ -710,7 +719,7 @@ func save_current(path: String) -> Error:
 func save_data() -> Dictionary:
 	return {
 		"base_name": base_name, "version": CABIN_SAVE_VERSION, "day": day, "account": account, "station": station,
-		"wide": wide_bag, "bag": inventory, "locker": locker, "preparation": preparation, "furniture_storage": furniture_storage, "storage_sizes": storage_sizes, "furniture_owned": furniture_owned, "active_item":active_item.duplicate(true),
+		"wide": wide_bag, "bag": inventory, "locker": locker, "preparation": preparation, "furniture_storage": furniture_storage, "storage_sizes": storage_sizes, "furniture_owned": furniture_owned, "temporary_furniture":temporary_furniture.duplicate(), "fixtures_seeded_cars":fixtures_seeded_cars, "technologies":technologies.duplicate(), "learned_furniture":learned_furniture.duplicate(), "furniture_content_signature":furniture_signature(), "active_item":active_item.duplicate(true),
 		"installed_charge": installed_charge, "debt": debt,
 		"days_in_debt": days_in_debt, "days_without_water": days_without_water,
 		"days_without_food": days_without_food, "drank_today": drank_today,
@@ -795,7 +804,7 @@ func load_cabin(path: String, known_stations: Array) -> bool:
 
 func load_data(data: Dictionary, known_stations: Array) -> bool:
 	var version: Variant = data.get("version")
-	if version != 1 and version != 2 and version != 3 and version != 4 and version != 5 and version != 6 and version != 7 and version != 8 and version != 9 and version != 10 and version != 11 and version != 12 and version != 13 and version != 14 and version != 15 and version != 16 and version != 17 and version != CABIN_SAVE_VERSION:
+	if version != 1 and version != 2 and version != 3 and version != 4 and version != 5 and version != 6 and version != 7 and version != 8 and version != 9 and version != 10 and version != 11 and version != 12 and version != 13 and version != 14 and version != 15 and version != 16 and version != 17 and version != 18 and version != CABIN_SAVE_VERSION:
 		return false
 	if version >= 15 and not CustomerDialogue.valid_social(data):
 		return false
@@ -835,16 +844,25 @@ func load_data(data: Dictionary, known_stations: Array) -> bool:
 		var cargo:=read_cargo(raw_extra[kind],dimensions)
 		if cargo.is_empty():return false
 		loaded_extra[kind]=cargo.entries
-	var loaded_owned: Variant=data.get("furniture_owned",FURNITURE_IDS.duplicate()) if version>=18 else FURNITURE_IDS.duplicate()
+	var loaded_owned: Variant=data.get("furniture_owned",Furniture.LEGACY_IDS.duplicate()) if version>=18 else Furniture.LEGACY_IDS.duplicate()
 	if not loaded_owned is Array:return false
 	for kind in loaded_owned:
-		if kind not in FURNITURE_IDS:return false
+		if not kind is String or (version>=18 and not data.furniture_layout.has(kind)) or not Furniture.ensure_instance(kind):return false
 	var loaded_bag := read_cargo(data.get("bag"), LARGE if data.wide else SMALL)
 	var loaded_locker := read_cargo(data.get("locker"),Vector2i(loaded_sizes.locker[0],loaded_sizes.locker[1]) if loaded_sizes.has("locker") else LOCKER)
 	if loaded_bag.is_empty() or loaded_locker.is_empty():
 		return false
 	var loaded_preparation := read_cargo(data.get("preparation"),Vector2i(loaded_sizes.preparation[0],loaded_sizes.preparation[1]) if loaded_sizes.has("preparation") else PREPARATION) if version >= 17 else {"entries":[]}
 	if loaded_preparation.is_empty():return false
+	if version>=19:
+		if not data.get("technologies",{}) is Dictionary or not data.get("learned_furniture",[]) is Array:return false
+		for key in data.get("technologies",{}):
+			if not (key is String or key is StringName) or not valid_index(data.technologies[key],0,100):return false
+		for id in data.get("learned_furniture",[]):
+			if id not in Furniture.IDS:return false
+		if not data.get("temporary_furniture") is Array or not valid_index(data.get("fixtures_seeded_cars"),0,int(data.carriage_count)):return false
+		for id in data.temporary_furniture:
+			if not id is String or id not in loaded_owned or not data.furniture_layout.has(id) or data.furniture_layout[id]!=null:return false
 	var loaded_active := {}
 	if version >= 16:
 		var raw_active: Variant = data.get("active_item")
@@ -855,18 +873,24 @@ func load_data(data: Dictionary, known_stations: Array) -> bool:
 			var active_check := read_cargo([raw_active],active_bounds)
 			if active_check.is_empty() or active_check.entries.size() != 1: return false
 			loaded_active = active_check.entries[0]
-	var loaded_layout := Furniture.add_missing_layout(data.furniture_layout,int(data.carriage_count)) if version == CABIN_SAVE_VERSION else migrate_furniture(data, int(version))
+	var loaded_layout := Furniture.copy_layout(data.furniture_layout) if version >= 18 else migrate_furniture(data, int(version))
 	var extra_cargo: Array=[]
 	for cargo in loaded_extra.values():extra_cargo.append_array(cargo)
-	var computers := 1 if loaded_layout.computer != null else 0
+	var computers:=0
+	for id in loaded_layout:
+		if Furniture.base_kind(id)=="computer" and loaded_layout[id]!=null:computers+=1
 	for entry in loaded_bag.entries + loaded_locker.entries + loaded_preparation.entries + extra_cargo + ([loaded_active] if not loaded_active.is_empty() else []):
 		if entry.kind == "computer": computers += 1
-	if computers > 1:
+	if computers > 1 and version < 19:
 		return false
 	inventory.assign(loaded_bag.entries)
 	locker.assign(loaded_locker.entries)
 	preparation.assign(loaded_preparation.entries)
 	furniture_storage=loaded_extra;storage_sizes=loaded_sizes;furniture_owned=loaded_owned.duplicate()
+	furniture_layout=loaded_layout;carriage_count=int(data.get("carriage_count",1))
+	temporary_furniture=data.get("temporary_furniture",[]).duplicate() if version>=19 else []
+	fixtures_seeded_cars=int(data.get("fixtures_seeded_cars",0)) if version>=19 else 0
+	technologies=data.get("technologies",{}).duplicate();learned_furniture=data.get("learned_furniture",[]).duplicate()
 	active_item = loaded_active
 	# Reissue runtime IDs across both grids after validating the saved placements.
 	next_id = 1
@@ -876,6 +900,15 @@ func load_data(data: Dictionary, known_stations: Array) -> bool:
 	if version < 17: give_preparation_tools()
 	carriage_count = int(data.carriage_count) if version >= 4 else 1
 	furniture_layout = loaded_layout
+	ensure_carriage_fixtures()
+	if version<19 or data.get("furniture_content_signature","")!=furniture_signature():
+		furniture_layout=Furniture.reconcile_layout(furniture_layout,carriage_count)
+	for id in furniture_layout:
+		if furniture_layout[id]!=null:
+			if id not in furniture_owned:furniture_owned.append(id)
+			temporary_furniture.erase(id)
+	for id in furniture_owned:
+		if furniture_layout.get(id)==null and Furniture.DEFINITIONS[id].item_id.is_empty() and id not in temporary_furniture:temporary_furniture.append(id)
 	if version < 6 and furniture_layout.computer == null and material_count("computer") == 0:
 		if not add_supply("computer", "locker") and not add_supply("computer", "bag"):
 			furniture_layout.computer = Furniture.default_placement("computer")
@@ -968,7 +1001,7 @@ func place_furniture(kind: String, placement: Variant) -> String:
 	if not problem.is_empty():
 		return problem
 	var item_id: String=Furniture.DEFINITIONS[kind].item_id
-	if not item_id.is_empty() and furniture_layout[kind]==null:
+	if not item_id.is_empty() and furniture_layout.get(kind)==null and kind not in temporary_furniture:
 		var consumed:=false
 		for cargo in all_cargo_arrays():
 			for entry in cargo:
@@ -976,27 +1009,22 @@ func place_furniture(kind: String, placement: Variant) -> String:
 			if consumed:break
 		if not consumed and not active_item.is_empty() and active_item.kind==ItemCatalog.runtime_id(item_id):active_item={};consumed=true
 		if not consumed:return "储物格里没有可摆放的"+Furniture.DEFINITIONS[kind].display_name+"。"
+	if item_id.is_empty() and kind not in furniture_owned:return "请先花费材料建造此家具。"
 	if kind not in furniture_owned:furniture_owned.append(kind)
+	temporary_furniture.erase(kind)
 	furniture_layout[kind] = Furniture.canonical(placement)
 	return ""
 
 func store_furniture(kind: String) -> String:
-	if not can_edit_home() or kind not in FURNITURE_IDS:
-		return "当前不能拆除这件家具。"
-	var trial:=furniture_layout.duplicate(true);trial[kind]=null
-	for other in trial:
-		if trial[other]!=null:
-			var support:=Furniture.support_problem(other,trial[other],trial)
-			if not support.is_empty():return "不能拆除正在提供支撑的家具："+support
-	var definition: Resource=Furniture.DEFINITIONS[kind]
-	if not definition.item_id.is_empty() and furniture_layout[kind]!=null:
-		if definition.storage!=Vector2i.ZERO and not entries(storage_container(kind)).is_empty():return "请先清空家具内的物品，再收纳家具。"
-		var stored:=false
-		for target in available_storage_containers()+["bag"]:
-			if target!=storage_container(kind) and add_supply(definition.item_id,target):stored=true;break
-		if not stored:return "储物格已满，无法收纳家具。"
-	furniture_layout[kind] = null
-	return ""
+	if Furniture.DEFINITIONS.has(kind) and not Furniture.DEFINITIONS[kind].item_id.is_empty():return Renovation.pack_item(self,kind)
+	return Renovation.temporary_store(self,kind)
+
+func temporarily_store_furniture(kind: String) -> String:
+	return Renovation.temporary_store(self,kind)
+func decompose_furniture(kind: String) -> String:
+	return Renovation.decompose(self,kind)
+func build_furniture(kind: String,placement: Dictionary) -> String:
+	return Renovation.build(self,kind,placement)
 
 func material_count(kind: String) -> int:
 	kind = ItemCatalog.runtime_id(kind)
@@ -1029,19 +1057,20 @@ func expand_carriage() -> String:
 					cargo.remove_at(index)
 					remaining -= 1
 	carriage_count += 1
+	ensure_carriage_fixtures()
 	return ""
 
 func valid_home_layout(data: Dictionary, version: int = CABIN_SAVE_VERSION) -> bool:
 	if not valid_index(data.get("carriage_count"), 1, MAX_CARRIAGES):
 		return false
 	var layout: Variant = data.get("furniture_layout")
-	var ids: Array = (["bed", "computer"] if version == 4 else Furniture.LEGACY_IDS) if version < 18 else FURNITURE_IDS
+	var ids: Array = (["bed", "computer"] if version == 4 else Furniture.LEGACY_IDS) if version < 18 else (data.furniture_layout.keys() if data.get("furniture_layout") is Dictionary else [])
 	if not layout is Dictionary or (version < 18 and layout.size()!=ids.size()):
 		return false
 	for required in Furniture.LEGACY_IDS:
 		if version>=18 and not layout.has(required):return false
 	for key in layout:
-		if key not in ids:
+		if key not in ids or (version>=18 and not Furniture.ensure_instance(key)):
 			return false
 	if version <= 5:
 		var occupied: Array[int] = []
@@ -1068,12 +1097,12 @@ func valid_home_layout(data: Dictionary, version: int = CABIN_SAVE_VERSION) -> b
 		if not Furniture.valid_placement(kind, p, int(data.carriage_count), version):
 			return false
 		for other in ids:
-			if other != kind and layout.get(other) != null and Furniture.valid_placement(other, layout[other], int(data.carriage_count), version) and Furniture.overlaps(kind, p, other, layout[other], version):
+			if (version<18 or version>=19 and data.get("furniture_content_signature","")==furniture_signature()) and other != kind and layout.get(other) != null and Furniture.valid_placement(other, layout[other], int(data.carriage_count), version) and Furniture.overlaps(kind, p, other, layout[other], version):
 				return false
 	return true
 
 func migrate_furniture(data: Dictionary, version: int) -> Dictionary:
-	if version in [11,12,13,14,15,16,17]:
+	if version in [11,12,13,14,15,16,17,18]:
 		return Furniture.add_missing_layout(data.furniture_layout,int(data.carriage_count))
 	if version in [6, 7, 8, 9, 10]:
 		var migrated:=Furniture.migrate_grid_layout(data.furniture_layout,version)
@@ -1086,7 +1115,7 @@ func migrate_furniture(data: Dictionary, version: int) -> Dictionary:
 		layout.computer = Furniture.default_placement("computer")
 		return layout
 	var legacy: Dictionary = data.furniture_layout
-	var ids: Array = (["bed", "computer"] if version == 4 else Furniture.LEGACY_IDS) if version < 18 else FURNITURE_IDS
+	var ids: Array = (["bed", "computer"] if version == 4 else Furniture.LEGACY_IDS) if version < 18 else (data.furniture_layout.keys() if data.get("furniture_layout") is Dictionary else [])
 	for kind in ids:
 		var old := int(legacy[kind])
 		if old < 0:
@@ -1100,9 +1129,10 @@ func migrate_furniture(data: Dictionary, version: int) -> Dictionary:
 	return layout
 
 func stored_furniture_available(kind: String) -> bool:
-	if furniture_layout.get(kind)!=null:return false
+	if not Furniture.DEFINITIONS.has(kind) or furniture_layout.get(kind)!=null:return false
+	if kind in temporary_furniture:return true
 	var item_id: String=Furniture.DEFINITIONS[kind].item_id
-	return kind in furniture_owned if item_id.is_empty() else material_count(item_id)>0 or (not active_item.is_empty() and active_item.kind==ItemCatalog.runtime_id(item_id))
+	return false if item_id.is_empty() else material_count(item_id)>0 or (not active_item.is_empty() and active_item.kind==ItemCatalog.runtime_id(item_id))
 
 ## Equip/swap is atomic; the active container owns its entry outside the backpack grid.
 func equip_active(id: int) -> String:
@@ -1224,7 +1254,7 @@ func storage_container(kind: String) -> String:
 func storage_containers() -> Array:
 	var result: Array=["locker","preparation"]
 	for kind in FURNITURE_IDS:
-		if kind not in ["locker","preparation"] and Furniture.DEFINITIONS[kind].storage!=Vector2i.ZERO:result.append(storage_container(kind))
+		if kind not in ["locker","preparation"] and Furniture.DEFINITIONS[kind].storage!=Vector2i.ZERO and (furniture_layout.get(kind)!=null or kind in furniture_owned or furniture_storage.has(kind)):result.append(storage_container(kind))
 	return result
 
 func all_cargo_arrays() -> Array:
@@ -1252,15 +1282,17 @@ func resize_furniture_storage(kind: String, dimensions: Vector2i) -> String:
 	return ""
 
 func furniture_completion_problem() -> String:
-	var missing: PackedStringArray=[]
-	for kind in furniture_owned:
-		if Furniture.DEFINITIONS.has(kind) and furniture_layout.get(kind)==null and Furniture.DEFINITIONS[kind].item_id.is_empty():missing.append(Furniture.DEFINITIONS[kind].display_name)
-	if not missing.is_empty():return "仍有未放置的家具："+"、".join(missing)+"。请放置完成；兼有物品属性的家具可收纳进储物家具。"
-	for kind in furniture_layout:
-		if furniture_layout[kind]!=null:
-			var support:=Furniture.support_problem(kind,furniture_layout[kind],furniture_layout)
-			if not support.is_empty():return support
-	return Furniture.distance_problem(furniture_layout)
+	if not temporary_furniture.is_empty():
+		var names: PackedStringArray=[]
+		for id in temporary_furniture:names.append(Furniture.DEFINITIONS[id].display_name)
+		return "临时收纳仓库仍有家具："+"、".join(names)+"。请放回、收纳为物品或分解后再完成装修。"
+	for base in ["door","window"]:
+		if Renovation.count_placed(self,base)<1:return "全车至少保留一个车门和一个车窗。"
+	for id in furniture_layout:
+		if furniture_layout[id]==null:continue
+		var problem:=furniture_placement_problem(id,furniture_layout[id])
+		if not problem.is_empty():return Furniture.DEFINITIONS[id].display_name+"："+problem
+	return ""
 
 
 func available_storage_containers() -> Array:
@@ -1268,3 +1300,56 @@ func available_storage_containers() -> Array:
 	for kind in FURNITURE_IDS:
 		if furniture_layout.get(kind)!=null and Furniture.DEFINITIONS[kind].storage!=Vector2i.ZERO:result.append(storage_container(kind))
 	return result
+
+
+func furniture_signature() -> String:
+	return FileAccess.get_file_as_string("res://content/furniture.json").sha256_text()
+
+func ensure_carriage_fixtures() -> void:
+	for car in range(fixtures_seeded_cars,carriage_count):
+		for base in ["door","window"]:
+			var present:=false
+			for id in furniture_layout:
+				if Furniture.base_kind(id)==base and furniture_layout[id]!=null and int(furniture_layout[id].car)==car:present=true;break
+			if present:continue
+			var id:=Renovation.next_id(self,base)
+			furniture_layout[id]=Furniture.default_placement(base,car)
+			if id not in furniture_owned:furniture_owned.append(id)
+	fixtures_seeded_cars=carriage_count
+
+
+func technology_level(id: String) -> int:
+	return auto_repair_level if id=="auto_repair" else int(technologies.get(id,0))
+func build_conditions(id: String) -> Array:
+	var definition: Resource=Furniture.DEFINITIONS[id]
+	var result: Array=[]
+	for tech in definition.required_technology:
+		var required:=int(definition.required_technology[tech]);var current:=technology_level(tech)
+		result.append({"met":current>=required,"text":"技术 · %s %d/%d级" % [{"auto_repair":"汽修","carpentry":"木工","electronics":"电工"}.get(tech,tech),current,required]})
+	if definition.required_technology.is_empty():result.append({"met":true,"text":"技术 · 无需技术"})
+	var materials: Dictionary=definition.build_cost.duplicate()
+	if not definition.item_id.is_empty():materials[definition.item_id]=int(materials.get(definition.item_id,0))+1
+	for kind in materials:
+		var amount:=material_count(kind)
+		if not active_item.is_empty() and kind==definition.item_id and active_item.kind==ItemCatalog.runtime_id(kind):amount+=1
+		result.append({"met":amount>=int(materials[kind]),"text":"材料 · %s %d/%d" % [item_name(kind),amount,int(materials[kind])]})
+	if materials.is_empty():result.append({"met":true,"text":"材料 · 无需材料"})
+	return result
+func build_options() -> Array:
+	var result: Array=[]
+	for id in Furniture.IDS:
+		var definition: Resource=Furniture.DEFINITIONS[id]
+		if not definition.enabled or not (definition.known or id in learned_furniture):continue
+		var conditions:=build_conditions(id);var ready:=true
+		for condition in conditions:
+			if not condition.met:ready=false
+		result.append({"id":id,"conditions":conditions,"ready":ready})
+	result.sort_custom(func(a,b):return a.ready if a.ready!=b.ready else String(a.id).to_lower()<String(b.id).to_lower())
+	return result
+func build_requirements_problem(id: String) -> String:
+	if not Furniture.DEFINITIONS.has(id):return "未知家具。"
+	var definition: Resource=Furniture.DEFINITIONS[id]
+	if not definition.enabled or not (definition.known or Furniture.base_kind(id) in learned_furniture):return "尚未掌握该家具的建造方式。"
+	for condition in build_conditions(id):
+		if not condition.met:return "尚未满足："+condition.text
+	return ""

@@ -1,5 +1,6 @@
 'use strict';
 // Shared geometry authoring: item masks/bindings and building art/physics/drop paths.
+const PreviewVisibility={collision:true,cells:true};
 const G={layer:'physics',mode:'move',floor:0,maskMode:'add',drag:null};
 function itemCells(){return C.data.cells??Array.from({length:C.data.width*C.data.height},(_,i)=>[i%C.data.width,Math.floor(i/C.data.width)])}
 function ensureBinding(){
@@ -44,8 +45,7 @@ function drawBinding(ctx,image){
 function drawItemBoundPreview(ctx,image){
  const p=itemProjection(),w=C.data.width,h=C.data.height;ctx.imageSmoothingEnabled=false;ctx.save();
  if(C.previewRotated||C.previewMirrored){ctx.translate(p.left+(C.previewRotated?h:w)*p.scale/2,p.base+(C.previewRotated?w:h)*p.scale/2);ctx.rotate(C.previewRotated?Math.PI/2:0);ctx.scale(C.previewMirrored?-1:1,1);ctx.translate(-p.left-w*p.scale/2,-p.base-h*p.scale/2)}
- ctx.fillStyle='#35504c';for(const[x,y]of itemCells())ctx.fillRect(p.left+x*p.scale,p.base+y*p.scale,p.scale,p.scale);
- drawBinding(ctx,image);ctx.strokeStyle='#a6dccc';for(const[x,y]of itemCells())ctx.strokeRect(p.left+x*p.scale,p.base+y*p.scale,p.scale,p.scale);ctx.restore();
+ drawBinding(ctx,image);if(PreviewVisibility.cells){ctx.fillStyle='#35504c66';ctx.strokeStyle='#a6dccc';for(const[x,y]of itemCells()){ctx.fillRect(p.left+x*p.scale,p.base+y*p.scale,p.scale,p.scale);ctx.strokeRect(p.left+x*p.scale,p.base+y*p.scale,p.scale,p.scale)}}ctx.restore();
  ctx.fillStyle='#f2eadd';ctx.font='14px sans-serif';ctx.fillText(`${itemCells().length} 个占位格 · 贴图手动绑定`,20,326);
 }
 function changeFloor(delta){
@@ -72,8 +72,8 @@ const geometryLootPoints=renderLootPoints;renderLootPoints=function(){geometryLo
 const geometryPreview=drawCatalogPreview;drawCatalogPreview=function(){
  if(C.kind!=='building_templates')return geometryPreview();if(!C.data)return;const ctx=$('catalogPreview').getContext('2d'),p=buildProjection();ctx.clearRect(0,0,600,340);ctx.fillStyle='#191927';ctx.fillRect(0,0,600,340);ctx.imageSmoothingEnabled=false;
  ctx.fillStyle=C.data.wall;ctx.fillRect(p.left,p.base-buildingHeight()*p.scale,C.data.width*p.scale,buildingHeight()*p.scale);drawBinding(ctx,imageFor(spritePath()));
- const box=C.data.collision;ctx.strokeStyle='#72d4df';ctx.lineWidth=2;ctx.strokeRect(p.left+box.x*p.scale,p.base-(box.y+box.height)*p.scale,box.width*p.scale,box.height*p.scale);ctx.fillStyle='#72d4df';ctx.fillRect(p.left+(box.x+box.width)*p.scale-4,p.base-(box.y+box.height)*p.scale-4,8,8);
- ensureFloors().forEach((y,index)=>{ctx.strokeStyle=index===G.floor?'#efc488':'#a6dccc';ctx.lineWidth=index===G.floor?3:1;ctx.beginPath();ctx.moveTo(p.left,p.base-y*p.scale);ctx.lineTo(p.left+C.data.width*p.scale,p.base-y*p.scale);ctx.stroke();ctx.fillStyle='#fff';ctx.fillText(`${index+1}F`,p.left+5,p.base-y*p.scale-5)});
+ if(PreviewVisibility.collision){const box=C.data.collision;ctx.strokeStyle='#72d4df';ctx.lineWidth=2;ctx.strokeRect(p.left+box.x*p.scale,p.base-(box.y+box.height)*p.scale,box.width*p.scale,box.height*p.scale);ctx.fillStyle='#72d4df';ctx.fillRect(p.left+(box.x+box.width)*p.scale-4,p.base-(box.y+box.height)*p.scale-4,8,8);}
+ if(PreviewVisibility.collision)ensureFloors().forEach((y,index)=>{ctx.strokeStyle=index===G.floor?'#efc488':'#a6dccc';ctx.lineWidth=index===G.floor?3:1;ctx.beginPath();ctx.moveTo(p.left,p.base-y*p.scale);ctx.lineTo(p.left+C.data.width*p.scale,p.base-y*p.scale);ctx.stroke();ctx.fillStyle='#fff';ctx.fillText(`${index+1}F`,p.left+5,p.base-y*p.scale-5)});
  C.data.loot_points.forEach((point,index)=>{const y=floorY(point.outside?0:point.floor),region=point.region;ctx.strokeStyle=index===C.point?'#f5d598':'#bba56c';ctx.fillStyle=ctx.strokeStyle;ctx.lineWidth=3;
   if(region){const a=stageXY([region.start[0],y+region.start[1]]),b=stageXY([region.end[0],y+region.end[1]]);ctx.beginPath();ctx.moveTo(...a);if(region.type==='arc'){const c=stageXY([region.control[0],y+region.control[1]]);ctx.quadraticCurveTo(...c,...b)}else ctx.lineTo(...b);ctx.stroke();for(const key of region.type==='arc'?['start','end','control']:['start','end']){const at=stageXY([region[key][0],y+region[key][1]]);ctx.fillRect(at[0]-5,at[1]-5,10,10)}}
   else ctx.fillRect(p.left+point.x*p.scale-7,p.base-y*p.scale-20,14,20);
@@ -85,9 +85,9 @@ $('catalogPreview').onpointerdown=e=>{
  if(C.kind==='items'&&(C.previewRotated||C.previewMirrored)){status('先选择贴图移动、缩放或旋转工具，再调整绑定');return}
  if(C.kind==='building_templates'&&G.layer==='physics'){
   const p=buildProjection();for(const[index,point]of C.data.loot_points.entries())if(point.region)for(const key of point.region.type==='arc'?['start','end','control']:['start','end']){const handle=stageXY([point.region[key][0],floorY(point.outside?0:point.floor)+point.region[key][1]]);if(Math.hypot(at[0]-handle[0],at[1]-handle[1])<12){C.point=index;G.drag={kind:'region',point,key};break}}
-  if(!G.drag){const index=ensureFloors().findIndex(y=>Math.abs(at[1]-(p.base-y*p.scale))<8);if(index>=0){G.floor=index;G.drag={kind:'floor',index}}}
+  if(!G.drag&&PreviewVisibility.collision){const index=ensureFloors().findIndex(y=>Math.abs(at[1]-(p.base-y*p.scale))<8);if(index>=0){G.floor=index;G.drag={kind:'floor',index}}}
   if(!G.drag){const index=C.data.loot_points.findIndex(point=>!point.region&&Math.hypot(at[0]-stageXY([point.x,floorY(point.outside?0:point.floor)])[0],at[1]-stageXY([point.x,floorY(point.outside?0:point.floor)])[1]+10)<18);if(index>=0){C.point=index;G.drag={kind:'point',point:C.data.loot_points[index]}}}
-  if(!G.drag){const box=C.data.collision;if(Math.abs(local[0]-box.x-box.width)<12/p.scale&&Math.abs(local[1]-box.y-box.height)<12/p.scale)G.drag={kind:'collision-scale',before:clone(box)};else if(local[0]>=box.x&&local[0]<=box.x+box.width&&local[1]>=box.y&&local[1]<=box.y+box.height)G.drag={kind:'collision',before:clone(box)}}
+  if(!G.drag&&PreviewVisibility.collision){const box=C.data.collision;if(Math.abs(local[0]-box.x-box.width)<12/p.scale&&Math.abs(local[1]-box.y-box.height)<12/p.scale)G.drag={kind:'collision-scale',before:clone(box)};else if(local[0]>=box.x&&local[0]<=box.x+box.width&&local[1]>=box.y&&local[1]<=box.y+box.height)G.drag={kind:'collision',before:clone(box)}}
  }else{const mode=bindingHit(at);if(mode)G.drag={kind:'binding',mode,before:clone(ensureBinding())}}
  if(G.drag){G.drag.start=local;G.drag.at=at;$('catalogPreview').setPointerCapture(e.pointerId);e.preventDefault();drawCatalogPreview()}
 };
@@ -118,3 +118,7 @@ $('catalogPreview').onpointerdown=e=>{if(e.button===1||e.button===2){e.preventDe
 $('catalogPreview').onpointermove=e=>{if(G.cameraDrag){const at=previewScreen(e);G.viewPan=at.map((v,i)=>G.cameraDrag.pan[i]+v-G.cameraDrag.at[i]);drawCatalogPreview()}else modelMove(e)};
 $('catalogPreview').onpointerup=$('catalogPreview').onpointercancel=e=>{G.cameraDrag=null;modelUp(e)};
 $('catalogPreview').oncontextmenu=e=>e.preventDefault();$('catalogPreview').addEventListener('wheel',e=>{e.preventDefault();zoomPreview(G.viewZoom*(e.deltaY<0?1.15:1/1.15),previewScreen(e))},{passive:false});
+
+const previewVisibilityBar=document.createElement('div');previewVisibilityBar.id='previewVisibilityBar';previewVisibilityBar.className='bar';
+for(const [key,title]of [['collision','显示碰撞箱'],['cells','显示占位格']]){const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.id=key==='collision'?'previewShowCollision':'previewShowCells';input.checked=PreviewVisibility[key];label.textContent=title;label.append(input);input.onchange=()=>{PreviewVisibility[key]=input.checked;drawCatalogPreview()};previewVisibilityBar.append(label)}
+$('catalogPreview').before(previewVisibilityBar);

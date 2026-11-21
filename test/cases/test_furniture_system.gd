@@ -8,7 +8,9 @@ var checks:=0
 func check(ok:bool,message:String)->void:
 	checks+=1
 	if not ok:failures+=1;push_error(message)
-func _initialize()->void:call_deferred("run")
+func _initialize()->void:
+	load(get_script().resource_path.get_base_dir()+"/support/furniture_fixtures.gd").canonical_profile()
+	call_deferred("run")
 func run()->void:
 	var state:=State.new()
 	check(state.furniture_completion_problem().is_empty(),"new base furniture is placed, or its item is safely stored")
@@ -52,6 +54,7 @@ func run()->void:
 	check(custom_state.auto_place(selection,"bag").is_empty() and custom_state.store_furniture(custom.id).is_empty(),"empty dual storage furniture returns to an inventory upright")
 	Catalog.IDS.erase(custom.id);Catalog.DEFINITIONS.erase(custom.id)
 	check(state.store_furniture("bed").is_empty() and not state.furniture_completion_problem().is_empty(),"non-item furniture must be placed before finishing renovation")
+	state.renovation_active=true
 	check(state.save_current(OS.get_environment("METRO_TEST_RESULTS").path_join("unfinished-furniture.json"))==ERR_INVALID_DATA,"unfinished furniture cannot be saved")
 	var animated=Definition.from_data({"id":"animation_test","name":"动画","texture":"res://assets/textures/temp/items/water_bottle.png","width":1,"height":1,"floor_cells":[[0,0]],"animation":{"frames":2,"columns":2,"fps":2,"durations":[100,300]}})
 	check(animated.frame_index(.05)==0 and animated.frame_index(.2)==1 and animated.frame_index(.45)==0,"animation supports variable frame durations and looping")
@@ -80,12 +83,15 @@ func run()->void:
 	var cursor: Vector2=mode.backdrop.carriage.get_global_transform()*sprite_center
 	mode.press_furniture("preparation",cursor);mode._process(1.0)
 	check(mode.target_at(cursor)==mode.state.furniture_layout.preparation,"dragging displaced artwork preserves its occupied anchor across carriage boundaries")
-	Catalog.DEFINITIONS.preparation.texture_binding=original_binding;mode.state.carriage_count=1;mode.cancel_selection()
+	Catalog.DEFINITIONS.preparation.texture_binding=original_binding;mode.state.carriage_count=1
+	for id in mode.state.furniture_layout.keys():
+		if mode.state.furniture_layout[id]!=null and mode.state.furniture_layout[id].car>=1:mode.state.furniture_layout.erase(id);mode.state.furniture_owned.erase(id)
+	mode.state.fixtures_seeded_cars=1;mode.cancel_selection()
 	mode.select_furniture("preparation");mode.edit_storage();await process_frame
-	check(is_instance_valid(mode.storage_panel) and mode.storage_panel.grids.size()==2,"renovation storage inspector reuses draggable cargo grids")
+	check(is_instance_valid(mode.storage_panel) and mode.storage_panel.grids.size()==1,"renovation storage inspector reuses draggable cargo grids")
 	mode.storage_panel.queue_free();await process_frame
 	mode.state.store_furniture("bed");mode.exit()
-	check(mode.active and mode.get_node("Message").text.contains("未放置"),"exit checks and explains unplaced furniture")
+	check(mode.active and mode.get_node("Message").text.contains("临时收纳"),"exit checks and explains unplaced furniture")
 	mode.state.place_furniture("bed",Catalog.default_placement("bed"));mode.exit();check(not mode.active,"valid complete renovation can finish")
 	home.queue_free();await process_frame
 	print("FURNITURE_SYSTEM_OK: %d checks, %d failures" % [checks,failures]);quit(1 if failures else 0)

@@ -6,13 +6,13 @@ const F={plane:'floor_cells',mode:'add',start:null,end:null,scale:32,textureMode
 const furnitureNew=newCatalog;newCatalog=function(){
  if(C.kind!=='furniture')return furnitureNew();
  let index=1;while(S.project.furniture.some(v=>v.id==='furniture_'+index))index++;
- C.data={id:'furniture_'+index,name:'新家具',enabled:true,texture:'res://assets/textures/Locker.png',animation:{frames:1,columns:1,fps:6},width:2,height:2,floor_cells:[[0,0],[1,0],[0,1],[1,1]],wall_cells:[],placement_type:'floor',interaction:'none',function_text:'查看家具',support_surface:true,storage:null,item_id:'',effects:[],distance_rules:[],default_placement:null,default_owned:true};
+ C.data={id:'furniture_'+index,name:'新家具',enabled:true,texture:'res://assets/textures/Locker.png',animation:{frames:1,columns:1,fps:6},width:2,height:2,floor_cells:[[0,0],[1,0],[0,1],[1,1]],wall_cells:[],placement_type:'floor',interaction:'none',function_text:'查看家具',support_surface:true,storage:null,item_id:'',effects:[],distance_rules:[],default_placement:null,default_owned:true,known:true,required_technology:{},build_cost:{steel_plate:1,bolts:2},dismantle_cost:{tools:1},salvage:{steel_plate:1}};
  C.originalId='';C.instance=null;delete C.outdoor;renderCatalogForm();dirty();
 };
 function furnitureSelect(object,key,label,entries){const wrap=document.createElement('label'),select=document.createElement('select');wrap.textContent=label;for(const [value,text]of entries)option(select,value,text);select.value=key==='item_id'?(S.project.items.find(v=>itemNames(v).includes(object[key]))?.id||object[key]||''):(object[key]??'');select.dataset.field=key;select.onchange=()=>{object[key]=select.value;renderCatalogForm();dirty()};wrap.append(select);return wrap}
 const furnitureForm=renderCatalogForm;renderCatalogForm=function(){
  if(C.kind!=='furniture'){furnitureTextureTools.hidden=true;return furnitureForm()}
- const d=C.data,form=$('catalogForm');if(!d)return;form.hidden=false;form.replaceChildren();$('catalogPreview').hidden=false;$('contentUpload').parentElement.hidden=false;$('contentUpload').accept='image/png,image/gif';$('artChoices').parentElement.hidden=false;$('lootEditor').hidden=true;$('clearBuildingTexture').hidden=true;$('returnToLevel').hidden=true;
+ const d=C.data,form=$('catalogForm');if(!d)return;d.known??=true;form.hidden=false;form.replaceChildren();$('catalogPreview').hidden=false;$('contentUpload').parentElement.hidden=false;$('contentUpload').accept='image/png,image/gif';$('artChoices').parentElement.hidden=false;$('lootEditor').hidden=true;$('clearBuildingTexture').hidden=true;$('returnToLevel').hidden=true;
  $('catalogTitle').textContent='家具 · '+d.name;$('archiveCatalog').textContent=d.deleted?'恢复条目':'－ 删除（归档）';
  const id=field(d,'id','稳定ID','text');id.querySelector('input').readOnly=!!C.originalId;
  form.append(id,field(d,'name','名称','text'),field(d,'enabled','启用','checkbox'),field(d,'default_owned','基地拥有此家具','checkbox'),field(d,'texture','PNG贴图 / 动画帧表','text'));
@@ -40,18 +40,29 @@ const furnitureForm=renderCatalogForm;renderCatalogForm=function(){
   const input=field(values,key,title);input.querySelector('input').oninput=e=>{d.texture_binding={...furnitureBinding(),[key]:+e.target.value};dirty();drawCatalogPreview()};binding.append(input);
  }
  form.append(binding);furnitureTextureTools.hidden=false;
+ form.append(field(d,'known','默认已知建造方式','checkbox'));
+ d.required_technology??={};const technologies=document.createElement('fieldset');technologies.id='requiredTechnology';technologies.append(document.createTextNode('所需技术（ID与最低等级）'));
+ for(const id of Object.keys(d.required_technology)){const row=document.createElement('div');row.className='bar';row.append(field(d.required_technology,id,id+' 最低等级','number',0,100),button('－ 技术',()=>{delete d.required_technology[id];renderCatalogForm();dirty()}));technologies.append(row)}
+ const techId=document.createElement('input');techId.placeholder='技术ID，例如 auto_repair';technologies.append(techId,button('＋ 技术',()=>{if(!/^[a-z][a-z0-9_-]*$/.test(techId.value)){status('请输入有效技术ID',true);return}d.required_technology[techId.value]=1;renderCatalogForm();dirty()}));form.append(technologies);
+
+ for(const [key,title]of [['build_cost','建造成本'],['dismantle_cost','分解成本'],['salvage','分解返还']]){
+  d[key]??={};const box=document.createElement('fieldset'),legend=document.createElement('legend');legend.textContent=title;box.append(legend);
+  for(const id of Object.keys(d[key])){const row=document.createElement('div');row.className='bar';row.append(field(d[key],id,S.project.items.find(item=>itemNames(item).includes(id))?.name||id,'number',0,1000),button('移除',()=>{delete d[key][id];renderCatalogForm();dirty()}));box.append(row)}
+  const select=document.createElement('select');for(const item of S.project.items.filter(v=>!v.deleted))option(select,item.id,item.name);box.append(select,button('＋ 材料',()=>{d[key][select.value]=1;renderCatalogForm();dirty()}));form.append(box);
+ }
  renderArtChoices();drawCatalogPreview();
 };
 const furniturePreview=drawCatalogPreview;drawCatalogPreview=function(){
  if(C.kind!=='furniture')return furniturePreview();if(!C.data)return;
  const d=C.data,c=$('catalogPreview').getContext('2d'),scale=32;F.scale=scale;c.save();c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,600,340);c.fillStyle='#191927';c.fillRect(0,0,600,340);c.setTransform(G.viewZoom,0,0,G.viewZoom,...G.viewPan);
- for(const [plane,color]of [['wall_cells','#659fdc'],['floor_cells','#e2b778']])for(const [x,y]of d[plane]||[]){c.fillStyle=color+'55';c.fillRect(30+x*scale,28+y*scale,scale,scale);c.strokeStyle=color;c.strokeRect(30+x*scale,28+y*scale,scale,scale)}
+
  const image=imageFor(d.texture),a=d.animation||{frames:1,columns:1,fps:6},b=furnitureBinding();
  if(image?.complete&&image.naturalWidth){
   const frame=furnitureAnimationFrame(a,performance.now()/1000),source=furnitureFrameRect(image,a,frame);c.save();c.translate(30+(b.x+b.width/2)*scale,28+(b.y+b.height/2)*scale);c.rotate(b.rotation*Math.PI/180);c.imageSmoothingEnabled=false;c.drawImage(image,...source,-b.width*scale/2,-b.height*scale/2,b.width*scale,b.height*scale);
   c.strokeStyle='#f5d598';c.lineWidth=1/G.viewZoom;c.strokeRect(-b.width*scale/2,-b.height*scale/2,b.width*scale,b.height*scale);
   c.fillStyle='#fff';c.fillRect(b.width*scale/2-5,b.height*scale/2-5,10,10);c.beginPath();c.moveTo(0,-b.height*scale/2);c.lineTo(0,-b.height*scale/2-18);c.stroke();c.beginPath();c.arc(0,-b.height*scale/2-18,5,0,Math.PI*2);c.fill();c.restore();
  }
+ if(PreviewVisibility.cells){for(const [plane,color]of [['wall_cells','#659fdc'],['floor_cells','#e2b778']])for(const [x,y]of d[plane]||[]){c.fillStyle=color+'55';c.fillRect(30+x*scale,28+y*scale,scale,scale);c.strokeStyle=color;c.strokeRect(30+x*scale,28+y*scale,scale,scale)}}
  c.restore();updateFurnitureBindingFields();
 
 };

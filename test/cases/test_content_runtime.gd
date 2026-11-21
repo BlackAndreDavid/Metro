@@ -11,7 +11,9 @@ func check(ok: bool, message: String) -> void:
 	if not ok:
 		failures += 1
 		push_error(message)
-func _initialize() -> void: call_deferred("run")
+func _initialize() -> void:
+	load(get_script().resource_path.get_base_dir()+"/support/furniture_fixtures.gd").canonical_profile()
+	call_deferred("run")
 func click(node: Control) -> void:
 	await process_frame
 	for pressed in [true,false]:
