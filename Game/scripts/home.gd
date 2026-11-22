@@ -1040,7 +1040,7 @@ func quick_pickup_slots(slots:Array)->int:
 
 func show_furniture_storage(kind: String) -> void:
 	var panel:=preload("res://scripts/construction/storage_editor.gd").new()
-	add_child(panel);panel.configure(self,kind,false)
+	add_child(panel);panel.configure(self,kind)
 
 func toggle_equipped_bag() -> void:
 	if state.backpack_item.is_empty():report("请先装备背包物品。");return

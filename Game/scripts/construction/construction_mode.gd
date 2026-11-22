@@ -475,7 +475,7 @@ func edit_storage() -> void:
 	clear_gesture()
 	close_storage_dock()
 	storage_panel=preload("res://scripts/construction/storage_editor.gd").new();add_child(storage_panel)
-	storage_panel.configure(self,selected_id,true,false)
+	storage_panel.configure(self,selected_id,false)
 	context_panel.hide()
 	storage_panel.tree_exited.connect(refresh_ui)
 

@@ -62,7 +62,16 @@ func run()->void:
 	check((bounds.get_center()+delta).is_equal_approx(Catalog.mount_position(0,1)),"the edited single anchor lands on the carriage mounting point")
 	screen.hanging_anchor=old_anchor
 	var home=load("res://scenes/game/home.tscn").instantiate();root.add_child(home);await process_frame;home.show_cabin();home.use_hotspot("gear");await process_frame
-	check(home.grids.map(func(g):return g.container).has("backpack") and not home.grids.map(func(g):return g.container).has("bag"),"equipment shows four positions before opening the backpack page")
+	check(home.view.bag_open and home.grids.any(func(g):return g.container=="bag"),"equipped backpack automatically opens its storage page")
+	check(home.view.bag_panel.has_node("SortBackpack") and home.view.bag_panel.has_node("TransferSelected"),"backpack sorting and transfer actions belong to its collapsible storage page")
+	var uniform: int=home.view.CELL_PIXELS
+	check(home.grids.all(func(g):return g.cell_size==uniform),"warehouse, equipment and backpack storage use the same displayed cell size")
+	var equipment: Control=home.view.equipment
+	check(is_equal_approx(equipment.backpack.global_position.x,equipment.pocket.global_position.x) and is_equal_approx(equipment.pocket.global_position.x,equipment.active.global_position.x) and equipment.backpack.global_position.y<equipment.pocket.global_position.y and equipment.pocket.global_position.y<equipment.active.global_position.y,"backpack, pocket and active positions form a vertical column")
+	var center_grid: Control=home.grids.filter(func(g):return g.container=="bag")[0]
+	var warehouse_grid: Control=home.grids.filter(func(g):return g.container=="preparation")[0]
+	check(warehouse_grid.get_global_rect().end.x<center_grid.global_position.x and center_grid.get_global_rect().end.x<equipment.global_position.x,"backpack storage is between the warehouse and right equipment column")
+	home.view.set_bag_open(false);await process_frame
 	var slot:Control=home.view.equipment.backpack;button(slot.get_global_rect().get_center(),true);button(slot.get_global_rect().get_center(),false);await process_frame
 	check(home.view.bag_open and home.grids.any(func(g):return g.container=="bag"),"clicking the equipped backpack opens its storage page")
 	var bag:Control=home.grids.filter(func(g):return g.container=="bag")[0];var prep:Control=home.grids.filter(func(g):return g.container=="preparation")[0]
@@ -70,6 +79,10 @@ func run()->void:
 	free=home.state.first_free_placement("water","preparation")
 	await drag(bag.global_position+Vector2(2.5,2.5)*bag.cell_size,prep.global_position+(Vector2(free.cell)+Vector2(.5,1.5))*prep.cell_size)
 	check(home.state.find_entry("preparation",id).get("x")==free.cell.x and home.state.find_entry("preparation",id).get("y")==free.cell.y,"grabbing a lower cell preserves the placement anchor across different grid scales")
+	home.view.set_bag_open(false)
+	var ui_large: Dictionary=home.state.preparation.filter(func(e):return e.kind=="large_backpack")[0]
+	await drag(prep.global_position+(Vector2(ui_large.x,ui_large.y)+Vector2(.5,.5))*prep.cell_size,home.view.equipment.backpack.get_global_rect().get_center())
+	check(home.view.bag_open and home.grids.any(func(g):return g.container=="bag" and g.size==Vector2(6,5)*uniform),"equipping a large backpack automatically reopens and resizes its storage")
 	if DisplayServer.get_name()!="headless" and not OS.get_environment("METRO_TEST_RESULTS").is_empty():
 		await process_frame;await RenderingServer.frame_post_draw
 		DirAccess.make_dir_recursive_absolute(OS.get_environment("METRO_TEST_RESULTS"))

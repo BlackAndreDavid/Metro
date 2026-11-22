@@ -72,7 +72,7 @@ func run()->void:
 	await process_frame
 	home.state.Furniture.DEFINITIONS.door.perform(home);await process_frame
 	check(home.screen=="gear", "only the door action opens departure")
-	home.view.toggle_bag();await process_frame
+	home.view.set_bag_open(true);await process_frame
 	var targets:Array=[]
 	for grid in home.grids:targets.append(grid.container)
 	check("preparation" in targets and "bag" in targets and "battery" not in targets and is_instance_valid(home.view.equipment.active),"preparation uses shared grids and equipment instead of a standalone battery slot")

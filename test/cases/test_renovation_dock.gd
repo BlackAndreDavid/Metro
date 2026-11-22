@@ -21,6 +21,7 @@ func run()->void:
 	home.show_cabin();home.construction.enter();await process_frame
 	var mode=home.construction;mode.select_furniture("locker");mode.edit_storage();await process_frame
 	var dock=mode.storage_panel;var grid=dock.grids[0]
+	check(dock.find_children("*","SpinBox",true,false).is_empty() and not dock.panel.get_children().any(func(child):return child is Button and child.text.contains("应用储物格")),"renovation storage has no row or column resize controls")
 	check(dock.panel.position.x==0 and dock.panel.size.x<=340 and dock.mouse_filter==Control.MOUSE_FILTER_IGNORE,"storage docks left and leaves the world interactive")
 	var item:Control=mode.registered.computer.get_ref()
 	var start:Vector2=item.get_global_rect().get_center()

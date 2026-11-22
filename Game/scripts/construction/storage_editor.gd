@@ -8,14 +8,12 @@ var selection: Dictionary = {}
 var grids: Array = []
 var pointer_position := Vector2.ZERO
 var message: Label
-var width_input: SpinBox
-var height_input: SpinBox
 var grid_layer: Control
 var show_backpack := true
 var owner_mode: Control
 var panel: Panel
 
-func configure(owner_ui: Control, furniture_kind: String, allow_resize: bool, show_bag: bool = true) -> void:
+func configure(owner_ui: Control, furniture_kind: String, show_bag: bool = true) -> void:
 	owner_mode=owner_ui;state=owner_ui.state;font=owner_ui.font;kind=furniture_kind;target=state.storage_container(kind);show_backpack=show_bag;z_index=110
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);mouse_filter=Control.MOUSE_FILTER_STOP if show_backpack else Control.MOUSE_FILTER_IGNORE
 	if show_backpack:
@@ -23,17 +21,6 @@ func configure(owner_ui: Control, furniture_kind: String, allow_resize: bool, sh
 	panel=Panel.new();panel.name="StorageDock";panel.position=Vector2(130,84) if show_backpack else Vector2(0,78);panel.size=Vector2(1020,550) if show_backpack else Vector2(336,550);panel.mouse_filter=Control.MOUSE_FILTER_STOP;add_child(panel)
 	var title:=Label.new();title.text=state.Furniture.DEFINITIONS[kind].display_name+" · 储物格";title.position=Vector2(24,20);panel.add_child(title)
 	var close:=Button.new();close.text="关闭";close.position=Vector2(920 if show_backpack else 264,16);panel.add_child(close);close.pressed.connect(queue_free)
-	if allow_resize:
-		width_input=SpinBox.new();height_input=SpinBox.new()
-		var dimensions: Vector2i=state.grid_size(target)
-		for input in [width_input,height_input]:input.custom_minimum_size.x=82;input.min_value=1;input.max_value=16;input.step=1;panel.add_child(input)
-		width_input.position=Vector2(24,65);width_input.value=dimensions.x
-		height_input.position=Vector2(174 if show_backpack else 132,65);height_input.value=dimensions.y
-		var resize_button:=Button.new();resize_button.text="应用储物格宽 × 高";resize_button.position=Vector2(324,65) if show_backpack else Vector2(24,104);panel.add_child(resize_button)
-		resize_button.pressed.connect(func():
-			var problem: String=state.resize_furniture_storage(kind,Vector2i(int(width_input.value),int(height_input.value)))
-			message.text="储物格已调整，缩小时不会删除物品。" if problem.is_empty() else problem
-			if problem.is_empty():selection={};rebuild_grids())
 	if not show_backpack:
 		var take:=Button.new();take.name="TakeSelected";take.text="取出选中到背包";take.position=Vector2(16,440);panel.add_child(take);take.pressed.connect(take_selected_to_bag)
 		var take_all:=Button.new();take_all.name="TakeAll";take_all.text="全部取出";take_all.position=Vector2(208,440);panel.add_child(take_all);take_all.pressed.connect(take_all_to_bag)
@@ -44,6 +31,7 @@ func rebuild_grids() -> void:
 	for child in grid_layer.get_children():child.queue_free()
 	grids.clear()
 	for container in ([target,"bag"] if show_backpack else [target]):
+		if container=="bag" and state.backpack_item.is_empty():continue
 		var grid=preload("res://scripts/cargo_grid.gd").new();grid_layer.add_child(grid)
 		grid.position=Vector2(0 if container==target else 590,0)
 		var dimensions: Vector2i=state.grid_size(container)
