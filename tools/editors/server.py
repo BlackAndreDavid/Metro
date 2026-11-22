@@ -148,8 +148,12 @@ def normalize_furniture_grid(data):
         if not hanging:
             for state,cells in [(2,legacy[1]),(1,legacy[0])]:
                 for x,y in cells:grid[int(y)][int(x)]=state
-    if hanging:require(grid==[],'悬挂物只能使用参考格')
+    if hanging:
+        require(grid==[],'悬挂物只能使用参考格')
+        anchor=data.setdefault('hanging_anchor',{'x':.5,'y':.5})
+        require(isinstance(anchor,dict) and set(anchor)=={'x','y'} and all(number(anchor[key],0,1) for key in ['x','y']),'悬挂物必须有且只有一个位于贴图内的悬挂点')
     else:
+        require('hanging_anchor' not in data,'非悬挂物不能设置悬挂点')
         require(isinstance(grid,list) and len(grid)==height and all(isinstance(row,list) and len(row)==width and all(isinstance(v,int) and not isinstance(v,bool) and v in (0,1,2) for v in row) for row in grid),'占位网格须为匹配宽高的三态矩阵：0空置、1实物、2墙面')
         require(any(any(row) for row in grid),'家具至少需要一个实物格或墙面格')
     reference=data.get('reference_cells',[])

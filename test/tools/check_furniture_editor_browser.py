@@ -65,8 +65,14 @@ with tempfile.TemporaryDirectory(prefix='metro-catalog-browser-') as scratch:
    grid=page.locator('#furnitureMask');grid.scroll_into_view_if_needed();r=grid.bounding_box();grid.click(position={'x':104*r['width']/560,'y':40*r['height']/192})
    assert page.evaluate('C.data.width===7&&C.data.occupancy_grid.length===0&&C.data.reference_cells.some(c=>c[0]===6&&c[1]===2)')
    assert page.evaluate("(()=>{const p=document.getElementById('furnitureMask').getContext('2d').getImageData(104,40,1,1).data;return p[0]===p[1]&&p[1]===p[2]&&p[0]>200})()")
+   page.get_by_role('button',name='调节悬挂点',exact=True).click()
+   anchor_start=page.evaluate('furnitureAnchorPoint()');anchor_end=page.evaluate("(()=>{const b=furnitureBinding(),c=furnitureCenter(b),a=b.rotation*Math.PI/180,x=-.25*b.width*32,y=.25*b.height*32;return [c[0]+x*Math.cos(a)-y*Math.sin(a),c[1]+x*Math.sin(a)+y*Math.cos(a)]})()")
+   drag_texture(anchor_start,anchor_end);assert abs(page.evaluate('C.data.hanging_anchor.x')-.25)<.02 and abs(page.evaluate('C.data.hanging_anchor.y')-.75)<.02
    page.click('#saveAll');page.wait_for_function('!EditorSession.hasChanges()&&!EditorSession.busy')
    hanging=next(v for v in json.loads((game/'content/furniture.json').read_text())['furniture'] if v['id']=='browser_furniture');assert hanging['placement_type']=='hanging' and hanging['width']==7 and hanging['reference_cells'] and hanging['occupancy_grid']==[] and 'floor_cells' not in hanging and 'wall_cells' not in hanging
+   assert abs(hanging['hanging_anchor']['x']-.25)<.02
+   for anchor in [[],[{'x':.5,'y':.5},{'x':.2,'y':.8}],{'x':2,'y':.5},{'x':.5}]:
+    response=page.request.post(url+'/api/furniture',data={**hanging,'hanging_anchor':anchor},headers={'X-Editor-Token':page.evaluate('S.project.token')});assert response.status==400
    invalid={**hanging,'floor_cells':[[0,0]]};response=page.request.post(url+'/api/furniture',data=invalid,headers={'X-Editor-Token':page.evaluate('S.project.token')});assert response.status==400
    page.uncheck('#furnitureHanging');assert page.get_by_role('button',name='实物格',exact=True).count()==1 and page.get_by_role('button',name='参考格',exact=True).count()==0 and page.evaluate('C.data.reference_cells.length===0&&C.data.occupancy_grid.length>0&&F.cellType===1')
    assert not errors,errors

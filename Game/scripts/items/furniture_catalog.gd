@@ -38,7 +38,7 @@ static func placement_rect(kind: String, placement: Dictionary) -> Rect2:
 		var binding: Dictionary=data.texture_binding
 		var extent:=Vector2(binding.get("width",data.texture.get_width()/32.0),binding.get("height",data.texture.get_height()/32.0))
 		var offset:=Vector2(binding.get("x",0),binding.get("y",0))
-		return Rect2(mount_position(int(placement.car),int(placement.mount))-(offset+extent/2)*CELL_SIZE,Vector2(data.grid_size)*CELL_SIZE)
+		return Rect2(mount_position(int(placement.car),int(placement.mount))-(offset+extent/2+((data.hanging_anchor-Vector2(.5,.5))*extent).rotated(deg_to_rad(float(binding.get("rotation",0)))))*CELL_SIZE,Vector2(data.grid_size)*CELL_SIZE)
 	return Rect2(floor_rect(int(placement.car)).position+Vector2(placement.x,placement.y)*CELL_SIZE,Vector2(data.grid_size)*CELL_SIZE)
 
 static func default_placement(kind: String, car: int = 0) -> Dictionary:

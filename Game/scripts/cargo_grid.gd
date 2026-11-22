@@ -53,13 +53,25 @@ func _get_drag_data(at: Vector2) -> Variant:
 	if entry.is_empty():
 		return null
 	host.select_cargo(container, entry.id)
+	var grabbed:=cell_at(at)-Vector2i(entry.x,entry.y)
+	var dimensions: Vector2i=host.state.ITEM_DEFINITIONS[entry.kind].inventory_size
+	if entry.rotated:grabbed=Vector2i(grabbed.y,dimensions.y-1-grabbed.x)
+	if entry.get("mirrored",false):grabbed.x=dimensions.x-1-grabbed.x
+	host.selection.grab_local=grabbed
 	set_drag_preview(host.drag_preview())
 	return host.selection
 
 func drag_cell() -> Vector2i:
 	# Use the viewport event position for both local and remotely injected drags.
 	var local := get_global_transform_with_canvas().affine_inverse() * Vector2(host.pointer_position)
-	return cell_at(local)
+	var grabbed: Vector2i=host.selection.get("grab_local",Vector2i.ZERO)
+	if host.selection.has("grab_local"):
+		var entry: Dictionary=host.state.picked(host.selection.source,host.selection.id)
+		if not entry.is_empty():
+			var dimensions: Vector2i=host.state.ITEM_DEFINITIONS[entry.kind].inventory_size
+			if host.selection.get("mirrored",false):grabbed.x=dimensions.x-1-grabbed.x
+			if host.selection.rotated:grabbed=Vector2i(dimensions.y-1-grabbed.y,grabbed.x)
+	return cell_at(local)-grabbed
 
 func _can_drop_data(_at: Vector2, payload: Variant) -> bool:
 	hover_cell = drag_cell()
@@ -67,7 +79,7 @@ func _can_drop_data(_at: Vector2, payload: Variant) -> bool:
 	# A wheel event can change the footprint without another mouse motion.
 	# Validate the final orientation in move_cargo when the button is released.
 	var bounds: Vector2i = host.state.grid_size(container)
-	return payload is Dictionary and payload == host.selection and Rect2i(Vector2i.ZERO, bounds).has_point(hover_cell)
+	return payload is Dictionary and payload == host.selection and host.state.can_place(host.selection,container,hover_cell)
 
 func _drop_data(_at: Vector2, _payload: Variant) -> void:
 	host.move_cargo(container, drag_cell())

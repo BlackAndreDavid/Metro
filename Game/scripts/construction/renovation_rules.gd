@@ -68,7 +68,7 @@ static func consume(state: RefCounted,recipe: Dictionary) -> void:
 
 static func cargo_backup(state: RefCounted) -> Dictionary:
 	var snapshot: Dictionary={"next_id":state.next_id,"cargo":{},"extra_storage":state.furniture_storage.duplicate(true),"storage_sizes":state.storage_sizes.duplicate(true)}
-	for name in state.storage_containers()+["bag"]:snapshot.cargo[name]=state.entries(name).duplicate(true)
+	for name in state.storage_containers()+["bag","pocket"]:snapshot.cargo[name]=state.entries(name).duplicate(true)
 	return snapshot
 static func restore_cargo(state: RefCounted,snapshot: Dictionary) -> void:
 	state.furniture_storage=snapshot.extra_storage.duplicate(true);state.storage_sizes=snapshot.storage_sizes.duplicate(true)

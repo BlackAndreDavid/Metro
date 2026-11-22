@@ -42,6 +42,7 @@ func cells_of_type(state: int) -> Array[Vector2i]:
 func cell_state(at: Vector2i) -> int:
 	if at.y<0 or at.y>=occupancy_grid.size() or at.x<0 or at.x>=occupancy_grid[at.y].size():return 0
 	return int(occupancy_grid[at.y][at.x])
+var hanging_anchor := Vector2(.5,.5)
 var reference_cells: Array[Vector2i] = []
 var storage := Vector2i.ZERO
 var item_id := ""
@@ -92,6 +93,8 @@ static func from_data(data: Dictionary) -> Resource:
 	result.action=data.get("interaction","none");result.texture_path=data.texture
 	result.grid_size=Vector2i(int(data.width),int(data.height))
 	result.placement_type=data.get("placement_type","floor")
+	var anchor: Dictionary=data.get("hanging_anchor",{"x":.5,"y":.5})
+	result.hanging_anchor=Vector2(anchor.x,anchor.y)
 	if result.placement_type!="hanging":
 		if data.has("occupancy_grid"):result.occupancy_grid=data.occupancy_grid.duplicate(true)
 		else:

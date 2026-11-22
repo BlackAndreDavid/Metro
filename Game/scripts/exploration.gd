@@ -54,6 +54,7 @@ func toggle_pack() -> void:
 	set_pack_open(not pack_open)
 
 func set_pack_open(value: bool) -> void:
+	if value and controller.state.backpack_item.is_empty():controller.report("未装备背包，仅可使用装备格。");return
 	pack_open = value
 	$PackAnchor.visible = value
 	$StreetFrame/SurfaceBlock.inspecting_pack = value

@@ -37,7 +37,7 @@ func configure(data: Resource, owner_home: Control, surface: Control) -> void:
 			caption.add_theme_stylebox_override("normal",card)
 			caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			caption.add_theme_font_size_override("font_size",14)
-			caption.z_index = 30
+			caption.z_index = 1000
 			mouse_default_cursor_shape = Control.CURSOR_ARROW
 		var info := Label.new()
 		info.name = "StationInfo"

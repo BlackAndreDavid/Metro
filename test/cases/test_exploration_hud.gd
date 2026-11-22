@@ -33,6 +33,8 @@ func run() -> void:
 		var event:=InputEventMouseButton.new();event.position=at;event.global_position=at;event.button_index=MOUSE_BUTTON_LEFT;event.pressed=down;Input.parse_input_event(event)
 	await process_frame
 	check(not home.view.pack_open and not street.inspecting_pack,"backpack mouse button closes overlay")
+	# This healing fixture fits the new 2x2 active position; authored larger items are tested separately.
+	home.state.ITEM_DEFINITIONS.meds.inventory_size=Vector2i(2,2);home.state.ITEM_DEFINITIONS.meds.occupancy.assign([Vector2i(0,0),Vector2i(1,0),Vector2i(0,1),Vector2i(1,1)])
 	home.state.inventory.clear();home.state.add_supply("meds","bag");home.state.health=50
 	var id:int=home.state.inventory[0].id
 	check(home.state.equip_active(id).is_empty() and home.state.inventory.is_empty(),"active item occupies no backpack grid")

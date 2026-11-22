@@ -11,6 +11,8 @@ var show_function_label:=true
 @onready var caption: Label = $Function
 
 func _ready() -> void:
+	caption.z_as_relative=false
+	caption.z_index=1000
 	mouse_entered.connect(pointer_highlight.bind(true))
 	mouse_exited.connect(pointer_highlight.bind(false))
 	focus_entered.connect(pointer_highlight.bind(true))

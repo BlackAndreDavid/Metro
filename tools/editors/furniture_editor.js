@@ -6,8 +6,8 @@ const F={cellType:1,start:null,end:null,scale:32,textureMode:'move',drag:null,fr
 
 // A cell is stored once: 0 empty, 1 physical, 2 wall. Hanging reference cells are view-only.
 function normalizeFurnitureGrid(d){
- if(d.placement_type==='hanging'){d.reference_cells??=Array.from({length:d.width*d.height},(_,i)=>[i%d.width,Math.floor(i/d.width)]);d.occupancy_grid=[]}
- else{const old=d.occupancy_grid;d.occupancy_grid=Array.from({length:d.height},(_,y)=>Array.from({length:d.width},(_,x)=>old?.[y]?.[x]||0));if(!old){for(const [key,state]of [['wall_cells',2],['floor_cells',1]])for(const [x,y]of d[key]||[])if(d.occupancy_grid[y]&&x<d.width)d.occupancy_grid[y][x]=state}d.reference_cells=[]}
+ if(d.placement_type==='hanging'){d.reference_cells??=Array.from({length:d.width*d.height},(_,i)=>[i%d.width,Math.floor(i/d.width)]);d.occupancy_grid=[];d.hanging_anchor??={x:.5,y:.5}}
+ else{delete d.hanging_anchor;const old=d.occupancy_grid;d.occupancy_grid=Array.from({length:d.height},(_,y)=>Array.from({length:d.width},(_,x)=>old?.[y]?.[x]||0));if(!old){for(const [key,state]of [['wall_cells',2],['floor_cells',1]])for(const [x,y]of d[key]||[])if(d.occupancy_grid[y]&&x<d.width)d.occupancy_grid[y][x]=state}d.reference_cells=[]}
  delete d.floor_cells;delete d.wall_cells;delete d.support_surface;
 }
 function furniturePaintCells(d){return d.placement_type==='hanging'?(d.reference_cells||[]).map(([x,y])=>[x,y,3]):(d.occupancy_grid||[]).flatMap((row,y)=>row.flatMap((state,x)=>state?[[x,y,state]]:[]))}
@@ -51,7 +51,7 @@ const furnitureForm=renderCatalogForm;renderCatalogForm=function(){
  for(const [key,title]of Object.entries({x:'贴图横偏移（格）',y:'贴图纵偏移（格）',width:'贴图宽（格）',height:'贴图高（格）',rotation:'贴图旋转（度）'})){
   const input=field(values,key,title);input.querySelector('input').oninput=e=>{d.texture_binding={...furnitureBinding(),[key]:+e.target.value};dirty();drawCatalogPreview()};binding.append(input);
  }
- form.append(binding);furnitureTextureTools.hidden=false;
+ form.append(binding);furnitureTextureTools.hidden=false;furnitureTextureTools.querySelector('[data-texture-mode="anchor"]').hidden=!hanging;if(!hanging&&F.textureMode==='anchor')F.textureMode='move';for(const control of furnitureTextureTools.querySelectorAll('button'))control.classList.toggle('selected',control.dataset.textureMode===F.textureMode);
  form.append(field(d,'known','默认已知建造方式','checkbox'));
  d.required_technology??={};const technologies=document.createElement('fieldset');technologies.id='requiredTechnology';technologies.append(document.createTextNode('所需技术（ID与最低等级）'));
  for(const id of Object.keys(d.required_technology)){const row=document.createElement('div');row.className='bar';row.append(field(d.required_technology,id,id+' 最低等级','number',0,100),button('－ 技术',()=>{delete d.required_technology[id];renderCatalogForm();dirty()}));technologies.append(row)}
@@ -74,6 +74,7 @@ const furniturePreview=drawCatalogPreview;drawCatalogPreview=function(){
   c.strokeStyle='#f5d598';c.lineWidth=1/G.viewZoom;c.strokeRect(-b.width*scale/2,-b.height*scale/2,b.width*scale,b.height*scale);
   c.fillStyle='#fff';c.fillRect(b.width*scale/2-5,b.height*scale/2-5,10,10);c.beginPath();c.moveTo(0,-b.height*scale/2);c.lineTo(0,-b.height*scale/2-18);c.stroke();c.beginPath();c.arc(0,-b.height*scale/2-18,5,0,Math.PI*2);c.fill();c.restore();
  }
+ if(d.placement_type==='hanging'){const point=furnitureAnchorPoint();c.strokeStyle='#ffffff';c.lineWidth=2/G.viewZoom;c.beginPath();c.arc(...point,7/G.viewZoom,0,Math.PI*2);c.moveTo(point[0]-11/G.viewZoom,point[1]);c.lineTo(point[0]+11/G.viewZoom,point[1]);c.moveTo(point[0],point[1]-11/G.viewZoom);c.lineTo(point[0],point[1]+11/G.viewZoom);c.stroke()}
  if(PreviewVisibility.cells){for(const [x,y,state]of furniturePaintCells(d)){const color=furnitureCellColor(state);c.fillStyle=color+'55';c.fillRect(30+x*scale,28+y*scale,scale,scale);c.strokeStyle=color;c.strokeRect(30+x*scale,28+y*scale,scale,scale)}}
  c.restore();updateFurnitureBindingFields();
 
@@ -120,17 +121,18 @@ function furnitureTextureHit(at,binding){
  return Math.abs(x)<=binding.width*16&&Math.abs(y)<=binding.height*16?F.textureMode:null;
 }
 const furnitureTextureTools=document.createElement('div');furnitureTextureTools.id='furnitureTextureTools';furnitureTextureTools.className='bar';furnitureTextureTools.hidden=true;
-for(const [mode,title]of [['move','拖动家具贴图'],['scale','缩放家具贴图'],['rotate','旋转家具贴图']]){const control=button(title,()=>{F.textureMode=mode;for(const b of furnitureTextureTools.querySelectorAll('button'))b.classList.toggle('selected',b.dataset.textureMode===mode);$('catalogPreview').style.cursor=mode==='move'?'move':mode==='scale'?'nwse-resize':'crosshair';drawCatalogPreview()},mode===F.textureMode?'selected':'');control.dataset.textureMode=mode;furnitureTextureTools.append(control)}
+for(const [mode,title]of [['move','拖动家具贴图'],['scale','缩放家具贴图'],['rotate','旋转家具贴图'],['anchor','调节悬挂点']]){const control=button(title,()=>{F.textureMode=mode;for(const b of furnitureTextureTools.querySelectorAll('button'))b.classList.toggle('selected',b.dataset.textureMode===mode);$('catalogPreview').style.cursor=mode==='move'?'move':mode==='scale'?'nwse-resize':'crosshair';drawCatalogPreview()},mode===F.textureMode?'selected':'');control.dataset.textureMode=mode;furnitureTextureTools.append(control)}
 const textureHint=document.createElement('span');textureHint.textContent='白色角点缩放 · 圆点旋转 · Shift旋转按15°吸附；修改占位不改变贴图绑定';furnitureTextureTools.append(textureHint);$('catalogPreview').before(furnitureTextureTools);
 const furniturePointerDown=$('catalogPreview').onpointerdown,furniturePointerMove=$('catalogPreview').onpointermove,furniturePointerUp=$('catalogPreview').onpointerup;
 $('catalogPreview').onpointerdown=e=>{
  if(C.kind!=='furniture'||e.button!==0)return furniturePointerDown(e);
- const at=stagePoint(e),binding=furnitureBinding(),mode=furnitureTextureHit(at,binding);if(!mode)return;
+ const at=stagePoint(e),binding=furnitureBinding(),mode=C.data.placement_type==='hanging'&&F.textureMode==='anchor'?'anchor':furnitureTextureHit(at,binding);if(!mode)return;
  F.drag={mode,before:clone(binding),at,center:furnitureCenter(binding)};G.drag=null;$('catalogPreview').setPointerCapture(e.pointerId);e.preventDefault();
 };
 $('catalogPreview').onpointermove=e=>{
  if(C.kind!=='furniture'||!F.drag)return furniturePointerMove(e);
  const drag=F.drag,at=stagePoint(e),before=drag.before,binding={...before};
+ if(drag.mode==='anchor'){const center=furnitureCenter(binding),angle=-binding.rotation*Math.PI/180,dx=at[0]-center[0],dy=at[1]-center[1];C.data.hanging_anchor={x:Math.max(0,Math.min(1,.5+(dx*Math.cos(angle)-dy*Math.sin(angle))/(binding.width*32))),y:Math.max(0,Math.min(1,.5+(dx*Math.sin(angle)+dy*Math.cos(angle))/(binding.height*32)))};drawCatalogPreview();dirty();return}
  if(drag.mode==='move'){binding.x+=(at[0]-drag.at[0])/32;binding.y+=(at[1]-drag.at[1])/32}
  else if(drag.mode==='scale'){
   const start=Math.max(1,Math.hypot(drag.at[0]-drag.center[0],drag.at[1]-drag.center[1])),ratio=Math.max(.01/Math.min(before.width,before.height),Math.min(4096/Math.max(before.width,before.height),Math.hypot(at[0]-drag.center[0],at[1]-drag.center[1])/start));
@@ -142,3 +144,5 @@ $('catalogPreview').onpointermove=e=>{
  C.data.texture_binding=binding;updateFurnitureBindingFields();drawCatalogPreview();dirty();
 };
 $('catalogPreview').onpointerup=$('catalogPreview').onpointercancel=e=>{F.drag=null;furniturePointerUp(e)};
+
+function furnitureAnchorPoint(){const b=furnitureBinding(),anchor=C.data.hanging_anchor||{x:.5,y:.5},center=furnitureCenter(b),angle=b.rotation*Math.PI/180,x=(anchor.x-.5)*b.width*32,y=(anchor.y-.5)*b.height*32;return [center[0]+x*Math.cos(angle)-y*Math.sin(angle),center[1]+x*Math.sin(angle)+y*Math.cos(angle)]}

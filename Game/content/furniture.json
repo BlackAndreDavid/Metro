@@ -497,7 +497,11 @@
           2
         ]
       ],
-      "occupancy_grid": []
+      "occupancy_grid": [],
+      "hanging_anchor": {
+        "x": 0.5,
+        "y": 0.5
+      }
     },
     {
       "deleted": false,

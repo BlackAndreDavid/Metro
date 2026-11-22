@@ -102,6 +102,8 @@ func _input(event: InputEvent) -> void:
 	elif event.physical_keycode == KEY_E and screen == "surface" and is_instance_valid(surface_block):
 		if not check_trip_timeout() and not is_instance_valid(vehicle_panel):
 			surface_block.interact()
+	elif event.physical_keycode==KEY_B and screen=="gear":
+		view.toggle_bag();get_viewport().set_input_as_handled()
 	elif event.physical_keycode == KEY_B and screen == "surface" and view.has_method("toggle_pack"):
 		view.toggle_pack()
 		get_viewport().set_input_as_handled()
@@ -611,14 +613,16 @@ func move_cargo(target: String, cell: Vector2i) -> void:
 		report("走近物品后按 E 拾取。")
 		return
 	if not state.place(selection, target, cell):
-		var problem := "放不下。试试空位、旋转，或重新摆放其他物品。"
+		var problem := "该位置被占用或实际占位超出边界，请旋转或选择其他空位。"
+		if target in ["active","backpack"]:problem=state.Equipment.plan(state,selection,target,cell).get("error",problem)
+		elif selection.source=="backpack" and not state.inventory.is_empty():problem="请先清空背包内部物品，再卸下背包。"
 		if target == "battery":
 			problem = "从背包选择七号电池，再放入手电筒。"
 		report(problem)
 		return
 	if check_trip_timeout():
 		return
-	var container_name: String = {"locker": "柜子", "preparation":"预备仓库", "bag": "背包", "battery": "手电筒"}[target]
+	var container_name: String = {"locker": "柜子", "preparation":"预备仓库", "bag": "背包", "battery": "手电筒","pocket":"口袋","active":"主动位","backpack":"背包装备位"}.get(target,target)
 	var message := "%s 已放入%s。" % [state.item_name(entry.kind), container_name]
 	if screen == "locker":
 		show_locker(message)
@@ -695,7 +699,7 @@ func pick_up_surface_item(slot: int) -> void:
 	if kind.is_empty():
 		return
 	if not state.pick_up_ground(slot):
-		report("背包没有合适的空位。")
+		report("随身储物格没有合适的空位。")
 		return
 	show_surface("已拾取%s，放入背包。" % state.item_name(kind))
 
@@ -806,22 +810,34 @@ func show_legacy_surface(message: String) -> void:
 	report(message)
 
 func update_surface_pack(walking: bool) -> void:
+	if state.backpack_item.is_empty() and view.has_method("set_pack_open") and view.pack_open:view.set_pack_open(false)
+	if is_instance_valid(surface_pack) and surface_pack.is_inside_tree():
+		var bag_grids:=grids.filter(func(grid):return is_instance_valid(grid) and grid.container=="bag")
+		if (not state.backpack_item.is_empty())==not bag_grids.is_empty():
+			for grid in grids:
+				if is_instance_valid(grid):grid.size=Vector2(state.grid_size(grid.container)*grid.cell_size);grid.queue_redraw()
+			if surface_pack.has_node("BackpackTitle"):surface_pack.get_node("BackpackTitle").text=cargo_title("bag")
+			if view.has_method("refresh_active"):view.refresh_active()
+			return
 	if is_instance_valid(surface_pack):
 		surface_pack.hide()
 		surface_pack.queue_free()
 	grids.clear()
+	if view.has_node("LoadoutBar"):grids.append_array(view.get_node("LoadoutBar").equipment_grids)
 	var parent: Control = view.get_node("PackAnchor") if view.has_node("PackAnchor") else view
 	var bounds := Rect2(Vector2.ZERO, parent.size) if parent != view else Rect2(836, 112, 404, 524)
 	var sidebar := plate(parent, bounds, DARK, BORDER)
 	surface_pack = sidebar
-	label(sidebar, cargo_title("bag"), Rect2(24, 17, 354, 33), 22)
-	add_grid(sidebar, "bag", Vector2(24, 60), 48)
+	var bag_title:=label(sidebar, cargo_title("bag"), Rect2(24,17,354,33),22);bag_title.name="BackpackTitle"
+	if not state.backpack_item.is_empty():add_grid(sidebar, "bag", Vector2(24,60),48)
+	else:label(sidebar,"未装备背包 · 仅可使用装备格",Rect2(24,60,354,60),17,MUTED)
 	if view.has_node("LoadoutBar") and is_instance_valid(view.get_node("LoadoutBar").battery_grid):grids.append(view.get_node("LoadoutBar").battery_grid)
 	plate(sidebar,Rect2(24,317,356,1),BORDER)
 	action(sidebar,"一键拾取附近",Rect2(24,330,168,34),quick_pickup_nearby).focus_mode=Control.FOCUS_NONE
 	action(sidebar,"一键整理背包",Rect2(202,330,178,34),sort_cargo.bind("bag")).focus_mode=Control.FOCUS_NONE
 	action(sidebar,"一键放置所选",Rect2(24,374,356,34),quick_place_selected).focus_mode=Control.FOCUS_NONE
-	wrapped(sidebar,"装备与主动道具已合并至左上角。\n将背包物品拖入主动位，或拖回背包；七号电池拖入手电槽。",Rect2(24,420,356,56),14,MUTED)
+	wrapped(sidebar,"装备与主动道具已合并至左上角。\n拖拽调整背包、口袋和主动位。
+七号电池放入主动位后按空格更换电池。",Rect2(24,420,356,56),14,MUTED)
 	var instructions := "B 背包 · 空格 主动 · R 旋转 · F 镜像 · 1 照明" if walking else "点击拾取或拖入背包 · R 旋转 · F 镜像 · 1 照明"
 	label(sidebar, instructions, Rect2(24, 488 if walking else 483, 356, 26), 14, MUTED)
 	refresh_equipment()
@@ -1025,3 +1041,8 @@ func quick_pickup_slots(slots:Array)->int:
 func show_furniture_storage(kind: String) -> void:
 	var panel:=preload("res://scripts/construction/storage_editor.gd").new()
 	add_child(panel);panel.configure(self,kind,false)
+
+func toggle_equipped_bag() -> void:
+	if state.backpack_item.is_empty():report("请先装备背包物品。");return
+	if screen=="gear":view.toggle_bag()
+	elif screen=="surface":view.toggle_pack()

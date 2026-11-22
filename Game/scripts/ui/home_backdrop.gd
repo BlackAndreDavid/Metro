@@ -187,6 +187,8 @@ func configure_world(home: Control) -> void:
 			(hanging_layer if data.placement_type == "hanging" else wall_layer if plane==2 or (data.floor_cells.is_empty() and not data.wall_cells.is_empty()) else floor_layer).add_child(item)
 			home.construction.register_furniture(item, data)
 			item.configure(data, home, self)
+			if not interaction_enabled:
+				item.automatic_hover=false;item.focus_mode=Control.FOCUS_NONE;item.mouse_filter=Control.MOUSE_FILTER_IGNORE;item.caption.hide()
 			if home.construction.moving and home.construction.selected_id == kind:
 				item.modulate.a = 0.25
 				item.mouse_filter = Control.MOUSE_FILTER_IGNORE

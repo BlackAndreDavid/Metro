@@ -38,12 +38,13 @@ func run()->void:
 	check(state.preparation==warehouse and state.active_item.is_empty(),"timeout loses carried tools but preserves stored tools")
 	state=State.new();state.inventory.clear()
 	var pack:Dictionary=state.preparation.filter(func(e):return e.kind=="large_backpack")[0]
-	check(state.auto_place({"source":"preparation","id":pack.id,"rotated":false},"bag").is_empty() and state.bag_size()==Vector2i(6,5),"carried large backpack expands storage")
+	check(state.place({"source":"preparation","id":pack.id,"rotated":false},"backpack",Vector2i.ZERO) and state.bag_size()==Vector2i(6,5),"equipped large backpack expands storage")
 	state.inventory.append(state.make_entry("bolts",Vector2i(5,4),false))
 	var before:=state.save_data().duplicate(true)
-	check(not state.auto_place({"source":"bag","id":pack.id,"rotated":false},"preparation").is_empty() and state.save_data()==before,"cannot remove backpack while cargo exceeds small bounds")
-	state.inventory.pop_back()
-	check(state.auto_place({"source":"bag","id":pack.id,"rotated":false},"preparation").is_empty() and state.bag_size()==Vector2i(5,4),"returning backpack safely shrinks carry capacity")
+	check(not state.auto_place({"source":"backpack","id":pack.id,"rotated":false},"preparation").is_empty() and state.save_data()==before,"cannot unload a backpack containing cargo")
+	state.inventory.clear()
+	var small:Dictionary=state.preparation.filter(func(e):return e.kind=="small_backpack")[0]
+	check(state.place({"source":"preparation","id":small.id,"rotated":false},"backpack",Vector2i.ZERO) and state.bag_size()==Vector2i(5,4),"equipping small backpack restores its storage capacity")
 	var identities: Array=state.preparation.map(func(e):return e.id)
 	check(state.sort_container("preparation").is_empty() and state.preparation.all(func(e):return e.id in identities),"sorting warehouse preserves item identities")
 	var materials:=State.new()
@@ -51,7 +52,7 @@ func run()->void:
 		for n in range(materials.EXPANSION_COST[kind]):materials.add_supply(kind,"preparation")
 	check(materials.expand_carriage().is_empty() and materials.material_count("steel_plate")==0 and materials.material_count("bolts")==0 and materials.material_count("tools")==0,"expansion consumes warehouse materials exactly once")
 	var legacy:=State.new();legacy.wide_bag=true;legacy.inventory.append(legacy.make_entry("bolts",Vector2i(5,4),false));legacy.sync_carried_tools()
-	check(legacy.bag_size()==Vector2i(6,5) and not legacy.depart({"heavy":false,"inventory_tools":true},0).is_empty(),"legacy wide cargo remains accessible until reorganized or physical backpack carried")
+	check(legacy.bag_size()==Vector2i(5,4) and legacy.depart({"heavy":false,"inventory_tools":true},0).is_empty(),"departure reflows legacy out-of-bounds positions into the equipped backpack")
 	var saved:=state.save_data().duplicate(true)
 	var loaded:=State.new()
 	check(loaded.load_data(saved,Rail.STATIONS.keys()) and loaded.preparation.size()==4,"warehouse persists in v17 saves")
@@ -71,6 +72,7 @@ func run()->void:
 	await process_frame
 	home.state.Furniture.DEFINITIONS.door.perform(home);await process_frame
 	check(home.screen=="gear", "only the door action opens departure")
+	home.view.toggle_bag();await process_frame
 	var targets:Array=[]
 	for grid in home.grids:targets.append(grid.container)
 	check("preparation" in targets and "bag" in targets and "battery" not in targets and is_instance_valid(home.view.equipment.active),"preparation uses shared grids and equipment instead of a standalone battery slot")
@@ -80,7 +82,7 @@ func run()->void:
 	var tool:Dictionary=home.state.preparation.filter(func(e):return e.kind=="flashlight")[0]
 	var spot:Dictionary=home.state.first_free_placement("flashlight","bag")
 	home.select_cargo("preparation",tool.id);home.selection.rotated=spot.rotated
-	home.pointer_position=bag.get_global_transform_with_canvas()*(Vector2(spot.cell)*44+Vector2(5,5))
+	home.pointer_position=bag.get_global_transform_with_canvas()*(Vector2(spot.cell)*bag.cell_size+Vector2(5,5))
 	bag._drop_data(Vector2.ZERO,home.selection)
 	check(home.screen=="gear" and home.state.carried_tools().light and home.selection.is_empty(),"dropping a warehouse tool into bag stays in preparation UI and refreshes capability")
 	var page: Control=home.view
@@ -108,9 +110,12 @@ func run()->void:
 		await RenderingServer.frame_post_draw
 		before_pixels=root.get_texture().get_image().get_region(Rect2i(Vector2i(bag.global_position),Vector2i(44,44))).get_data()
 	var swapping:=State.new();var wide_tool: Dictionary=swapping.preparation.filter(func(e):return e.kind=="large_backpack")[0]
-	check(swapping.equip_active(wide_tool.id,"preparation").is_empty() and swapping.bag_size()==Vector2i(6,5),"equipped backpack expands capacity")
-	swapping.inventory.append(swapping.make_entry("bolts",Vector2i(5,4),false));var outgoing:Dictionary=swapping.preparation[0];var swap_before:Dictionary=swapping.save_data().duplicate(true)
-	check(not swapping.equip_active(outgoing.id,"preparation").is_empty() and swapping.save_data()==swap_before,"equipment swap that would clip cargo is atomic")
+	check(swapping.place({"source":"preparation","id":wide_tool.id,"rotated":false},"backpack",Vector2i.ZERO) and swapping.bag_size()==Vector2i(6,5),"equipped backpack expands capacity")
+	swapping.inventory.clear()
+	for y in range(5):
+		for x in range(6):swapping.inventory.append(swapping.make_entry("bolts",Vector2i(x,y),false))
+	var outgoing:Dictionary=swapping.preparation.filter(func(e):return e.kind=="small_backpack")[0];var swap_before:Dictionary=swapping.save_data().duplicate(true)
+	check(not swapping.place({"source":"preparation","id":outgoing.id,"rotated":false},"backpack",Vector2i.ZERO) and swapping.save_data()==swap_before,"equipment swap that would clip cargo is atomic")
 	if DisplayServer.get_name()!="headless" and not OS.get_environment("METRO_TEST_RESULTS").is_empty():
 		await process_frame
 		await RenderingServer.frame_post_draw
