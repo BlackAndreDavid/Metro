@@ -9,6 +9,16 @@ extends Resource
 @export var price := 0.0
 @export var category := "none"
 @export var rarity := 0
+const Storage=preload("res://scripts/storage/storage_component.gd")
+var tags: Array[String]=[]
+var storage_component: Resource=Storage.new()
+var storage: Vector2i:
+	get:return storage_component.size
+	set(value):storage_component.size=value
+
+func has_storage() -> bool:
+	return "storage" in tags and storage.x>0 and storage.y>0
+
 var occupancy: Array[Vector2i] = []
 var texture_binding: Dictionary = {}
 var _texture: Texture2D
@@ -43,4 +53,6 @@ static func from_data(data: Dictionary) -> Resource:
 	result.furniture_kind = data.get("furniture_kind","computer" if result.id=="computer" else "")
 	result.category = data.get("category","none")
 	result.rarity = int(data.get("rarity",0))
+	result.tags.assign(data.get("tags",[]))
+	result.storage_component=Storage.from_data(data.get("storage"))
 	return result

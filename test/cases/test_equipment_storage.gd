@@ -19,6 +19,32 @@ func drag(start:Vector2,finish:Vector2)->void:
 func run()->void:
 	root.size=Vector2i(1280,720)
 	var state:=State.new()
+	var legacy_warehouse: Dictionary=state.save_data().duplicate(true)
+	legacy_warehouse.storage_sizes.erase("preparation")
+	legacy_warehouse.preparation.append({"kind":"water","x":7,"y":4,"rotated":false})
+	var restored_warehouse:=State.new()
+	check(restored_warehouse.load_data(legacy_warehouse,state.Rail.STATIONS.keys()) and restored_warehouse.grid_size("preparation")==Vector2i(8,6),"old warehouse capacity without a snapshot survives authored default changes without losing cargo")
+	state=State.new()
+	check(restored_warehouse.load_data(state.save_data(),state.Rail.STATIONS.keys()) and restored_warehouse.grid_size("preparation")==state.Furniture.DEFINITIONS.preparation.storage,"new furniture storage capacities persist independently of later defaults")
+	var restore_storage:=State.new()
+	state=State.new()
+	var Item=load("res://scripts/items/item_definition.gd")
+	state.ITEM_DEFINITIONS.storage_probe=Item.from_data({"id":"storage_probe","name":"储物探针","width":2,"height":2,"tags":["storage"],"storage":{"width":7,"height":6}})
+	state.ITEM_DEFINITIONS.unit_probe=Item.from_data({"id":"unit_probe","name":"单格探针","width":1,"height":1})
+	check(state.add_supply("storage_probe","preparation") and state.bag_size()==Vector2i(5,4),"an unequipped storage-tagged item grants no carried capacity")
+	var custom: Dictionary=state.preparation.filter(func(e):return e.kind=="storage_probe")[0]
+	check(state.place({"source":"preparation","id":custom.id,"rotated":false},"backpack",Vector2i.ZERO) and state.bag_size()==Vector2i(7,6),"any tagged storage item equips using authored capacity without a hard-coded backpack ID")
+	state.inventory.clear()
+	for index in range(21):state.inventory.append(state.make_entry("unit_probe",Vector2i(index%7,index/7),false))
+	check(restore_storage.load_data(state.save_data(),state.Rail.STATIONS.keys()) and restore_storage.bag_size()==Vector2i(7,6) and restore_storage.inventory.size()==21,"custom storage equipment and its cargo survive v20 save round-trip")
+	var custom_before: Dictionary=state.save_data().duplicate(true)
+	var small: Dictionary=state.preparation.filter(func(e):return e.kind=="small_backpack")[0]
+	check(not state.place({"source":"preparation","id":small.id,"rotated":false},"backpack",Vector2i.ZERO) and state.save_data()==custom_before,"a smaller storage item cannot replace equipment when contents exceed capacity")
+	check(state.sort_container("bag").is_empty() and state.inventory.size()==21,"tagged item storage uses shared lossless sorting")
+	check(not state.place({"source":"backpack","id":custom.id,"rotated":false},"preparation",Vector2i(6,0)),"tagged storage equipment must be emptied before removal")
+	var storage_furniture: Resource=state.Furniture.DEFINITIONS.preparation
+	check(storage_furniture.storage_component.get_script()==state.ITEM_DEFINITIONS.storage_probe.storage_component.get_script() and storage_furniture.storage_component.size==storage_furniture.storage,"furniture and item storage use the same component class")
+	state=State.new()
 	var definition=load("res://scripts/items/item_definition.gd").from_data({"id":"mask_probe","name":"空白占位测试","width":8,"height":8,"cells":[[0,0]]})
 	state.ITEM_DEFINITIONS.mask_probe=definition
 	var empty: Array[Dictionary]=[]
@@ -91,6 +117,12 @@ func run()->void:
 	check(home.state.place({"source":"backpack","id":home.state.backpack_item.id,"rotated":false},"preparation",free.cell),"empty equipped backpack can be returned to warehouse")
 	home.view.refresh_inventory();home.view.set_bag_open(true);await process_frame
 	check(not home.view.bag_open and not home.grids.any(func(g):return g.container=="bag"),"no backpack exposes no storage page beyond equipment positions")
+	home.state.ITEM_DEFINITIONS.storage_ui=Item.from_data({"id":"storage_ui","name":"大容量储物探针","width":1,"height":1,"tags":["storage"],"storage":{"width":16,"height":16},"texture":"res://assets/textures/temp/items/locked_case.png"})
+	check(home.state.add_supply("storage_ui","preparation"),"large-capacity tagged storage can be supplied")
+	var storage_ui: Dictionary=home.state.preparation.filter(func(e):return e.kind=="storage_ui")[0]
+	home.select_cargo("preparation",storage_ui.id);home.move_cargo("backpack",Vector2i.ZERO);await process_frame
+	var large_grid: Control=home.grids.filter(func(g):return g.container=="bag")[0]
+	check(home.view.bag_open and large_grid.size==Vector2(16,16)*uniform and large_grid.get_parent() is ScrollContainer and large_grid.get_parent().size.y<large_grid.size.y,"custom 16x16 storage scrolls within the central page instead of covering its actions")
 	home.show_cabin();var furniture:Control=home.home_backdrop.carriage.get_node("FurnitureSlots/Door");furniture.set_highlighted(true)
 	check(not furniture.caption.z_as_relative and furniture.caption.z_index>home.home_backdrop.carriage.get_node("Rails").z_index,"furniture action captions draw above the rails")
 	if DisplayServer.get_name()!="headless" and not OS.get_environment("METRO_TEST_RESULTS").is_empty():

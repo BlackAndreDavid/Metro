@@ -55,7 +55,7 @@ func toggle_bag() -> void:
 	set_bag_open(not bag_open)
 
 func set_bag_open(value: bool) -> void:
-	if value and controller.state.backpack_item.is_empty():controller.report("请先拖入并装备背包物品。");return
+	if value and controller.state.backpack_item.is_empty():controller.report("请先拖入并装备储物类物品。");return
 	bag_open=value
 	equipment.show()
 	if is_instance_valid(bag_panel):
@@ -65,6 +65,8 @@ func set_bag_open(value: bool) -> void:
 	bag_panel=Panel.new();bag_panel.name="BackpackStorage";bag_panel.position=Vector2(432,188);bag_panel.size=Vector2(342,286);content_panel.add_child(bag_panel)
 	bag_title=controller.label(bag_panel,controller.state.item_name(controller.state.backpack_item.kind),Rect2(12,6,228,28),18)
 	controller.action(bag_panel,"收起",Rect2(270,6,60,28),set_bag_open.bind(false))
-	controller.add_grid(bag_panel,"bag",Vector2(12,44),CELL_PIXELS)
+	var scroll:=ScrollContainer.new();scroll.name="StorageScroll";scroll.position=Vector2(12,44);scroll.size=Vector2(318,190);bag_panel.add_child(scroll)
+	controller.add_grid(scroll,"bag",Vector2.ZERO,CELL_PIXELS)
+	var storage_grid: Control=controller.grids[-1];storage_grid.custom_minimum_size=storage_grid.size
 	var sort_button: Button=controller.action(bag_panel,"一键整理背包",Rect2(12,242,148,36),controller.sort_cargo.bind("bag"));sort_button.name="SortBackpack"
 	var transfer_button: Button=controller.action(bag_panel,"一键转移",Rect2(170,242,160,36),controller.quick_place_selected);transfer_button.name="TransferSelected"

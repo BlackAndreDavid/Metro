@@ -131,6 +131,23 @@ console.log('EDITOR_MODELS_OK');
         result=subprocess.run([node,'-e',source+checks],capture_output=True,text=True)
         self.assertEqual(result.returncode,0,result.stderr);self.assertIn('EDITOR_MODELS_OK',result.stdout)
 
+    def test_shared_storage_schema_and_item_tag_persistence(self):
+        item=copy.deepcopy(editor.catalog('items','items')[0])
+        item.update(id='storage_probe',name='储物探针',tags=['storage'],storage={'width':7,'height':6})
+        saved=editor.save_item(item)
+        self.assertEqual(saved['storage'],{'width':7,'height':6})
+        reloaded=next(v for v in editor.catalog('items','items') if v['id']=='storage_probe')
+        self.assertIn('storage',reloaded['tags'])
+        renamed=editor.save_item({**reloaded,'id':'renamed_storage','_original_id':'storage_probe'})
+        self.assertEqual(renamed['runtime_id'],'storage_probe')
+        self.assertEqual(renamed['storage'],saved['storage'])
+        for dimensions in [None,{}, {'width':0,'height':4},{'width':4,'height':17},{'width':True,'height':4},{'width':2.5,'height':4}]:
+            with self.subTest(dimensions=dimensions),self.assertRaises(ValueError):editor.validate_item({**item,'storage':dimensions})
+        for tags in ['storage',['storage','storage'],[42],[]]:
+            with self.subTest(tags=tags),self.assertRaises(ValueError):editor.validate_item({**item,'tags':tags})
+        plain={**item,'tags':[]};plain.pop('storage');editor.validate_item(plain)
+        for dimensions in [{'width':1,'height':16},{'width':16,'height':1}]:editor.validate_storage(dimensions)
+
     def test_item_enemy_catalogues_and_offset_weighted_buildings(self):
         item=copy.deepcopy(editor.catalog('items','items')[0]);item.update(id='editor_part',name='编辑零件',texture='res://assets/textures/temp/items/scrap_metal.png',price=17.25,width=2,height=1,category='materials',rarity=1)
         editor.validate_item(item);editor.upsert_catalog('items','items',item)
@@ -347,6 +364,8 @@ console.log('EDITOR_MODELS_OK');
         editor.atomic(self.game/'content/customers.json',data)
         custom=copy.deepcopy(editor.catalog('items','items')[0]);custom.update(cells=[[0,0],[1,0]],texture_binding={'x':-.1,'y':0,'width':1.7,'height':.9,'rotation':25},id='editor_part',name='编辑零件',texture='res://assets/textures/temp/items/scrap_metal.png',price=17.25,width=2,height=1,category='materials',rarity=1)
         editor.validate_item(custom);editor.upsert_catalog('items','items',custom)
+        storage={**custom,'id':'editor_storage','name':'编辑储物箱','tags':['storage'],'storage':{'width':7,'height':6}}
+        editor.save_item(storage)
         water=next(i for i in editor.catalog('items','items') if i['id']=='water')
         editor.save_item({**water,'id':'drinking_water','_original_id':'water'})
         editor.save_customer(self.customer());editor.save_level('南京东路',self.level())

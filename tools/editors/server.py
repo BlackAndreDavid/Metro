@@ -181,7 +181,7 @@ def validate_furniture(data):
     if durations is not None:require(isinstance(durations,list) and len(durations)==animation['frames'] and all(number(v,1,60000) for v in durations),'动画帧时长无效')
     storage=data.get('storage')
     if data['id'] in ['locker','preparation']:require(storage is not None,'基地柜子与预备仓库须保留储物功能，避免丢失现有物品')
-    if storage is not None:require(isinstance(storage,dict) and integer(storage.get('width'),1,16) and integer(storage.get('height'),1,16),'储物格尺寸须为1～16')
+    if storage is not None:validate_storage(storage)
     require(isinstance(data.get('effects',[]),list) and all(isinstance(v,str) and 0<len(v)<=80 for v in data.get('effects',[])),'家具效果标签无效')
     definitions={v['id']:v for v in catalog('furniture','furniture')};definitions[data['id']]=data
     require(isinstance(data.get('distance_rules',[]),list),'距离规则无效')
@@ -204,10 +204,17 @@ def validate_furniture(data):
         else:require(integer(placement.get('x'),0,35-data['width']) and integer(placement.get('y'),0,12-data['height']),'默认家具位置超出车厢')
     if 'texture_binding' in data:validate_binding(data)
 
+def validate_storage(storage):
+    require(isinstance(storage,dict) and integer(storage.get('width'),1,16) and integer(storage.get('height'),1,16),'储物格尺寸须为1～16')
+
 def validate_item(data):
     require(isinstance(data,dict) and ID.fullmatch(data.get('id','')) and isinstance(data.get('name'),str) and data['name'],'物品ID或名称无效')
     require(integer(data.get('width'),1,8) and integer(data.get('height'),1,8),'物品占格必须为1～8')
     require(number(data.get('price'),0,1000000) and integer(data.get('rarity'),0,3) and data.get('category') in CATEGORIES|{'none'},'物品价格、稀有度或类别无效')
+    tags=data.get('tags',[])
+    require(isinstance(tags,list) and all(isinstance(tag,str) and ID.fullmatch(tag) for tag in tags) and len(tags)==len(set(tags)),'物品标签须为不重复的有效标识')
+    if 'storage' in tags:validate_storage(data.get('storage'))
+    else:require(data.get('storage') is None,'配置储物空间前须启用储物类标签')
     effect=data.get('active_use',{'action':'none','amount':1})
     require(isinstance(effect,dict) and effect.get('action') in ('none','drink','eat','heal') and number(effect.get('amount',1),1,100),'主动使用效果无效')
     if 'cells' in data:

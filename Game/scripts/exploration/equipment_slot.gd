@@ -4,7 +4,7 @@ func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and not event.pressed and (host.selection.is_empty() or container=="backpack"):
 		if container=="backpack":
 			var selected: Dictionary={} if host.selection.is_empty() else host.state.picked(host.selection.source,host.selection.id)
-			if selected.is_empty() or not host.state.Equipment.BACKPACKS.has(selected.kind):host.toggle_equipped_bag();accept_event();return
+			if selected.is_empty() or not host.state.Equipment.is_storage(selected.kind,host.state.ITEM_DEFINITIONS):host.toggle_equipped_bag();accept_event();return
 		if container=="active" and host.screen=="surface" and not host.view.pack_open:
 			host.use_active_item();accept_event();return
 	super._gui_input(event)
@@ -13,7 +13,7 @@ func _get_tooltip(at: Vector2) -> String:
 	if container=="backpack":
 		var entry:Dictionary=host.state.backpack_item
 		var title: String="未装备背包" if entry.is_empty() else host.state.item_name(entry.kind)+" · %d×%d" % [host.state.bag_size().x,host.state.bag_size().y]
-		return title+"\n拖入背包物品装备；点击展开储物页，拖出可卸下（需先清空）。"
+		return title+"\n拖入储物类物品装备；点击展开储物页，拖出可卸下（需先清空）。"
 	return super._get_tooltip(at)
 
 func _get_drag_data(_at: Vector2) -> Variant:

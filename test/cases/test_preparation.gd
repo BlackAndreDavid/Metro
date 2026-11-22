@@ -25,7 +25,7 @@ func cargo_point(grid: Control,entry: Dictionary)->Vector2:
 	return grid.global_position+(Vector2(entry.x,entry.y)+Vector2(.5,.5))*grid.cell_size
 func run()->void:
 	var state:=State.new()
-	check(state.grid_size("preparation")==Vector2i(8,6) and state.preparation.size()==4,"separate 8x6 warehouse has four physical starter tools")
+	check(state.grid_size("preparation")==state.Furniture.DEFINITIONS.preparation.storage and state.preparation.size()==4,"warehouse honors authored capacity and contains four physical starter tools")
 	check(not state.carried_tools().light and not state.carried_tools().wide,"stored tools grant no carried capability")
 	var lamp:Dictionary=state.preparation.filter(func(e):return e.kind=="flashlight")[0]
 	check(state.auto_place({"source":"preparation","id":lamp.id,"rotated":false},"bag").is_empty() and state.carried_tools().light,"warehouse to bag grants flashlight capability")
@@ -48,6 +48,7 @@ func run()->void:
 	var identities: Array=state.preparation.map(func(e):return e.id)
 	check(state.sort_container("preparation").is_empty() and state.preparation.all(func(e):return e.id in identities),"sorting warehouse preserves item identities")
 	var materials:=State.new()
+	materials.resize_furniture_storage("preparation",Vector2i(8,6))
 	for kind in materials.EXPANSION_COST:
 		for n in range(materials.EXPANSION_COST[kind]):materials.add_supply(kind,"preparation")
 	check(materials.expand_carriage().is_empty() and materials.material_count("steel_plate")==0 and materials.material_count("bolts")==0 and materials.material_count("tools")==0,"expansion consumes warehouse materials exactly once")

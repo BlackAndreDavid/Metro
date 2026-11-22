@@ -44,7 +44,11 @@ func cell_state(at: Vector2i) -> int:
 	return int(occupancy_grid[at.y][at.x])
 var hanging_anchor := Vector2(.5,.5)
 var reference_cells: Array[Vector2i] = []
-var storage := Vector2i.ZERO
+const Storage=preload("res://scripts/storage/storage_component.gd")
+var storage_component: Resource=Storage.new()
+var storage: Vector2i:
+	get:return storage_component.size
+	set(value):storage_component.size=value
 var item_id := ""
 var effects: Array = []
 var build_cost: Dictionary = {}
@@ -103,8 +107,7 @@ static func from_data(data: Dictionary) -> Resource:
 			for entry in [["wall_cells",2],["floor_cells",1]]:
 				for cell in data.get(entry[0],[]):result.occupancy_grid[int(cell[1])][int(cell[0])]=entry[1]
 	for cell in data.get("reference_cells",[]):result.reference_cells.append(Vector2i(cell[0],cell[1]))
-	var container: Variant=data.get("storage")
-	if container is Dictionary:result.storage=Vector2i(int(container.width),int(container.height))
+	result.storage_component=Storage.from_data(data.get("storage"))
 	result.item_id=data.get("item_id","");result.effects=data.get("effects",[]).duplicate()
 	result.required_technology=data.get("required_technology",{}).duplicate();result.known=data.get("known",true)
 	result.build_cost=data.get("build_cost",{}).duplicate();result.dismantle_cost=data.get("dismantle_cost",{}).duplicate();result.salvage=data.get("salvage",{}).duplicate()

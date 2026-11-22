@@ -144,6 +144,12 @@ func run() -> void:
 	check(street.building_instances.has(building.id) and is_equal_approx(street.door_x(building),building.x+27),"building instances encapsulate shared geometry")
 	home.queue_free()
 	await process_frame
+	var storage_state:=State.new()
+	var reload_state:=State.new()
+	check(storage_state.add_supply("editor_storage","preparation"),"editor-authored storage item spawns")
+	var storage_entry: Dictionary=storage_state.preparation.filter(func(e):return e.kind=="editor_storage")[0]
+	check(storage_state.place({"source":"preparation","id":storage_entry.id,"rotated":false},"backpack",Vector2i.ZERO) and storage_state.bag_size()==Vector2i(7,6),"editor-authored storage tag and capacity drive equipment at runtime")
+	check(reload_state.load_data(storage_state.save_data(),Rail.STATIONS.keys()) and reload_state.backpack_item.kind=="editor_storage" and reload_state.bag_size()==Vector2i(7,6),"editor storage capacity persists through runtime save loading")
 	print("CONTENT_RUNTIME: %d checks, %d failures" % [checks,failures])
 	if failures == 0: print("CONTENT_RUNTIME_OK")
 	quit(1 if failures else 0)

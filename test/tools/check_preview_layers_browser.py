@@ -23,6 +23,10 @@ with tempfile.TemporaryDirectory(prefix='metro-catalog-browser-') as scratch:
    page.uncheck('#previewShowCells');assert pixel(146,48)==[255,0,0],pixel(146,48)
    assert page.evaluate('JSON.stringify(C.data)')==before and not page.evaluate('EditorSession.hasChanges()')
    page.check('#previewShowCells')
+   page.check('#itemStorageTag');storage=page.locator('#itemStorageTag').locator('xpath=../..');storage.locator('input[data-field=width]').fill('7');storage.locator('input[data-field=height]').fill('6');page.click('#saveAll');page.wait_for_function('!EditorSession.hasChanges()&&!EditorSession.busy')
+   authored=next(v for v in json.loads((game/'content/items.json').read_text())['items'] if v['id']=='preview_probe');assert authored['tags']==['storage'] and authored['storage']=={'width':7,'height':6}
+   page.locator('#catalogForm').screenshot(path=str(OUTPUT/'item-storage-tag.png'))
+   page.uncheck('#itemStorageTag');page.click('#saveAll');page.wait_for_function('!EditorSession.hasChanges()&&!EditorSession.busy');authored=next(v for v in json.loads((game/'content/items.json').read_text())['items'] if v['id']=='preview_probe');assert 'storage' not in authored.get('tags',[]) and 'storage' not in authored
    furniture={'id':'preview_furniture','name':'家具预览探针','width':2,'height':2,'texture':texture,'animation':{'frames':1,'columns':1,'fps':6},'floor_cells':[[0,0],[1,0],[0,1],[1,1]],'wall_cells':[],'placement_type':'floor','interaction':'none','function_text':'查看','default_owned':False,'default_placement':None,'storage':None,'item_id':'','distance_rules':[],'effects':[],'texture_binding':item['texture_binding']}
    page.evaluate("async data=>{await api('/api/furniture',data);S.project=await api('/api/project')}",furniture)
    page.click('#furnitureTab');page.locator('#catalogCards [data-catalog-id=preview_furniture]').click();page.wait_for_function('imageFor(C.data.texture)?.complete');page.evaluate('drawCatalogPreview()');before=page.evaluate('JSON.stringify(C.data)')
@@ -38,6 +42,6 @@ with tempfile.TemporaryDirectory(prefix='metro-catalog-browser-') as scratch:
    page.uncheck('#previewShowCollision');assert pixel(251,150)==[255,0,0],pixel(251,150)
    assert page.evaluate('JSON.stringify(C.data)')==before and not page.evaluate('EditorSession.hasChanges()')
    assert not errors,errors
-   print('PREVIEW_LAYERS_OK: item/furniture grids and building collision render above textures, toggles restore texture pixels without changing authored data')
+   print('PREVIEW_LAYERS_OK: storage tags and capacities persist, item/furniture grids and building collision render above textures, toggles restore texture pixels without changing authored data')
    browser.close()
  finally:server.terminate();server.wait(timeout=5)

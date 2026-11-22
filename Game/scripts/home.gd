@@ -815,7 +815,7 @@ func update_surface_pack(walking: bool) -> void:
 		var bag_grids:=grids.filter(func(grid):return is_instance_valid(grid) and grid.container=="bag")
 		if (not state.backpack_item.is_empty())==not bag_grids.is_empty():
 			for grid in grids:
-				if is_instance_valid(grid):grid.size=Vector2(state.grid_size(grid.container)*grid.cell_size);grid.queue_redraw()
+				if is_instance_valid(grid):grid.size=Vector2(state.grid_size(grid.container)*grid.cell_size);grid.custom_minimum_size=grid.size;grid.queue_redraw()
 			if surface_pack.has_node("BackpackTitle"):surface_pack.get_node("BackpackTitle").text=cargo_title("bag")
 			if view.has_method("refresh_active"):view.refresh_active()
 			return
@@ -829,7 +829,10 @@ func update_surface_pack(walking: bool) -> void:
 	var sidebar := plate(parent, bounds, DARK, BORDER)
 	surface_pack = sidebar
 	var bag_title:=label(sidebar, cargo_title("bag"), Rect2(24,17,354,33),22);bag_title.name="BackpackTitle"
-	if not state.backpack_item.is_empty():add_grid(sidebar, "bag", Vector2(24,60),48)
+	if not state.backpack_item.is_empty():
+		var scroll:=ScrollContainer.new();scroll.name="StorageScroll";scroll.position=Vector2(24,60);scroll.size=Vector2(356,250);sidebar.add_child(scroll)
+		add_grid(scroll,"bag",Vector2.ZERO,48)
+		grids[-1].custom_minimum_size=grids[-1].size
 	else:label(sidebar,"未装备背包 · 仅可使用装备格",Rect2(24,60,354,60),17,MUTED)
 	if view.has_node("LoadoutBar") and is_instance_valid(view.get_node("LoadoutBar").battery_grid):grids.append(view.get_node("LoadoutBar").battery_grid)
 	plate(sidebar,Rect2(24,317,356,1),BORDER)
